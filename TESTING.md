@@ -74,3 +74,10 @@ counts, scope, fractional progress and bounded numeric timing fields. These
 focused tests use controlled source, native and clock fixtures; they do not
 claim a timed-out model on another PC is repaired until that PC uses the current
 helper and is checked again.
+
+After publication, the unchanged 1.34.0 installation ZIP was used as the actual
+starting installation for a live anonymous GitHub update to 1.34.1. Its original
+helper verified and installed the new release through the detached runner. A
+fresh helper confirmed 1.34.1; all 123 installed file hashes matched the signed
+release and cache/personal-file sentinels were retained. No browser registration
+or personal installation was changed by this isolated test.
