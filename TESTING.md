@@ -100,3 +100,10 @@ node tests/test-fox-hide-seek.cjs
 The existing six real-extension popup groups separately verify the new notice's
 scroll/focus behavior and retained check/install/progress/reload workflow. Native
 responses and runtime.reload remain explicit fixtures in that browser test.
+
+After publication, a separate unchanged 1.34.1 release installation downloaded
+and installed 1.35.0 from the public GitHub release through its real native
+helper and detached runner. All 124 installed files matched the signed manifest;
+cache and personal-file sentinels were retained, and a fresh check reported the
+new current version. The user's own registered installation and Desktop copy
+remained on their unchanged 1.34.1 files for explicit popup adoption.
