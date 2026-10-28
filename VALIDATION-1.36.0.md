@@ -1,7 +1,9 @@
 # Version 1.36.0 validation
 
-Local review build only. No release publication or live installation replacement.
-Helper 1.19.0 and all browser permissions remain unchanged.
+Reviewed locally, then published after the user's explicit push instruction.
+Helper 1.19.0 and all browser permissions remain unchanged. No registered live
+installation or Desktop application folder was replaced during development or
+publication.
 
 ## Update discovery and refresh
 
@@ -55,6 +57,20 @@ Helper 1.19.0 and all browser permissions remain unchanged.
   was replaced with the local signed assets. This is not a live GitHub test.
 - Frozen registered and Desktop installations matched their managed baselines
   before and after packaging. Their files were not copied over or installed.
+
+## Published-release verification
+
+- Published `v1.36.0` at source commit `e9681db`, with all four expected signed
+  release assets. The release is public, stable and marked latest.
+- The real anonymous GitHub/native-host update test upgraded the exact previous
+  `1.35.3` release in an isolated temporary installation. It downloaded and
+  verified the public signature and archive, completed the detached transaction,
+  checked all 132 managed files, retained existing model/course/voice cache
+  sentinels and unrelated personal notes, and then reported current on a second
+  live check. No setup or model job was started.
+- This live transport/transaction test and the separate real Brave lifecycle
+  test cover different boundaries; the live test does not register a browser
+  native host or update the user's installed application.
 
 Automatic discovery is activity-driven with a one-hour attempt cooldown, not a
 promise of instant notifications while Brave is idle/closed. Pinning the icon
