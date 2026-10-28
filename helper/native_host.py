@@ -19,13 +19,15 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import support_events
+
 # Limit BLAS/OpenMP before their DLLs are loaded by any worker. The speech
 # supervisor is a separate process with its own resource policy.
 from process_resources import worker_threads
 for _thread_variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_thread_variable] = str(worker_threads())
 
-HOST_VERSION = "1.16.0"
+HOST_VERSION = "1.19.0"
 MAX_INPUT = 16 * 1024 * 1024
 MAX_RESULT = 8 * 1024 * 1024
 CACHE_ROOT = Path(os.environ.get("IKNOW_READER_CACHE", str(Path(os.environ.get("LOCALAPPDATA", Path.home())) / "iKnowLesehilfe"))).resolve()
@@ -119,6 +121,21 @@ def source_signature(source, features=None):
     return hashlib.sha256(encoded).hexdigest()
 
 
+def word_reply(message, component):
+    """Capture speech outcomes/timings without the requested word or audio."""
+    journal = support_events.Recorder(CACHE_ROOT, component, requestKey=support_events.correlation(message.get("requestId")),
+        courseId=message.get("courseId"), voice=message.get("voice"), playbackSpeed=message.get("speed"))
+    began = time.monotonic()
+    journal.record("word_requested", status="running")
+    def reply(value):
+        if isinstance(value, dict):
+            journal.record("word_ready" if value.get("ok") else "word_failed",
+                status="complete" if value.get("ok") else "error", code=value.get("code"), cached=value.get("cached"),
+                durationMs=max(0, round((time.monotonic() - began) * 1000)))
+        send(value)
+    return reply
+
+
 class FileLock:
     def __init__(self, path):
         self.path, self.file = path, None
@@ -174,6 +191,14 @@ class Job:
         self.last = {"type": "progress", "courseId": identifier, "status": "running", "stage": "model", "completed": 0, "total": 0, "message": "Starting preparation …"}
         self.owns_lock = False
         self.engine_meta = {}
+        self.started_at = int(time.time() * 1000)
+        self.started_monotonic = time.monotonic()
+        self.last_progress_at = self.started_at
+        self.last_journal_at = 0
+        self.last_journal_stage = None
+        self.last_journal_completed = 0
+        self.journal = support_events.Recorder(CACHE_ROOT, "preparation", courseId=identifier,
+            jobKey=support_events.correlation(self.token), requestKey=support_events.correlation(request_id), features=self.features)
         self.thread = threading.Thread(target=self.run, name=f"course-{identifier}", daemon=True)
 
     def envelope(self, data):
@@ -189,6 +214,8 @@ class Job:
         if data.get("type") == "partial":
             self.result(data["pack"], interim=True)
             return
+        if data.get("type") == "heartbeat":
+            data = {**self.last, "message": data.get("message", self.last.get("message", ""))}
         for key in ("cached", "partial", "audioExcluded", "translationExcluded", "wordExcluded", "colorsExcluded"):
             if key in data and isinstance(data[key], (int, bool)):
                 self.engine_meta[key] = data[key]
@@ -202,10 +229,23 @@ class Job:
         total = total if isinstance(total, (int, float)) and not isinstance(total, bool) and total >= completed else 0
         output = {"type": "progress", "status": "running", "stage": stage, "completed": completed, "total": total,
                   "message": str(data.get("message", ""))[:500]}
+        now = int(time.time() * 1000)
+        if stage != self.last.get("stage") or completed != self.last.get("completed"):
+            self.last_progress_at = now
         self.last = self.envelope(output)
         if persist and self.owns_lock:
-            atomic_json(self.state_path, {**self.last, "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
+            atomic_json(self.state_path, {**self.last, **self.support_state(), "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
+        if stage != self.last_journal_stage or completed - self.last_journal_completed >= 5 or now - self.last_journal_at >= 10000:
+            self.journal.record("phase_changed" if stage != self.last_journal_stage else "progress", stage=stage,
+                status="running", completed=completed, total=total, lastProgressAt=self.last_progress_at,
+                durationMs=max(0, round((time.monotonic() - self.started_monotonic) * 1000)))
+            self.last_journal_at, self.last_journal_stage, self.last_journal_completed = now, stage, completed
         send(self.last)
+
+    def support_state(self):
+        return {"startedAt": self.started_at, "lastProgressAt": self.last_progress_at,
+                "durationMs": max(0, round((time.monotonic() - self.started_monotonic) * 1000)),
+                "jobKey": self.journal.context.get("jobKey"), "requestKey": self.journal.context.get("requestKey")}
 
     def cancel_requested(self):
         if not self.cancel_path.exists():
@@ -239,6 +279,8 @@ class Job:
                    "audioAccepted": len(audio), "audioExcluded": max(0, sentences - len(audio)) if self.features["audio"] else 0,
                    "groupsExcluded": max(0, sentences - colors) if self.features["colors"] else 0}
         metadata = {**self.engine_meta, "interim": interim}
+        self.journal.record("checkpoint_sent" if interim else "result_sent", stage=self.last.get("stage", "model"),
+                            interim=interim, **summary)
         # Keep each native-message frame well below Chromium's 1 MiB limit.
         if byte_count < 850_000:
             send(self.envelope({"type": "result", "pack": pack, "summary": summary, **metadata}))
@@ -254,6 +296,7 @@ class Job:
         lock = FileLock(JOBS_ROOT / f"{self.identifier}.lock")
         worker_lock = FileLock(JOBS_ROOT / "worker.lock")
         try:
+            self.journal.record("job_started", status="running", startedAt=self.started_at, workerThreads=worker_threads())
             self.emit({"stage": "model", "message": "Starting preparation …"}, persist=False)
             last_observed = None
             while not lock.acquire():
@@ -284,8 +327,12 @@ class Job:
                 raise InterruptedError("Preparation paused.")
             atomic_json(self.result_path, pack)
             self.result(pack)
-            self.last = self.envelope({"type": "progress", "status": "complete", "stage": "done", "completed": 1, "total": 1, "message": "Preparation saved.", **self.engine_meta})
-            atomic_json(self.state_path, {**self.last, "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
+            total = pack.get("course", {}).get("sentenceCount", 0)
+            total = total if type(total) is int and total >= 0 else 0
+            self.last = self.envelope({"type": "progress", "status": "complete", "stage": "done", "completed": total, "total": total, "message": "Preparation saved.", **self.engine_meta})
+            self.journal.record("job_completed", status="complete", stage="done", completed=total, total=total,
+                                **self.support_state(), **self.engine_meta)
+            atomic_json(self.state_path, {**self.last, **self.support_state(), "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
             send(self.last)
         except InterruptedError as error:
             checkpoint = getattr(error, "pack", None)
@@ -300,15 +347,32 @@ class Job:
             message = str(error) if reason == "network_unavailable" else "Preparation paused. Completed results are kept."
             self.last = self.envelope({"type": "progress", "status": "cancelled", "stage": self.last.get("stage", "model"), "completed": self.last.get("completed", 0), "total": self.last.get("total", 0), "message": message,
                                        **({"code": reason} if reason == "network_unavailable" else {})})
+            self.journal.record("job_cancelled", status="cancelled", stage=self.last.get("stage", "model"),
+                completed=self.last.get("completed", 0), total=self.last.get("total", 0),
+                reason=reason if reason == "network_unavailable" else "requested", **self.support_state())
             if self.owns_lock:
-                atomic_json(self.state_path, {**self.last, "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
+                atomic_json(self.state_path, {**self.last, **self.support_state(), "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
             if not stopping.is_set():
                 send(self.last)
         except Exception as error:
+            checkpoint = getattr(error, "pack", None)
+            if checkpoint and not stopping.is_set():
+                try:
+                    self.result(checkpoint, interim=True)
+                except (InterruptedError, OSError, ValueError):
+                    pass  # A disconnected browser can restore disk checkpoints.
             message = str(error)[:500] or "Local preparation failed."
-            self.last = self.envelope({"type": "error", "status": "error", "code": "preparation_failed", "message": message})
+            code = getattr(error, "code", "preparation_failed")
+            if not isinstance(code, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,79}", code):
+                code = "preparation_failed"
+            self.last = self.envelope({"type": "error", "status": "error", "code": code, "message": message,
+                                       "stage": self.last.get("stage", "model"), "completed": self.last.get("completed", 0), "total": self.last.get("total", 0)})
+            failure = support_events.exception_info(error)
+            self.journal.record("job_failed", status="error", code=code, stage=self.last.get("stage", "model"),
+                completed=self.last.get("completed", 0), total=self.last.get("total", 0), failure=failure, **self.support_state())
             if self.owns_lock:
-                atomic_json(self.state_path, {**self.last, "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
+                atomic_json(self.state_path, {**self.last, **self.support_state(), "failure": failure,
+                    "sourceDigest": self.signature, "jobToken": self.token, "updatedAt": time.time()})
             if not stopping.is_set():
                 send(self.last)
         finally:
@@ -332,7 +396,7 @@ def handle(message):
     if kind == "diagnostics":
         import diagnostics
         send({"type": "diagnostics-result", "requestId": request_id, "ok": True,
-              "report": diagnostics.collect(CACHE_ROOT, HOST_VERSION)})
+              "report": diagnostics.collect(CACHE_ROOT, HOST_VERSION, active_checks=message.get("extended") is True)})
         return
     if kind in {"update:check", "update:status", "update:install"}:
         import updater
@@ -370,7 +434,7 @@ def handle(message):
         if kind == "word-neural-status":
             send({"type": "word-neural-status-result", "requestId": request_id, **neural_speech.status(CACHE_ROOT)})
         else:
-            neural_speech.enqueue(message, CACHE_ROOT, send, stopping)
+            neural_speech.enqueue(message, CACHE_ROOT, word_reply(message, "word_audio"), stopping)
         return
     if kind in {"word-speech", "word-speech-status"}:
         import word_speech
@@ -378,7 +442,7 @@ def handle(message):
             send({"type": "word-speech-status-result", "requestId": request_id, "ok": True,
                   "ready": word_speech.installed(), "voice": word_speech.VOICE, "voiceVersion": word_speech.VERSION})
         else:
-            word_speech.enqueue(message, CACHE_ROOT, send, stopping)
+            word_speech.enqueue(message, CACHE_ROOT, word_reply(message, "word_audio"), stopping)
         return
     identifier = course_id(message.get("courseId"))
     if kind not in {"prepare", "status", "cancel"}:
@@ -485,6 +549,7 @@ def main():
                 break
             size = struct.unpack("<I", header)[0]
             if not 0 < size <= MAX_INPUT:
+                support_events.append(CACHE_ROOT, "native", "protocol_error", code="invalid_size", status="error")
                 send({"type": "error", "code": "invalid_size", "message": "Message is too large or empty."})
                 break
             payload = read_exact(sys.stdin.buffer, size)
@@ -499,9 +564,10 @@ def main():
                     warm_dependencies()
                 handle(message)
             except (ValueError, TypeError, UnicodeError) as error:
+                support_events.Recorder(CACHE_ROOT, "native").error("protocol_error", error, code="invalid_request", status="error")
                 send({"type": "error", "code": "invalid_request", "message": str(error)[:200]})
-    except (BrokenPipeError, OSError, InterruptedError, ValueError):
-        pass
+    except (BrokenPipeError, OSError, InterruptedError, ValueError) as error:
+        support_events.Recorder(CACHE_ROOT, "native").error("connection_closed", error, status="interrupted")
     finally:
         stopping.set()
         for job in list(jobs.values()):

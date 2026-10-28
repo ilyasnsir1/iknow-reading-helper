@@ -1,6 +1,12 @@
-# iKnow! Reading Helper · 1.35.0
+# iKnow! Reading Helper · 1.35.3
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.35.3 removes PowerShell from update signature verification and diagnostic exports. The helper calls Windows CNG directly with the same pinned RSA/SHA-256 publisher key and rejects modified releases. This removes the encoded-command subprocess blocked by some endpoint security products. It includes the preparation and complete diagnostic improvements described below. Helper 1.19.0 is included; no model download is required. An older installation whose verifier is already blocked requires a one-time reviewed recovery at its existing folder before it can adopt the fix.
+
+Version 1.35.2 makes Export diagnostics a single support bundle. It includes persistent browser/helper event history, job correlations and timings, installation/registration consistency, bounded file integrity and resource checks, and integrated Windows signature verification. Missing helpers retain a browser-only export and marked last-known helper evidence. No report is uploaded. Helper 1.18.0 is included; existing models remain compatible. History starts after adopting this version.
+
+Version 1.35.1 improves local preparation and update verification. Model requests bypass system proxies, allow longer bounded CPU inference, and remain cancellable. A shared model failure interrupts the queue at the affected course; Resume reuses saved additions. Helper 1.17.0 retains error phases and real sentence counts in diagnostics. Windows CNG verifies the same publisher signatures without legacy CSP key containers; verification errors now distinguish a signature mismatch from Windows runtime failures. Existing models and caches remain compatible.
 
 Version 1.35.0 adds the original pixel fox to the update notice. It peeks from different places behind the banner and ducks away when the mouse catches it. Clicking the notice scrolls smoothly to Updates and focuses the section. Reduced motion keeps a static fox; hidden popups and off-screen notices stop the scene. Install this release through the popup updater, then reopen the popup and refresh iKnow pages. No model setup is required.
 

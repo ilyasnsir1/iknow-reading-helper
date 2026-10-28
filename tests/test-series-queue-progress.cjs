@@ -94,6 +94,28 @@ const progress=(stage,completed,total=196)=>({type:"progress",status:"running",s
   await f.command({type:"ikr:queue:resume"});await f.settle();q=await f.status();assert.equal(q.status,"running");assert.equal(q.currentIndex,0);assert.equal(q.progressFraction,2/3);assert.equal(q.courses[0].stageProgress.language.completed,0);
   pass("Single-module queues estimate that module alone; failed courses remain distinct from saved courses while processed-work progress still reaches its terminal state");
 
+  for (const code of ["model_not_installed", "model_start_failed", "model_start_timeout", "model_request_timeout", "model_connection_failed"]) {
+    for (const type of ["error", "progress"]) {
+      f=await fixture({courses:2,count:3});q=await f.start({german:true});
+      q=await f.emit({type:"result",interim:true,pack:packFor(f.sourceMap["566924"],1,0)});
+      q=await f.emit(progress("language",1,3));
+      const checkpoint=q.progressFraction, original=f.requests.find(value=>value.type==="prepare");
+      q=await f.emit({type,status:"error",code,stage:"language",completed:1,total:3,message:"The local language model needs another attempt. Completed additions are kept."});
+      assert.equal(q.status,"error");assert.equal(q.currentIndex,0);assert.equal(q.courses[0].status,"pending");
+      assert.equal(q.courses[0].code,code);assert.equal(q.progressFraction,checkpoint);assert.ok(q.error.includes("Completed additions are kept"));
+      assert.equal(f.requests.filter(value=>value.type==="prepare").length,1,"A shared service failure must not cascade into the next course");
+      assert.equal(Object.keys(f.data.iknowReaderCoursePacks["566924"].germanItems).length,1);
+      await f.command({type:"ikr:queue:resume"});await f.settle();q=await f.status();
+      const resumed=f.requests.filter(value=>value.type==="prepare").at(-1);
+      assert.equal(q.status,"running");assert.equal(q.currentIndex,0);assert.equal(resumed.courseId,original.courseId);assert.notEqual(resumed.requestId,original.requestId);assert.equal(q.progressFraction,checkpoint);
+      q=await f.emit({type:"result",pack:packFor(f.sourceMap["566924"])},1000,original);
+      assert.equal(q.currentIndex,0,"Late failed-request data must not finish a resumed request");
+      q=await f.emit({type:"result",pack:packFor(f.sourceMap["566924"])},1000,resumed);
+      assert.equal(q.currentIndex,1);assert.equal(q.completedCourses,1);
+    }
+  }
+  pass("Shared model failures interrupt both native error protocols at the current course, preserve validated checkpoints and progress, and require explicit resume without accepting stale results");
+
   f=await fixture({courses:2,count:3,audio:false});q=await f.start({audio:true});
   // No sentence has an audio asset, so no audio work remains; the validated
   // course still passes through final preparation rather than inventing a rate.

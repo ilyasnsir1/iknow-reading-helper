@@ -1,10 +1,11 @@
 /* Local preparation bridge. Executable code and models never come from a course pack. */
 "use strict";
-importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js");
+importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostic-history.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js");
 
 const AutoCore = globalThis.IKnowReaderCore;
 const AutoPacks = globalThis.IKnowReaderPacks;
 const HOST = "de.iknow.lesehilfe";
+const MODEL_SERVICE_FAILURES = new Set(["model_not_installed", "model_start_failed", "model_start_timeout", "model_request_timeout", "model_connection_failed"]);
 const states = new Map();
 const clients = new Set();
 const transfers = new Map();
@@ -48,6 +49,7 @@ function publish(id, values) {
   const state = { ...(states.get(id) || {}), courseId: id, ...values, updatedAt: Date.now() };
   state.features = features(state.features);
   states.set(id, state);
+  globalThis.IKnowReaderDiagnosticHistory?.state(state);
   if (values.status === "error") globalThis.IKnowReaderDiagnostics?.record("course-preparation", state.code || "preparation_failed", id);
   for (const client of clients) if (client.courseId === id) {
     try { client.port.postMessage({ type: "state", state: publicState(state) }); } catch { /* A closed tab is removed on disconnect. */ }
@@ -110,6 +112,7 @@ function connectNative() {
       const interim = message?.interim === true || transfer?.interim === true;
       try { await receiveNative(message); }
       catch (error) {
+        globalThis.IKnowReaderDiagnosticHistory?.exception("course-preparation", error, { courseId: courseId(message?.courseId), code: "native_result_rejected" });
         const id = courseId(message?.courseId);
         const state = states.get(id);
         if (message?.transferId) {
@@ -137,6 +140,7 @@ function connectNative() {
   port.onDisconnect.addListener(() => {
     if (nativePort !== port) return;
     const reason = chrome.runtime.lastError?.message || "Native helper disconnected";
+    globalThis.IKnowReaderDiagnosticHistory?.record("helper-connection", "disconnected", { code: "helper_disconnected", message: reason }, true);
     nativePort = null; nativeStopping.clear(); clearTimeout(nativeIdleTimer); nativeIdleTimer = null;
     transfers.clear(); discardedTransfers.clear();
     disconnectError(reason);
@@ -263,18 +267,19 @@ async function receiveNative(message) {
       stage: String(message.stage || "language").slice(0, 32),
       completed: Number.isFinite(message.completed) ? Math.max(0, message.completed) : 0,
       total: Number.isFinite(message.total) ? Math.max(0, message.total) : 0,
-      message: typeof message.message === "string" ? message.message.slice(0, 500) : "", code: status === "cancelled" && message.code === "network_unavailable" ? "network_unavailable" : "" });
+      message: typeof message.message === "string" ? message.message.slice(0, 500) : "", code: status === "error" ? String(message.code || "preparation_failed").slice(0, 100) : status === "cancelled" && message.code === "network_unavailable" ? "network_unavailable" : "" });
     await updateQueueFromState(id);
     if (status === "cancelled") {
       if (seriesQueue?.status === "running" && seriesQueue.courses[seriesQueue.currentIndex]?.id === id && current.fromQueue) await pauseQueue(message.code === "network_unavailable" ? states.get(id).message : undefined);
       void pumpAutos();
     } else if (status === "error") {
-      await failQueueCourse(id, states.get(id).message); void pumpAutos();
+      await handleQueueFailure(id); void pumpAutos();
     }
   } else if (message.type === "result") await saveResult(id, message.pack, { expected: current.expected, requestId: current.requestId, summary: message.summary, interim: message.interim === true || current.status === "cancelled" });
   else if (message.type === "error") {
     publish(id, { status: "error", code: String(message.code || "preparation_failed").slice(0, 100), message: String(message.message || "Preparation could not be completed.").slice(0, 500) });
-    await failQueueCourse(id, states.get(id).message);
+    await updateQueueFromState(id);
+    await handleQueueFailure(id);
     void pumpAutos();
   }
   else if (message.type === "result-start") {
@@ -338,6 +343,15 @@ async function command(message, sender) {
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const type = String(message?.type || "");
+  if (type === "ikr:diagnostics:page-error") {
+    const url = sender?.url || sender?.tab?.url || "", id = AutoCore.courseIdFromUrl(url), seriesId = AutoCore.courseListIdFromUrl(url);
+    if (sender?.id !== chrome.runtime.id || !(ownPage(sender) || id || seriesId)) { respond({ ok: false }); return; }
+    globalThis.IKnowReaderDiagnosticHistory?.record("extension-page", "exception", {
+      courseId: id, seriesId, errorType: message.errorType, frames: message.frames,
+      code: "uncaught_project_error", message: "An extension-owned script raised an unhandled error. See the project frames."
+    }, true);
+    respond({ ok: true }); return;
+  }
   if (type === "ikr:diagnostics:export") {
     let allowed = false;
     try { allowed = ownPage(sender) && new URL(sender.url).pathname === "/diagnostics.html"; } catch { /* Invalid sender URL. */ }
@@ -381,6 +395,7 @@ function startNative(id, source, mask, force = false, fromQueue = false) {
 }
 function publicQueue() { return seriesQueue ? structuredClone(seriesQueue) : null; }
 function persistQueue() {
+  globalThis.IKnowReaderDiagnosticHistory?.queue(seriesQueue);
   if (!seriesQueue) return Promise.resolve();
   seriesQueue.updatedAt = Date.now();
   const snapshot = publicQueue();
@@ -500,6 +515,16 @@ async function failQueueCourse(id, message) {
   seriesQueue.courses[seriesQueue.currentIndex].error = String(message).slice(0, 300);
   Object.assign(seriesQueue.courses[seriesQueue.currentIndex], { code: states.get(id)?.code || "preparation_failed", updatedAt: Date.now() });
   seriesQueue.currentIndex++; recalculateQueue(); await persistQueue(); void pumpQueue();
+}
+async function handleQueueFailure(id) {
+  const state = states.get(id);
+  if (MODEL_SERVICE_FAILURES.has(state?.code) && state?.fromQueue && seriesQueue?.status === "running" && seriesQueue.courses[seriesQueue.currentIndex]?.id === id) {
+    // A failed shared model is not a defect in every remaining course. Keep
+    // this course and its checkpoint in place for an explicit resume.
+    await pauseQueue(state.message, true);
+    return;
+  }
+  await failQueueCourse(id, state?.message);
 }
 async function pauseQueue(message = "Preparation paused. Completed data is kept.", error = false) {
   const q = seriesQueue;

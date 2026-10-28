@@ -13,19 +13,25 @@ from pathlib import Path
 import platform
 import re
 import sys
+import time
+
+import diagnostic_checks
+import support_events
+import updater
 
 SCHEMA_VERSION = 1
 MAX_JSON = 64 * 1024
-MAX_LOG_READ = 16 * 1024
-MAX_TOTAL_LOG_READ = 96 * 1024
-MAX_REPORT = 110 * 1024
+MAX_LOG_READ = 32 * 1024
+MAX_TOTAL_LOG_READ = 192 * 1024
+MAX_REPORT = 512 * 1024
 FIXED_LOGS = (
-    "logs/setup-latest.log", "logs/llama.log", "neural/engine.log",
+    "logs/setup-latest.log", "logs/llama.log", "logs/llama.previous.log", "neural/engine.log",
     "neural/supervisor.log", "neural/course-jobs/worker.log",
 )
 PACKAGE_NAMES = {"numpy", "av", "ctranslate2", "faster-whisper", "onnxruntime",
                  "tokenizers", "huggingface-hub", "requests", "pyopenjtalk-plus"}
 INTERESTING = re.compile(r"error|warning|exception|traceback|failed|failure|time[ -]?out|timed out|missing|setup complete|installation|interrupted|cancelled", re.I)
+TECHNICAL = re.compile(r"(?:\b(?:loading|loaded|ready|listening|starting|started|stopped|memory|threads?|backend|device|vulkan|cuda|ggml|llama|duration|exit code)\b|^\s*File [\"']|^\s*(?:Caused by|Traceback|[a-zA-Z_.]+(?:Error|Exception):))", re.I)
 LEARNING_FIELD = re.compile(r"[\"']?\b(?:text|kana|reading|japanese|sentence|prompt|response|source|word|words)\b[\"']?\s*[:=]", re.I)
 CREDENTIAL = re.compile(r"\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|authorization|secret|token)\b[\"']?\s*[:=]", re.I)
 JAPANESE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaffー々〆〇]+")
@@ -68,7 +74,7 @@ def _redactor(root):
         text = str(value).replace("\x00", "")
         if LEARNING_FIELD.search(text):
             return "[learning/request content omitted]"
-        if CREDENTIAL.search(text) or re.search(r"\bbearer\s+\S+", text, re.I):
+        if CREDENTIAL.search(text) or re.search(r"\bbearer\s+\S+|--(?:api[-_]?key|token|password|secret)\s+", text, re.I):
             return "[credential-bearing diagnostic line omitted]"
         # URLs may contain credentials, user names and query tokens. Omit the
         # complete URL instead of attempting to recognize each secret name.
@@ -112,9 +118,11 @@ def _log(root, relative, budget, redact):
         text = raw.decode(encoding, errors="replace").lstrip("\ufeff")
         if size > amount and "\n" in text:
             text = text.split("\n", 1)[1]
-        lines = [line for line in text.splitlines() if INTERESTING.search(line)]
-        result.update(status="available", lines=[redact(line) for line in lines[-40:]],
-                      truncated=size > amount or len(lines) > 40)
+        lines = [(index + 1, line) for index, line in enumerate(text.splitlines()) if INTERESTING.search(line) or TECHNICAL.search(line)]
+        result.update(status="available", lines=[redact(line) for _, line in lines[-80:]],
+                      tailLineNumbers=[index for index, _ in lines[-80:]],
+                      context="Bounded technical/error context; arbitrary learning/request lines are omitted.",
+                      truncated=size > amount or len(lines) > 80)
         return result, len(raw)
     except OSError:
         result["status"] = "unreadable"
@@ -134,7 +142,12 @@ def _entries(root, relative, maximum=200):
                 path = Path(entry.path)
                 if _inside(path, root):
                     values.append(path)
-        return values
+        def modified(path):
+            try:
+                return path.stat().st_mtime_ns
+            except OSError:
+                return 0
+        return sorted(values, key=modified, reverse=True)
     except OSError:
         return []
 
@@ -166,18 +179,28 @@ def _small_status(value, redact):
         item = value.get(key)
         if isinstance(item, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,100}", item):
             result[key] = item
-    for key in ("completed", "total", "ready", "failed", "updatedAt"):
+    for key in ("completed", "total", "ready", "failed", "updatedAt", "startedAt", "lastProgressAt", "durationMs"):
         item = value.get(key)
-        if type(item) in (int, float) and math.isfinite(item) and 0 <= item <= 10**12:
+        if type(item) in (int, float) and math.isfinite(item) and 0 <= item <= 10**15:
             result[key] = item
     if isinstance(value.get("message"), str):
         result["message"] = redact(value["message"], 300)
+    for key in ("jobKey", "requestKey"):
+        if isinstance(value.get(key), str) and re.fullmatch(r"[a-f0-9]{20}", value[key]):
+            result[key] = value[key]
+    if isinstance(value.get("features"), dict):
+        result["features"] = {key: value["features"].get(key) is True for key in ("german", "colors", "audio")}
+    failure = support_events.safe_failure(value.get("failure"))
+    if failure:
+        result["failure"] = failure
     return result
 
 
-def collect(cache_root, helper_version):
-    """Read small fixed fields/log tails only. No directory creation or writes."""
+def collect(cache_root, helper_version, *, active_checks=False, app_root=None):
+    """Collect project support evidence; explicit active checks never install."""
+    started = time.monotonic()
     root = Path(cache_root).resolve()
+    app = Path(app_root).resolve() if app_root is not None else updater.APP_ROOT
     redact = _redactor(root)
     setup = _read_json(root, "setup-state.json") or {}
     marker = _read_json(root, "neural/installation.json") or {}
@@ -206,7 +229,7 @@ def collect(cache_root, helper_version):
     relatives = list(FIXED_LOGS)
     # Current jobs share worker.log; tolerate up to three later per-job logs
     # without permitting arbitrary paths or reading request/cache files.
-    for directory in _entries(root, "neural/course-jobs", 24):
+    for directory in _entries(root, "neural/course-jobs", 200):
         if directory.is_dir() and re.fullmatch(r"[a-f0-9]{64}", directory.name):
             relative = str((directory / "worker.log").relative_to(root)).replace("\\", "/")
             if _file(root, relative):
@@ -220,9 +243,12 @@ def collect(cache_root, helper_version):
             log["name"] = "neural/course-jobs/[job]/worker.log"
         logs.append(log); budget -= consumed
     jobs = []
+    scanned = {}
     for kind, folder, pattern in (("course", "jobs", r"([1-9][0-9]{0,8})\.json"),
                                    ("word", "neural/course-jobs", r"[a-f0-9]{64}\.state\.json")):
-        for path in _entries(root, folder):
+        candidates = _entries(root, folder, 1000)
+        scanned[kind] = {"directoryEntriesScanned": len(candidates), "scanLimitReached": len(candidates) >= 1000}
+        for path in candidates:
             matched = re.fullmatch(pattern, path.name)
             if not matched:
                 continue
@@ -234,17 +260,40 @@ def collect(cache_root, helper_version):
                 jobs.append(item)
     jobs.sort(key=lambda item: item.get("updatedAt", 0), reverse=True)
     report = {"schemaVersion": SCHEMA_VERSION,
+              "diagnosticFormatVersion": 2,
               "helperVersion": helper_version if isinstance(helper_version, str) and VERSION.fullmatch(helper_version) else "unknown",
               "platform": {"system": platform.system(), "release": redact(platform.release(), 80), "pythonVersion": sys.version.split()[0]},
-              "capabilities": capabilities, "setup": setup_status, "logs": logs, "jobs": jobs[:20],
+              "capabilities": capabilities, "setup": setup_status, "logs": logs, "jobs": jobs[:100],
+              "updates": updater.diagnostic_snapshot(root, app),
+              "localChecks": diagnostic_checks.collect(root, app, helper_version=helper_version),
+              "events": support_events.read_recent(root, limit=160),
               "limits": {"logTailBytesPerFile": MAX_LOG_READ, "totalLogReadBytes": MAX_TOTAL_LOG_READ,
-                         "jobStatusFilesScannedPerKind": 200, "exportedJobs": 20},
-              "scope": "Fixed redacted diagnostic lines and light presence checks only; no learning cache, audio or model contents."}
+                         "jobStatusFilesScannedPerKind": 1000, "exportedJobs": 100, "jobScans": scanned,
+                         "matchingJobsFound": len(jobs), "jobsTruncated": len(jobs) > 100, "maxReportBytes": MAX_REPORT},
+              "scope": "Project-only local support evidence, structured history, bounded technical logs and file checks; no learning caches, audio, model contents or personal paths."}
+    if active_checks:
+        try:
+            import update_diagnostics
+            report["updates"]["activeCheck"] = update_diagnostics.collect(root, app_root=app, deadline=time.monotonic() + 20, allow_network=True)
+        except (ImportError, OSError, ValueError, TypeError) as error:
+            report["updates"]["activeCheck"] = {"status": "unavailable", "error": diagnostic_checks.error_code(error)}
+    report["collection"] = {"activeChecksRequested": active_checks is True, "durationMs": round((time.monotonic() - started) * 1000),
+                            "modelsStarted": False, "preparationStarted": False, "updatesInstalled": False}
     while len(json.dumps(report, ensure_ascii=False).encode("utf-8")) > MAX_REPORT:
         log = next((entry for entry in reversed(logs) if entry["lines"]), None)
         if log is None:
-            report["jobs"] = report["jobs"][:10]
-            break
-        log["lines"].pop(); log["truncated"] = True
+            if len(report["events"].get("events", [])) > 20:
+                report["events"]["events"] = report["events"]["events"][20:]
+                report["events"]["truncated"] = True
+            elif len(report["jobs"]) > 20:
+                report["jobs"] = report["jobs"][:-10]
+                report["limits"]["jobsTruncated"] = True
+            else:
+                break
+        else:
+            log["lines"].pop()
+            if log.get("tailLineNumbers"):
+                log["tailLineNumbers"].pop()
+            log["truncated"] = True
         report["reportTruncated"] = True
     return report

@@ -1,27 +1,37 @@
-# Export a troubleshooting report
+# Export one support report
 
 1. Reproduce the problem if possible.
-2. Open the extension popup and choose **Diagnostics** near the bottom. It remains available when the master switch is off.
-3. Click **Export diagnostics**. The browser downloads an `iKnow-Reading-Helper-diagnostics-….json` file.
-4. Use **View report** to inspect the contents. Share the file together with a short description of what you clicked and what happened.
+2. Open the extension popup and choose **Diagnostics**.
+3. Click **Export diagnostics** once. Collection and Windows verification can take up to 45 seconds.
+4. Share the downloaded JSON. **View report** shows the same inert contents for review.
 
-The report is generated locally on demand. There is no automatic upload. It does not prepare courses, synthesize words, install components, repair the installation or start a language/voice model.
+Nothing is uploaded. No external support platform, account, subscription or paid service is used. The explicit export can read public GitHub release metadata if it has no retained copy, but it never downloads application archives, installs an update, prepares a course or starts a model. Keeping the same application folder and Brave extension entry preserves the existing saved results.
 
-## Included information
+## Evidence in the file
 
-- Extension/helper/Python versions and coarse operating-system/architecture information.
-- A fixed subset of display, preparation and voice settings.
-- Preparation status, public course IDs, phases/counts and available error codes. Raw course titles/messages/source data are not copied wholesale.
-- Up to30 deduplicated course/word/word-preparation error codes from the current background session. These entries are in memory and do not constitute a complete persistent browser error history.
-- Lightweight presence checks for known runtime/model files, installation markers, selected setup components and relevant installed package metadata. These checks do not hash or load model files and do not prove that every installed component works.
-- Bounded recent diagnostic lines from fixed setup/course/voice logs, plus small persisted job-status summaries. Missing or unreadable logs are identified in the report.
+- Loaded extension ID/version, permissions, browser/OS information, relevant settings and coarse online status.
+- Current series queue, selected modules, phase totals, per-course checkpoints, missing results and measured estimate scope.
+- Persistent browser event history: phase/status changes, sampled progress, errors, project script frames and update transitions. It survives background/Brave restarts.
+- Helper job history and a persistent journal of model startup, readiness, inference timing, failure/cancellation, process cleanup and word voice outcomes. Correlation references connect events from the same operation without exporting request payloads.
+- Structured exception types, numeric Windows/HTTP causes and project frame locations, without stack locals or raw model requests.
+- Setup capabilities, known package versions, configured component presence and sizes, application identity/version, native registration consistency and allowed-extension fingerprints.
+- Available physical RAM and disk space, logical CPU count, configured thread/GPU limits and proxy-presence facts. Model contents and credentials are not read.
+- Bounded managed-application file checks against the local release baseline. This is consistency evidence; authenticity is checked separately by the pinned publisher signature.
+- The saved update state and direct native Windows CNG signature verification, including key/metadata/signature fingerprints and bounded Windows status codes. Legacy PowerShell probes are not run; this avoids repeating endpoint security alerts caused by encoded command lines. Retained public metadata supports offline verification. Missing network/metadata or an expired time budget is explicit.
+- Technical log tails with nearby failure context, including the preceding model-start log, and a counts-only inventory of saved browser course packs.
 
-No translation/alignment caches, generated audio, model contents, browser history or browser profiles are included. Known personal paths/user identifiers, URLs, credential-bearing lines, raw learning/request fields and Japanese learning text are omitted or redacted from helper diagnostics. Logs are filtered to relevant diagnostic lines and limited in size. Review the report before sharing it; it is a troubleshooting snapshot rather than a universal anonymization guarantee or a complete record of every error.
+Reports remain usable with a missing or unresponsive helper: browser evidence is exported, and a previous successful helper snapshot is included if available, labelled **stale** with its capture time. No missing current result is silently replaced with old evidence. An older helper is explicitly identified as using the older report format.
 
-## Missing or older local helper
+## Retention and limits
 
-The download still works when the helper is missing, disconnected, too old or times out. The report marks helper information as incomplete, which itself helps identify the problem. The rest of the extension information remains available.
+Browser history retains the latest 240 sampled events. Progress is sampled at phase changes, about five sentences or ten seconds; terminal errors and relevant transitions are persisted promptly. It does not continuously copy learning content or serialize full course packs.
 
-For an existing installation, keep the complete current application files together and run **helper/Setup.cmd → 3 — Check / repair** if the report indicates that the helper is missing or the registered helper still points to an old/moved folder. This updates/checks the existing connection and selected capabilities. A fresh PC still starts with **1 — Complete** or **2 — Voices only**. Compatible downloads and saved course data are retained.
+The helper journal uses two rotating 256 KiB files and exports the most recent 160 structured events. Up to 100 job summaries and bounded fixed technical log tails are included. The helper report is capped at 512 KiB; omitted/truncated sections and scan limits are named. Application integrity checks have a byte/file/time budget and never hash multi-gigabyte models. Export does not clear histories or prepared results.
 
-Brave's own Errors view remains useful for JavaScript/extension failures. It does not replace this report for local setup/model/voice problems. The report likewise does not capture every browser console error or certify translations and meaning groups.
+History starts after installing this version. Unrecorded older failures, a full OS crash before persistence, external application failures or data beyond retention cannot be reconstructed. A single report is intended to cover routine support needs; it is not a guarantee that every possible fault can be diagnosed without another reproduction.
+
+## What stays out
+
+Raw learning/translation/alignment caches, generated audio, model contents, other PC files, browsing history, raw command lines, private keys, credentials and personal paths are not included. Reports are generated from typed fields and redacted technical logs. Review before sharing; this is a bounded project support report rather than a universal anonymization guarantee.
+
+The temporary **Check-update** folder was needed because earlier installed helpers could not run these checks. Once this diagnostic version is installed, the normal export includes the native checks without starting PowerShell. An installation that is still blocked on an earlier updater may need the one-time support/recovery path before it can acquire the new code.

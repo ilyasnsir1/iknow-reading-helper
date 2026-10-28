@@ -1,5 +1,25 @@
 # Updates
 
+Version 1.35.3 removes PowerShell from runtime update verification and support
+exports. Windows CNG is called directly through its system library; the same
+pinned RSA key, SHA-256 and PKCS#1 signature checks remain mandatory. No
+antivirus exclusions or browser permission changes are required by the code.
+Whether an endpoint security product accepts the new path must be tested on
+the affected PC. An old verifier that is already blocked cannot install its
+own replacement; use the reviewed one-time recovery at the existing folder.
+
+Version 1.35.2 includes helper 1.18.0 and a comprehensive local diagnostic
+export. The normal Export diagnostics action now gathers persistent project
+history, installation checks and both Windows signature verifiers in one file.
+No upload service is added. Update first to start recording the new history;
+unrecorded failures from earlier installations cannot be recovered retroactively.
+
+Version 1.35.1 uses Windows CNG for the same pinned RSA/SHA-256 publisher
+signature. No legacy CSP key container is created. A real signature mismatch
+still blocks installation; Windows verification/runtime failures have separate
+messages and safe diagnostic evidence. The publisher key and signing algorithm
+are unchanged. Helper 1.17.0 ships with this release.
+
 Version 1.35.0 decorates available-update notices with the original pixel fox.
 It moves between hiding places only while fully concealed behind the notice.
 Move the mouse near an exposed fox to make it duck and return later. Clicking

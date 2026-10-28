@@ -23,6 +23,7 @@ The course step's sentence count and progress bar show **saved, source-validated
 | Close/restart Brave or reload the extension | The local work is interrupted. Completed browser and helper checkpoints remain. The series queue restores paused; choose Resume. For an individual course, select the missing additions and prepare/resume them. |
 | Lose internet before fetching the next course | The queue stops at that course with a connection message instead of failing all later courses. Reconnect and choose Resume. |
 | Lose internet during audio preparation | A new recording request has bounded retries. Repeated connectivity failure pauses and flushes completed work. Reconnect and Resume; compatible completed recordings are reused. |
+| The shared local language model times out, disconnects, or cannot start | The queue interrupts at the current course instead of failing subsequent courses. The last validated additions are kept in browser and helper storage. Address the reported issue, then choose Resume to retry the missing work in that course. |
 | One recording returns HTTP404 | That recording is unavailable. Other recordings can continue; the missing result remains visible and retryable rather than being counted as saved. |
 | Local translation/color work already has its course source and installed models | That calculation can run without an internet service. Audio preparation additionally needs the original recordings; uncached recordings require a connection. |
 | Open iKnow from scratch with no internet | The extension is not an offline copy of iKnow. The original page and uncached course sources/recordings may be unavailable even though preparation checkpoints remain on disk. |
@@ -31,3 +32,10 @@ The course step's sentence count and progress bar show **saved, source-validated
 Keep the same extension entry and application folder when updating. Clearing extension storage, removing the extension, deleting helper caches or moving the installation is different from refreshing a page and can remove availability or require reconnecting the helper. Ordinary recovery does not require those actions.
 
 If a job cannot resume, keep its saved data and export **Diagnostics** from the popup. Share the report with the course URL, selected additions and the step that stopped. There is no need to keep a terminal open during normal preparation.
+
+The model connection is loopback-only and bypasses Windows/environment proxies.
+Loading remains bounded; one inference response may take up to 15 minutes on a
+slow CPU. While the response is pending, a liveness message appears every ten
+seconds without inventing completed sentences. Pause still stops the model
+process promptly. A longer timeout improves reliability, not processing speed;
+the measured estimate depends on the computer and selected additions.

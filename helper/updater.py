@@ -9,6 +9,7 @@ the Windows RSA implementation already present on supported Windows systems.
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
 import json
 import os
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import threading
@@ -25,6 +27,7 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
+import xml.etree.ElementTree as ET
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 MAX_METADATA = 2 * 1024 * 1024
@@ -44,6 +47,88 @@ class UpdateError(ValueError):
 
 class UpdateBusy(UpdateError):
     pass
+
+
+class SignatureVerificationError(UpdateError):
+    """Fail closed while retaining only public, bounded verification evidence."""
+    def __init__(self, message, code, verification):
+        super().__init__(message)
+        self.code = code
+        self.verification = {**verification, "code": code}
+
+
+class NativeSignatureError(ValueError):
+    """Only a Windows status and fixed operation name; no key/request data."""
+    def __init__(self, stage, ntstatus):
+        self.stage, self.ntstatus = stage, int(ntstatus) & 0xffffffff
+        super().__init__("Windows public signature verification failed.")
+
+
+def _rsa_public_blob(public_key):
+    """Convert only a bounded RSA public key to the documented CNG blob."""
+    if not isinstance(public_key, str) or not 100 < len(public_key) < 8192 or "<!" in public_key:
+        raise ValueError("Invalid public key.")
+    root = ET.fromstring(public_key)
+    if root.tag != "RSAKeyValue" or root.attrib or len(root) != 2 or {item.tag for item in root} != {"Modulus", "Exponent"}:
+        raise ValueError("Only the public modulus and exponent are supported.")
+    parts = {}
+    for item in root:
+        if item.attrib or len(item) or not isinstance(item.text, str):
+            raise ValueError("Invalid public key field.")
+        parts[item.tag] = base64.b64decode(item.text.strip(), validate=True)
+    modulus, exponent = parts["Modulus"], parts["Exponent"]
+    if len(modulus) not in (256, 384, 512) or modulus[0] < 128 or not modulus[-1] & 1:
+        raise ValueError("Unsupported RSA public modulus.")
+    if not 1 <= len(exponent) <= 8 or exponent[0] == 0 or int.from_bytes(exponent, "big") < 3 or not exponent[-1] & 1:
+        raise ValueError("Unsupported RSA public exponent.")
+    # BCRYPT_RSAKEY_BLOB uses six little-endian ULONG fields, followed by
+    # big-endian exponent and modulus bytes (BCRYPT_RSAPUBLIC_MAGIC = RSA1).
+    return struct.pack("<6I", 0x31415352, len(modulus) * 8, len(exponent), len(modulus), 0, 0) + exponent + modulus
+
+
+def _bcrypt_verify(public_key, raw, signature):
+    """Use Windows CNG in this process. No shell, provider script or key store."""
+    blob = _rsa_public_blob(public_key)
+    modulus_bytes = struct.unpack("<6I", blob[:24])[3]
+    if len(signature) != modulus_bytes:
+        raise NativeSignatureError("verify", 0xC000A000)
+    # Load only the operating system's DLL, never a DLL next to a downloaded
+    # package. CNG validates the public key; no validation bypass is requested.
+    library = ctypes.WinDLL("bcrypt.dll", winmode=0x00000800)
+    handle, ulong, status = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32
+    library.BCryptOpenAlgorithmProvider.argtypes = [ctypes.POINTER(handle), ctypes.c_wchar_p, ctypes.c_wchar_p, ulong]
+    library.BCryptOpenAlgorithmProvider.restype = status
+    library.BCryptImportKeyPair.argtypes = [handle, handle, ctypes.c_wchar_p, ctypes.POINTER(handle), ctypes.c_void_p, ulong, ulong]
+    library.BCryptImportKeyPair.restype = status
+    library.BCryptVerifySignature.argtypes = [handle, ctypes.c_void_p, ctypes.c_void_p, ulong, ctypes.c_void_p, ulong, ulong]
+    library.BCryptVerifySignature.restype = status
+    library.BCryptDestroyKey.argtypes = [handle]
+    library.BCryptDestroyKey.restype = status
+    library.BCryptCloseAlgorithmProvider.argtypes = [handle, ulong]
+    library.BCryptCloseAlgorithmProvider.restype = status
+    class Padding(ctypes.Structure):
+        _fields_ = [("algorithm", ctypes.c_wchar_p)]
+    algorithm, key = handle(), handle()
+    def checked(result, stage):
+        if result != 0:
+            raise NativeSignatureError(stage, result)
+    try:
+        checked(library.BCryptOpenAlgorithmProvider(ctypes.byref(algorithm), "RSA", None, 0), "provider")
+        if not algorithm.value:
+            raise NativeSignatureError("provider", 0xC0000008)
+        key_buffer = ctypes.create_string_buffer(blob)
+        checked(library.BCryptImportKeyPair(algorithm, None, "RSAPUBLICBLOB", ctypes.byref(key), key_buffer, len(blob), 0), "import")
+        if not key.value:
+            raise NativeSignatureError("import", 0xC0000008)
+        digest_buffer = ctypes.create_string_buffer(hashlib.sha256(raw).digest())
+        signature_buffer = ctypes.create_string_buffer(signature)
+        padding = Padding("SHA256")
+        checked(library.BCryptVerifySignature(key, ctypes.byref(padding), digest_buffer, 32, signature_buffer, len(signature), 2), "verify")
+    finally:
+        if key.value:
+            library.BCryptDestroyKey(key)
+        if algorithm.value:
+            library.BCryptCloseAlgorithmProvider(algorithm, 0)
 
 
 class FileLock:
@@ -290,7 +375,7 @@ def download(url, limit, target=None, progress=None):
             stream.close()
 
 
-def verify_signature(raw, encoded_signature, public_key):
+def verify_signature(raw, encoded_signature, public_key, *, timeout=25):
     if os.name != "nt":
         raise UpdateError("Signed updates currently require Windows.")
     try:
@@ -299,17 +384,53 @@ def verify_signature(raw, encoded_signature, public_key):
         raise UpdateError("The release signature is invalid.") from error
     if not 256 <= len(signature) <= 512:
         raise UpdateError("The release signature is invalid.")
-    script = """$ErrorActionPreference='Stop';try {$v=[Console]::In.ReadToEnd()|ConvertFrom-Json;$rsa=New-Object Security.Cryptography.RSACryptoServiceProvider;$rsa.PersistKeyInCsp=$false;$rsa.FromXmlString([string]$v.key);$ok=$rsa.VerifyData([Convert]::FromBase64String([string]$v.data),'SHA256',[Convert]::FromBase64String([string]$v.signature));$rsa.Dispose();if($ok){[Console]::Out.Write('VALID');exit 0};exit 2}catch{exit 3}"""
-    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    evidence = {"provider": "windows-bcrypt", "trustedKeySha256": hashlib.sha256(public_key.encode("utf-8")).hexdigest(),
+                "metadataSha256": hashlib.sha256(raw).hexdigest(), "signatureSha256": hashlib.sha256(signature).hexdigest()}
     try:
-        result = subprocess.run(["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-                                input=json.dumps({"key": public_key, "data": base64.b64encode(raw).decode("ascii"), "signature": base64.b64encode(signature).decode("ascii")}).encode("ascii"),
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25,
-                                creationflags=subprocess.CREATE_NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise UpdateError("Windows could not verify the publisher signature.") from error
-    if result.returncode != 0 or result.stdout != b"VALID":
-        raise UpdateError("The release signature does not match the trusted publisher.")
+        _bcrypt_verify(public_key, raw, signature)
+    except NativeSignatureError as error:
+        evidence.update(step=error.stage, ntstatus=error.ntstatus)
+        if error.stage == "verify" and error.ntstatus == 0xC000A000:
+            raise SignatureVerificationError("The release signature does not match the trusted publisher.", "signature_mismatch", evidence) from error
+        raise SignatureVerificationError("Windows could not complete the publisher signature check. Export Diagnostics for the Windows status.", "signature_runtime_error", evidence) from error
+    except OSError as error:
+        evidence["step"] = "library"
+        if type(getattr(error, "winerror", None)) is int:
+            evidence["winerror"] = error.winerror
+        raise SignatureVerificationError("Windows cryptographic verification is unavailable. Export Diagnostics for details.", "signature_verifier_unavailable", evidence) from error
+    except (ValueError, TypeError, AttributeError, ET.ParseError) as error:
+        evidence["step"] = "key"
+        raise SignatureVerificationError("The installed publisher public key could not be read. Export Diagnostics for details.", "signature_runtime_error", evidence) from error
+
+
+def diagnostic_snapshot(cache, app_root=APP_ROOT):
+    """Read existing update support fields without checking or installing updates."""
+    result = {}
+    try:
+        settings = config(app_root)
+        result["trustedKeySha256"] = hashlib.sha256(settings["publicKeyXml"].encode("utf-8")).hexdigest()
+    except UpdateError:
+        result["configuration"] = "unavailable"
+    state = read_json(state_path(cache, app_root)) or {}
+    if state.get("status") in {"available", "current", "error", "unconfigured", "complete", "downloading", "installing"}:
+        result["status"] = state["status"]
+    evidence = state.get("verification")
+    if isinstance(evidence, dict):
+        safe = {}
+        for key in ("trustedKeySha256", "metadataSha256", "signatureSha256"):
+            if isinstance(evidence.get(key), str) and HASH.fullmatch(evidence[key]):
+                safe[key] = evidence[key]
+        for key, pattern in (("code", r"signature_[a-z_]{1,60}"), ("provider", r"windows-(?:cng|bcrypt)"), ("step", r"(?:input|key|library|provider|import|verify)"),
+                             ("exceptionType", r"[A-Za-z][A-Za-z0-9_.+]{0,159}"), ("powershellVersion", r"[0-9.]{1,32}"),
+                             ("languageMode", r"(?:FullLanguage|ConstrainedLanguage|RestrictedLanguage|NoLanguage)")):
+            if isinstance(evidence.get(key), str) and re.fullmatch(pattern, evidence[key]):
+                safe[key] = evidence[key]
+        for key in ("exitCode", "hresult", "ntstatus", "winerror"):
+            if type(evidence.get(key)) is int and -(2**31) <= evidence[key] < 2**32:
+                safe[key] = evidence[key]
+        if safe:
+            result["verification"] = safe
+    return result
 
 
 def managed_path(value):
@@ -384,7 +505,25 @@ def validate_manifest(raw, settings, installed, helper_version):
     return value
 
 
-def get_release(settings, installed, helper_version):
+def remember_diagnostic_metadata(cache, app_root, settings, raw, signature):
+    """Retain only the last small public metadata pair during a normal check.
+
+    The pair is deliberately labelled unverified: diagnostics always checks
+    it again with the current pinned key before drawing a trust conclusion.
+    Failure to write support evidence must not prevent an ordinary update.
+    """
+    if len(raw) > 512 * 1024 or len(signature) > 4096:
+        return
+    try:
+        value = {"schema": 1, "owner": settings["owner"], "repository": settings["repository"],
+                 "capturedAt": time.time(), "trustedKeySha256": hashlib.sha256(settings["publicKeyXml"].encode("utf-8")).hexdigest(),
+                 "rawBase64": base64.b64encode(raw).decode("ascii"), "signatureBase64": base64.b64encode(signature).decode("ascii")}
+        atomic_json(update_root(cache, app_root) / "diagnostic-metadata.json", value)
+    except (OSError, ValueError, KeyError):
+        pass
+
+
+def get_release(settings, installed, helper_version, *, on_metadata=None):
     endpoint = "https://api.github.com/repos/" + settings["owner"] + "/" + settings["repository"] + "/releases/latest"
     raw = download(safe_url(endpoint, settings, api=True), MAX_METADATA)
     release = strict_json(raw)
@@ -403,6 +542,8 @@ def get_release(settings, installed, helper_version):
         raise UpdateError("The published version has no signed update package yet.")
     metadata = download(required["update-manifest.json"], MAX_METADATA)
     signature = download(required["update-manifest.sig"], 4096)
+    if on_metadata is not None:
+        on_metadata(metadata, signature)
     verify_signature(metadata, signature, settings["publicKeyXml"])
     manifest = validate_manifest(metadata, settings, installed, helper_version)
     matching = [asset for asset in assets if isinstance(asset, dict) and asset.get("name") == manifest["asset"]["name"]
@@ -539,7 +680,8 @@ def _check(cache, helper_version, app_root=APP_ROOT):
         settings = config(app_root)
     except UpdateError as error:
         return save_state(cache, {"status": "unconfigured", "currentVersion": installed, "latestVersion": installed, "message": str(error)}, app_root)
-    manifest, raw, signature = get_release(settings, installed, helper_version)
+    manifest, raw, signature = get_release(settings, installed, helper_version,
+                                         on_metadata=lambda raw, sig: remember_diagnostic_metadata(cache, app_root, settings, raw, sig))
     available = version(manifest["version"]) > version(installed)
     return save_state(cache, {"status": "available" if available else "current", "currentVersion": installed,
                              "latestVersion": manifest["version"], "message": "A new version is ready to install." if available else "You are up to date."}, app_root)
@@ -641,7 +783,8 @@ def install(cache, helper_version, app_root=APP_ROOT, busy=None):
         base = {"status": "downloading", "currentVersion": installed, "latestVersion": installed,
                 "ownerPid": os.getpid(), "operation": operation, "message": "Checking the signed release …", "progress": 0}
         save_state(cache, base, app_root)
-        manifest, raw, signature = get_release(settings, installed, helper_version)
+        manifest, raw, signature = get_release(settings, installed, helper_version,
+                                             on_metadata=lambda raw, sig: remember_diagnostic_metadata(cache, app_root, settings, raw, sig))
         if version(manifest["version"]) <= version(installed):
             return save_state(cache, {**base, "status": "current", "latestVersion": installed, "message": "You are up to date."}, app_root)
         base.update(latestVersion=manifest["version"], message="Downloading the update …")
@@ -722,7 +865,14 @@ def handle(message, cache, send, helper_version, busy=None):
             reply({**status(cache), "status": "busy", "message": str(error)}, False)
         except Exception as error:
             text = str(error) if isinstance(error, UpdateError) else "The update could not be completed. Check Diagnostics or try again."
-            state = save_state(cache, {**status(cache), "status": "error", "message": text})
+            state = {**status(cache), "status": "error", "message": text}
+            if isinstance(error, SignatureVerificationError):
+                state["verification"] = error.verification
+                state["code"] = error.code
+            else:
+                state.pop("verification", None)
+                state.pop("code", None)
+            state = save_state(cache, state)
             reply(state, False)
         finally:
             guard.release()

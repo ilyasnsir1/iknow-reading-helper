@@ -17,7 +17,8 @@
   function normalize(value) {
     if (!value || typeof value !== "object" || !statuses.has(value.status)) throw Error("The helper returned an invalid update status.");
     return { status: value.status, currentVersion: version, latestVersion: validVersion(value.latestVersion),
-      message: String(value.message || "").slice(0, 320), progress: Number.isFinite(value.progress) ? Math.min(1, Math.max(0, value.progress)) : null,
+      message: String(value.message || "").slice(0, 320), code: typeof value.code === "string" && /^[a-z][a-z0-9_]{0,79}$/.test(value.code) ? value.code : null,
+      progress: Number.isFinite(value.progress) ? Math.min(1, Math.max(0, value.progress)) : null,
       checkedAt: Number.isFinite(value.checkedAt) ? value.checkedAt : state.checkedAt || null,
       lastAttemptAt: Number.isFinite(value.lastAttemptAt) && value.lastAttemptAt > 0 ? value.lastAttemptAt : state.lastAttemptAt || null,
       refreshTabs: value.refreshTabs === true || state.refreshTabs === true,
@@ -25,7 +26,9 @@
       reloadedVersion: validVersion(value.reloadedVersion) || state.reloadedVersion || null };
   }
   async function save(value) {
+    const previousStatus = state.status;
     state = { ...state, ...value, currentVersion: version };
+    if (previousStatus !== state.status) globalThis.IKnowReaderDiagnosticHistory?.record("updates", "transition", { status: state.status, code: state.code, message: state.message }, state.status === "error");
     await chrome.storage.local.set({ [KEY]: state });
     return state;
   }
@@ -141,6 +144,7 @@
       else await save(reply.state);
       return { ok: reply.ok, state };
     } catch (error) {
+      globalThis.IKnowReaderDiagnosticHistory?.exception("updates", error, { code: "update_operation_failed" });
       if (automatic) { await save(previous); return { ok: false, state }; }
       await save({ status: "error", latestVersion: previous.latestVersion, message: String(error.message || error).slice(0, 320) });
       return { ok: false, state };

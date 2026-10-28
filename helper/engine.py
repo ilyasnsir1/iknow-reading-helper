@@ -26,12 +26,25 @@ import urllib.parse
 import urllib.request
 
 from process_resources import ChildLifetime, child_environment, creation_flags, worker_threads
+import support_events
 
 VERSION = "1.5.0-qwen35-9b-7"
 MODEL_NAME = "Qwen3.5-9B / Unsloth GGUF Q4_K_M"
 HERE = Path(__file__).resolve().parent
 MAX_COURSE_BYTES = 16 * 1024 * 1024
 MAX_PACK_BYTES = 8 * 1024 * 1024
+# A full 2,600-token validation retry may take more than three minutes on a
+# CPU. This is a bounded inference wait, not an Internet download timeout.
+MODEL_INFERENCE_TIMEOUT = 15 * 60
+MODEL_HEARTBEAT_INTERVAL = 10
+
+
+class ModelServiceError(RuntimeError):
+    """An actionable local-service failure, distinct from bad model output."""
+
+    def __init__(self, code, message):
+        self.code = code
+        super().__init__(message)
 
 
 class SentencePreparationError(ValueError):
@@ -202,6 +215,12 @@ class LocalModel:
         self.lock_file = None
         self.lifetime = None
         self.process_lock = threading.Lock()
+        self.journal = support_events.from_emit(root, emit, "model")
+        self.process_started = None
+        self.process_reported_stopped = False
+        # Windows proxy/VPN settings must never route the private model's
+        # loopback requests through an Internet proxy.
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         atexit.register(self.close_process)
 
     def __enter__(self):
@@ -214,16 +233,19 @@ class LocalModel:
             raise
 
     def start(self):
+        began = time.monotonic()
         executable = Path(self.config.get("llamaExecutable", self.root / "runtime/llama/llama-server.exe"))
         model = Path(self.config.get("llamaModel", self.root / "models/Qwen3.5-9B-Q4_K_M.gguf"))
         if not executable.is_file() or not model.is_file():
-            raise RuntimeError("The local language model has not been set up yet. Please run setup.")
+            self.journal.record("model_unavailable", code="model_not_installed")
+            raise ModelServiceError("model_not_installed", "The local language model has not been set up yet. Please run setup.")
         # One GPU inference process at a time, including different browser tabs.
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock_file = (self.root / "model.lock").open("a+b")
         self.lock_file.seek(0)
         self.lock_file.write(b"0")
         self.lock_file.flush()
+        waiting_reported = False
         while True:
             check_cancel(self.cancel)
             try:
@@ -236,6 +258,9 @@ class LocalModel:
                     fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except OSError:
+                if not waiting_reported:
+                    self.journal.record("model_lock_wait", status="waiting")
+                    waiting_reported = True
                 emit_progress(self.emit, "model", 0, 0, "Waiting for the current local preparation …")
                 self.cancel.wait(1)
         emit_progress(self.emit, "model", 0, 0, "Loading the local language model …")
@@ -245,24 +270,38 @@ class LocalModel:
         self.base = f"http://127.0.0.1:{port}"
         logs = self.root / "logs"
         logs.mkdir(exist_ok=True)
+        # Keep the immediately preceding startup/failure log when a queued
+        # course launches a fresh model. Structured support history survives
+        # independently across both log rotations and browser restarts.
+        current_log = logs / "llama.log"
+        if current_log.is_file():
+            with contextlib.suppress(OSError):
+                os.replace(current_log, logs / "llama.previous.log")
         self.log = (logs / "llama.log").open("w", encoding="utf-8")
+        self.journal.record("model_loading", timeoutSeconds=180, workerThreads=worker_threads(),
+                            gpuLayers=self.config.get("gpuLayers", 99), modelBytes=model.stat().st_size)
         command = [str(executable), "--model", str(model), "--host", "127.0.0.1", "--port", str(port), "--ctx-size", "8192", "--parallel", "1", "--threads", str(worker_threads()), "--threads-batch", str(worker_threads()), "--batch-size", "256", "--ubatch-size", "128", "--poll", "0", "--poll-batch", "0", "--n-gpu-layers", str(self.config.get("gpuLayers", 99)), "--api-key", self.api_key, "--jinja", "--reasoning-budget", "256", "--chat-template-kwargs", '{"enable_thinking":false}', "--no-webui"]
         try:
             self.process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=self.log, stderr=self.log,
                                             creationflags=creation_flags(), env=child_environment())
+            self.process_started = time.monotonic()
+            self.journal.record("model_process_started", childPid=self.process.pid, ownedChild=True)
             self.lifetime = ChildLifetime(self.process)
             deadline = time.monotonic() + 180
             while time.monotonic() < deadline:
                 check_cancel(self.cancel)
                 if self.process.poll() is not None:
-                    raise RuntimeError("The local language model could not start. See the helper log for details.")
+                    raise ModelServiceError("model_start_failed", "The local language model could not start. See the helper log for details.")
                 try:
                     self.request("/health", None, timeout=2)
+                    self.journal.record("model_ready", status="ready", durationMs=round((time.monotonic() - began) * 1000))
                     return self
                 except (OSError, ValueError):
                     self.cancel.wait(0.25)
-            raise RuntimeError("Loading the local language model timed out. Please try again.")
-        except BaseException:
+            raise ModelServiceError("model_start_timeout", "Loading the local language model timed out. Completed additions are kept. Close memory-heavy applications and resume preparation.")
+        except BaseException as error:
+            self.journal.error("model_start_failed", error, durationMs=round((time.monotonic() - began) * 1000),
+                               code=getattr(error, "code", "model_start_failed"))
             self.__exit__(None, None, None)
             raise
 
@@ -271,12 +310,14 @@ class LocalModel:
         if data is not None:
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(self.base + endpoint, data=None if data is None else json.dumps(data, ensure_ascii=False).encode(), headers=headers)
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with self.opener.open(request, timeout=timeout) as response:
             raw = response.read(2 * 1024 * 1024)
         return json.loads(raw.decode("utf-8"))
 
     def generate(self, system, prompt, schema, max_tokens=2400, thinking=False):
         check_cancel(self.cancel)
+        began = time.monotonic()
+        self.journal.record("inference_started", maxTokens=max_tokens, timeoutSeconds=MODEL_INFERENCE_TIMEOUT)
         # Expanding large maxItems bounds into a llama.cpp grammar exceeds its
         # rule-complexity limit. Enforce the bounds in compile_translation;
         # the generation grammar still guarantees the JSON shape and types.
@@ -291,19 +332,33 @@ class LocalModel:
         box = {}
         def request_worker():
             try:
-                box["response"] = self.request("/v1/chat/completions", payload)
+                box["response"] = self.request("/v1/chat/completions", payload, timeout=MODEL_INFERENCE_TIMEOUT)
             except BaseException as exception:
                 box["error"] = exception
             finally:
                 finished.set()
         threading.Thread(target=request_worker, daemon=True).start()
+        last_heartbeat = time.monotonic()
         while not finished.wait(0.15):
             if self.cancel.is_set():
                 self.close_process()
+                self.journal.record("inference_cancelled", cancelled=True, durationMs=round((time.monotonic() - began) * 1000))
                 raise InterruptedError("Preparation stopped.")
+            if time.monotonic() - last_heartbeat >= MODEL_HEARTBEAT_INTERVAL:
+                # Show liveness without inventing completed sentences or ETA.
+                self.emit({"type": "heartbeat", "message": "The local language model is still processing …"})
+                last_heartbeat = time.monotonic()
         if "error" in box:
-            raise box["error"]
+            error = box["error"]
+            self.journal.error("inference_failed", error, durationMs=round((time.monotonic() - began) * 1000))
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                raise ModelServiceError("model_request_timeout", "The local language model took too long to answer. Completed additions are kept; resume preparation to retry the missing work.") from error
+            if isinstance(error, (OSError, urllib.error.URLError)):
+                raise ModelServiceError("model_connection_failed", "The local language model connection was interrupted. Completed additions are kept; resume preparation to retry the missing work.") from error
+            raise error
         response = box["response"]
+        self.journal.record("inference_response", durationMs=round((time.monotonic() - began) * 1000))
         check_cancel(self.cancel)
         try:
             choice = response["choices"][0]
@@ -338,6 +393,10 @@ class LocalModel:
             if self.lifetime is not None:
                 self.lifetime.close()
                 self.lifetime = None
+            if self.process is not None and self.process.poll() is not None and not self.process_reported_stopped:
+                self.journal.record("model_process_stopped", childPid=self.process.pid, childExitCode=self.process.returncode,
+                    ownedChild=True, durationMs=round((time.monotonic() - self.process_started) * 1000) if self.process_started else 0)
+                self.process_reported_stopped = True
     def __exit__(self, *_):
         self.close_process()
         if self.log:
@@ -657,6 +716,16 @@ def prepare(course_id, source, cache_root, emit, cancel_event, force=False, feat
     checkpoint = {}
     try:
         return _prepare(course_id, source, cache_root, emit, cancel_event, force=force, features=features, checkpoint=checkpoint)
+    except ModelServiceError as error:
+        # A slow/crashed model may fail between throttled native snapshots.
+        # Flush the last validated results as well as retaining disk records.
+        pack = checkpoint.get("pack")
+        if pack and (pack.get("alignments") or pack.get("audio")):
+            try:
+                error.pack = validate_pack(copy.deepcopy(pack), checkpoint["sentences"])
+            except (ValueError, KeyError, TypeError):
+                pass
+        raise
     except InterruptedError as error:
         # The ordinary emit callback rejects work after pause. Carry the current
         # validated additions to the transport so it can flush them once before
@@ -794,6 +863,10 @@ def _prepare(course_id, source, cache_root, emit, cancel_event, force=False, fea
     missing_words = [item for item in course["items"] if features["german"] and item["id"] not in pack["germanItems"]]
     if pending or missing_words:
         with LocalModel(root, config, emit, cancel_event) as model:
+            # start() reports model loading. Restore the actual work phase
+            # before its first potentially long request (including words-only
+            # enrichment), so heartbeats/timeouts retain honest progress.
+            emit_progress(emit, "language", done, total, "Preparing selected language modules …")
             for item, sentence in pending:
                 check_cancel(cancel_event)
                 try:
