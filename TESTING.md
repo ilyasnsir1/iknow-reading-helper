@@ -107,3 +107,35 @@ helper and detached runner. All 124 installed files matched the signed manifest;
 cache and personal-file sentinels were retained, and a fresh check reported the
 new current version. The user's own registered installation and Desktop copy
 remained on their unchanged 1.34.1 files for explicit popup adoption.
+
+
+## Version 1.35.3 native verification and recovery
+
+Eight native signature tests exercise real Windows CNG against disposable and
+previously published RSA/SHA-256 signatures. Verification and support export
+are tested with child-process creation forbidden. Modified metadata, wrong
+keys, malformed XML and native API errors fail closed; handle cleanup and
+PKCS#1 padding/ABI parameters are checked.
+
+The complete helper export, persistent history and browser diagnostic page
+were tested with absent/older helpers, restart persistence, bounded logs,
+partial checks, storage inventory, redaction and inert rendering. Preparation
+regressions cover model failures, saved checkpoints and prompt cancellation.
+
+After publication, an exact unchanged 1.35.0 installation fetched the public
+1.35.3 release through its original native helper and detached runner. The
+11.52-second isolated transaction verified all 129 managed file hashes, retained
+model/course/voice and personal-file sentinels, and a new helper check reported
+the current version. Browser registration and personal installations were
+not changed by this test.
+
+The separately published recovery ZIP was downloaded anonymously and matched
+the reviewed SHA-256 and complete bundle contents. Eight offline recovery
+checks passed for each of the 1.34.1 and exact published 1.34.0 starting
+fixtures. They cover no-write review, typed confirmation, Brave/activity
+guards, altered-file rejection, signature/archive tampering and rollback.
+Recovery preserves the original folder, publisher key and saved-data sentinels.
+
+The affected user's Norton computer has not yet run this recovery. These tests
+prove the reviewed code and package behavior locally; endpoint-security
+acceptance on that computer remains to be confirmed.
