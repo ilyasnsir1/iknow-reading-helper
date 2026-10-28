@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>iKnow! Reading Helper</title>
+    <link rel="stylesheet" href="popup.css">
+    <script src="core.js" defer></script>
+    <script src="course-packs.js" defer></script>
+    <script src="packs-ui.js" defer></script>
+    <script src="popup.js" defer></script>
+    <script src="popup-updates.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <img class="wordmark" src="icons/icon128.png" width="55" height="55" alt="" aria-hidden="true">
+        <div>
+          <p class="eyebrow">iKnow! Reading Helper</p>
+          <h1>Read, listen &amp; understand</h1>
+        </div>
+      </header>
+
+      <a id="update-notice" class="update-notice" href="#app-updates" hidden><span id="update-notice-text"></span><span aria-hidden="true">↓</span></a>
+
+      <form id="settings" aria-busy="true">
+        <label class="master setting-row" for="enabled">
+          <span class="setting-copy">
+            <span class="setting-title">Reading Helper enabled</span>
+          </span>
+          <input id="enabled" name="enabled" type="checkbox" role="switch" disabled>
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <fieldset id="reading-settings" disabled>
+          <legend>Reading</legend>
+          <div class="card">
+            <label class="setting-row" for="followPanels">
+              <span class="setting-copy">
+                <span class="setting-title">Keep panels visible</span>
+                <span class="setting-description">Follow reading and course panels while scrolling</span>
+              </span>
+              <input id="followPanels" name="followPanels" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="wordRomaji">
+              <span class="setting-copy">
+                <span class="setting-title">Vocabulary Romaji</span>
+              </span>
+              <input id="wordRomaji" name="wordRomaji" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="sentenceRomaji">
+              <span class="setting-copy">
+                <span class="setting-title">Sentence Romaji</span>
+              </span>
+              <input id="sentenceRomaji" name="sentenceRomaji" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="audioFollow">
+              <span class="setting-copy">
+                <span class="setting-title">Follow sentence audio</span>
+                <span class="setting-description">Highlight words as the original audio plays</span>
+              </span>
+              <input id="audioFollow" name="audioFollow" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="wordAudio">
+              <span class="setting-copy">
+                <span class="setting-title">Click words to listen</span>
+                <span class="setting-description">Optional playback; the sentence speaker always stays available</span>
+              </span>
+              <input id="wordAudio" name="wordAudio" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label id="neural-voice-row" class="select-row" for="wordNeuralVoice">
+              <span class="setting-title">Voice</span>
+              <select id="wordNeuralVoice" name="wordNeuralVoice">
+                <option value="female">Female · Mao Plain</option>
+                <option value="male">Male · Nise</option>
+              </select>
+            </label>
+            <p id="word-audio-note" class="setting-description word-voice-note">Local neural voice · Setup: helper/Setup.cmd. No audio timings needed.</p>
+            <div id="word-prepare-row" class="word-prepare-row"><a id="word-prepare-link" href="word-voice.html" target="_blank" aria-disabled="true">Prepare course words <span aria-hidden="true">↗</span></a><p id="word-prepare-note">Open an iKnow course to prepare its words.</p></div>
+            <label class="select-row" for="wordAudioSpeed">
+              <span class="setting-title">Playback speed</span>
+              <select id="wordAudioSpeed" name="wordAudioSpeed">
+                <option value="0.7">0.7×</option>
+                <option value="0.85">0.85×</option>
+                <option value="1">1×</option>
+              </select>
+            </label>
+            <label class="setting-row" for="kanaVisible">
+              <span class="setting-copy">
+                <span class="setting-title">Show Kana</span>
+              </span>
+              <input id="kanaVisible" name="kanaVisible" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="pronunciation">
+              <span class="setting-copy">
+                <span class="setting-title">Pronunciation help</span>
+                <span class="setting-description">wa instead of ha; spoken number readings</span>
+              </span>
+              <input id="pronunciation" name="pronunciation" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="setting-row" for="sentenceBold">
+              <span class="setting-copy">
+                <span class="setting-title">Bold the focus word in sentences</span>
+              </span>
+              <input id="sentenceBold" name="sentenceBold" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="select-row" for="fontSize">
+              <span class="setting-title">Romaji font size</span>
+              <select id="fontSize" name="fontSize">
+                <option value="14">14 px</option>
+                <option value="16">16 px</option>
+                <option value="18">18 px</option>
+                <option value="20">20 px</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset id="color-settings" disabled>
+          <legend>Understanding</legend>
+          <div class="card colors-card">
+            <label class="select-row" for="translationLanguage">
+              <span class="setting-title">Translation</span>
+              <select id="translationLanguage" name="translationLanguage">
+                <option value="en">English</option>
+                <option value="de">German</option>
+                <option value="both">Both</option>
+              </select>
+            </label>
+            <label class="select-row" for="alignmentMode">
+              <span class="setting-title">Alignment</span>
+              <select id="alignmentMode" name="alignmentMode">
+                <option value="phrases">Meaning groups</option>
+                <option value="words">Word detail</option>
+              </select>
+            </label>
+            <label class="select-row" for="colorMode">
+              <span class="setting-title">Meaning colors</span>
+              <select id="colorMode" name="colorMode">
+                <option value="hover">On hover</option>
+                <option value="all">All groups</option>
+                <option value="off">Off</option>
+              </select>
+            </label>
+            <label class="setting-row" for="groupInfo">
+              <span class="setting-copy">
+                <span class="setting-title">Meanings &amp; hover</span>
+                <span class="setting-description">Highlight related words when pointing at them</span>
+              </span>
+              <input id="groupInfo" name="groupInfo" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset id="preparation-settings" disabled>
+          <legend>Preparation</legend>
+          <a class="queue-link" href="queue.html" target="_blank">Series &amp; queue <span aria-hidden="true">↗</span></a>
+          <a class="setup-link" href="helper-setup.html" target="_blank">Set up the local helper <span aria-hidden="true">↗</span></a>
+        </fieldset>
+      </form>
+
+      <section id="app-updates" class="app-updates" aria-labelledby="updates-title" aria-busy="false">
+        <div class="update-heading"><h2 id="updates-title">Updates</h2><span id="update-version"></span></div>
+        <p id="update-status" role="status" aria-live="polite" hidden></p>
+        <progress id="update-progress" max="1" aria-label="Update progress" hidden></progress>
+        <div class="update-actions">
+          <button id="check-updates" type="button">Check for updates</button>
+          <button id="install-update" type="button" class="update-primary" hidden>Install update</button>
+          <button id="refresh-updated-tabs" type="button" hidden>Refresh iKnow pages</button>
+        </div>
+      </section>
+
+      <a class="setup-link" id="open-diagnostics" href="diagnostics.html" target="_blank" rel="noopener noreferrer">Diagnostics <span aria-hidden="true">↗</span></a>
+
+      <details class="pack-settings">
+        <summary>Import a course file</summary>
+        <input type="file" id="course-pack-file" accept="application/json,.json" hidden>
+        <button type="button" id="import-course-pack">Choose file</button>
+        <p id="course-pack-status" role="status" aria-live="polite" hidden></p>
+      </details>
+      <footer>
+        <div class="save-state">
+          <p id="save-status" class="save-status" role="status" aria-live="polite">Loading …</p>
+          <button id="retry-save" type="button" hidden>Try again</button>
+        </div>
+        <a class="course-link" href="https://iknow.jp/content/japanese" target="_blank" rel="noopener noreferrer">Open courses <span aria-hidden="true">↗</span></a>
+      </footer>
+    </main>
+  </body>
+</html>

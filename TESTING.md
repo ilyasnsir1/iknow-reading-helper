@@ -1,0 +1,44 @@
+# Validation and maintainer checks
+
+The 1.34.0 updater was checked in Windows 11 with the production helper and an
+isolated Brave profile. These checks do not use the installed browser profile,
+personal model cache, registry registration or saved courses.
+
+- 12 helper cases: real Windows RSA signatures, bounded downloads and archives,
+  Windows paths, local-edit protection, model/cache preservation, rollback,
+  interrupted transactions, cross-process activity locks, detached native-host
+  handoff and manual adoption for expanded browser permissions.
+- 5 cleanup cases: bounded old-stage retention, live/foreign/recovery-stage
+  preservation, and rejection of junctions outside the update directory.
+- 6 service-worker policy groups: popup-only messages, daily silent checks,
+  explicit installation, invalid replies, interrupted reloads and late recovery.
+- 5 isolated Brave popup groups: current/available/error/busy states, progress,
+  popup reopening during installation, native-port closure, settings retention,
+  page refresh and a single reload handoff. Native responses and the final
+  runtime.reload call are controlled fixtures in these browser checks.
+- 8 publisher cases: deterministic archives, pinned-key signing, full-file
+  checksums, unsafe files, unexpected models/credentials and tampered releases.
+
+Run the checked-in focused tests from this repository with Python 3.11+ and
+Node.js 18+; Windows PowerShell is required for the RSA/transaction cases:
+
+```powershell
+python tests/test-updater-helper.py
+python tests/test-updater-cleanup.py
+node tests/test-updates-policy.cjs
+python tools/publisher/test-publisher.py
+node tests/test-extension-updates.cjs
+```
+
+The last test also requires Playwright and Brave. Set IKNOW_PLAYWRIGHT to the
+Playwright package location and IKNOW_BROWSER_PATH to Brave's executable when
+they are not found by the test. It creates its own browser profile and evidence
+under tests/extension-updates-evidence; do not commit those files.
+
+The broader download, cancellation, diagnostics and settings regression checks
+also passed in the development workspace. The public focused suite above is
+limited to update distribution; it does not claim every course/model operation
+can succeed without an internet connection or adequate memory. Model/dependency
+installation remains an explicit Setup action when release notes require it.
+
+See tools/publisher/README.md for release staging, signing and publishing.

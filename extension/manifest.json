@@ -1,0 +1,129 @@
+{
+  "manifest_version": 3,
+  "name": "iKnow! Reading Helper",
+  "version": "1.34.0",
+  "description": "Romaji, meaning colors, German translations and word audio for iKnow Japanese courses.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://iknow.jp/*",
+    "https://en.iknow.jp/*",
+    "https://ja.iknow.jp/*",
+    "https://assets.iknow.jp/*",
+    "https://assets0.iknow.jp/*",
+    "https://assets1.iknow.jp/*",
+    "https://assets2.iknow.jp/*",
+    "https://assets3.iknow.jp/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "iKnow! Reading Helper – Settings",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://iknow.jp/courses/*",
+        "https://en.iknow.jp/courses/*",
+        "https://ja.iknow.jp/courses/*"
+      ],
+      "js": [
+        "audio-bridge.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://iknow.jp/courses/*",
+        "https://en.iknow.jp/courses/*",
+        "https://ja.iknow.jp/courses/*"
+      ],
+      "js": [
+        "core.js",
+        "view-state.js",
+        "data.js",
+        "audio-data.js",
+        "english-notes.js",
+        "meaning-notes.js",
+        "translation-corrections.js",
+        "word-alignment.js",
+        "course-packs.js",
+        "word-pronunciation.js",
+        "word-audio-data.js",
+        "word-audio-lookup.js",
+        "audio-edges.js",
+        "audio-phrases.js",
+        "audio-pcm.js",
+        "audio-clip-records.js",
+        "audio-sync.js",
+        "scene-motion.js",
+        "near-arm-art.js",
+        "automation.js",
+        "panel-layout.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css",
+        "automation.css",
+        "series.css",
+        "companion.css",
+        "panel-layout.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://iknow.jp/series/*",
+        "https://en.iknow.jp/series/*",
+        "https://ja.iknow.jp/series/*",
+        "https://iknow.jp/content/japanese/series/*",
+        "https://en.iknow.jp/content/japanese/series/*",
+        "https://ja.iknow.jp/content/japanese/series/*"
+      ],
+      "js": [
+        "core.js",
+        "view-state.js",
+        "series.js"
+      ],
+      "css": [
+        "series.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/reading-emblem-v1.png",
+        "assets/reading-fox-v1.png",
+        "assets/reading-fox-motion-v1.png",
+        "assets/reading-fox-actions-v1.png",
+        "assets/reading-fox-breeze-v1.png",
+        "assets/reading-fox-walk-v3.png",
+        "assets/reading-fox-near-arm-v1.png",
+        "assets/reading-fox-stand-v1.png"
+      ],
+      "matches": [
+        "https://iknow.jp/*",
+        "https://en.iknow.jp/*",
+        "https://ja.iknow.jp/*"
+      ]
+    }
+  ]
+}

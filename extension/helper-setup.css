@@ -1,0 +1,17 @@
+:root { color-scheme: light; font: 15px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; color: #2a2e43; background: #f7f6f2; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 650px; margin: 8vh auto; padding: 42px 50px; border: 1px solid #e5e2dc; border-radius: 22px; background: #fffefa; box-shadow: 0 16px 70px #25223d06; }
+img { display: block; margin-bottom: 22px; }
+.eyebrow { color: #a9592f; font-size: 11px; font-weight: 650; letter-spacing: .08em; margin: 0 0 8px; }
+h1 { font-size: 34px; line-height: 1.2; letter-spacing: -1.2px; font-weight: 600; margin: 0 0 18px; }
+.intro { color: #6a6c77; margin: 0 0 32px; font-size: 14px; }
+ol { padding: 0; list-style: none; margin: 0; }
+li { display: flex; gap: 16px; padding: 20px 0; border-top: 1px solid #eeece7; }
+li>span { flex: 0 0 29px; width: 29px; height: 29px; border-radius: 50%; background: #f1eee8; text-align: center; line-height: 29px; font-size: 12px; color: #777277; }
+h2 { font-size: 14px; font-weight: 600; margin: 1px 0 5px; }
+li p { color: #6a6c77; font-size: 12px; line-height: 1.7; margin: 0; }
+strong { font-weight: 600; color: #42465b; }
+.footnote { font-size: 11px; color: #8b8a90; margin: 25px 0 0; }
+a:focus-visible, button:not(:disabled):focus-visible, input:not(:disabled):focus-visible, select:not(:disabled):focus-visible, summary:focus-visible { outline: 2px solid #969ba8; outline-offset: 3px; }
+@media (max-width: 660px) { main { margin: 20px; padding: 30px 25px; } h1 { font-size: 29px; } }

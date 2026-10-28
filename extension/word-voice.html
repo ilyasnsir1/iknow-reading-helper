@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prepare word audio · iKnow! Reading Helper</title><link rel="stylesheet" href="word-voice.css"><script src="core.js" defer></script><script src="data.js" defer></script><script src="audio-data.js" defer></script><script src="course-packs.js" defer></script><script src="word-pronunciation.js" defer></script><script src="word-voice-course.js" defer></script><script src="word-voice.js" defer></script></head>
+<body><main>
+ <header><img src="icons/icon128.png" width="44" height="44" alt=""><div><p class="eyebrow">iKnow! Reading Helper</p><h1>Prepare word audio</h1></div></header>
+ <p class="intro">Optional: save a course's spoken words in advance so new words start faster while you study. Choose a voice and speed, then select Prepare words. You can also skip this and let words prepare when you click them on iKnow.</p>
+ <section class="card">
+  <form id="course-form"><label for="course">Course link or ID</label><div class="course-input"><input id="course" name="course" inputmode="url" placeholder="iKnow course link or ID" autocomplete="off" aria-describedby="course-input-help"><button id="load" type="submit">Load course</button></div><p id="course-input-help" class="muted">Load course only selects the course and checks its words. Audio preparation starts when you choose Prepare words.</p></form>
+  <h2 id="course-title">Choose a course</h2><p id="course-detail" class="muted">Loading a course only checks its word readings.</p>
+  <div class="settings"><label>Voice<select id="voice"><option value="female">Female · Mao Plain</option><option value="male">Male · Nise</option></select></label><label>Speed<select id="speed"><option value="1">1×</option><option value="0.85">0.85×</option><option value="0.7">0.7×</option></select></label></div>
+  <div class="progress-title"><strong id="heading">Ready when you are</strong><span id="eta" class="muted"></span></div><progress id="progress" max="1" value="0"></progress>
+  <p id="status" role="status" aria-live="polite">Load a course, then choose Prepare words.</p>
+  <div class="actions"><button id="prepare" class="primary" disabled>Prepare words</button><button id="pause" hidden>Pause</button><button id="refresh" hidden>Refresh status</button></div>
+ </section>
+ <p class="footnote">Preparation runs locally and can continue with this page closed. You can pause and resume it. Only this voice and speed are prepared; changing either uses its own cache. Starting preparation also selects this voice and speed for playback.</p>
+ <details><summary>Setup and sentence highlighting</summary><p>For first-time setup, open <strong>helper/Setup.cmd</strong> and choose Complete or Voices only. No additional language model is needed here.</p><p>This prepares independently spoken words. <strong>Audio timings</strong> remains a separate course option for highlighting words during the original iKnow sentence recording. Cached files can be reclaimed when the word cache reaches its limit; refreshing this page checks what remains.</p></details>
+</main></body></html>

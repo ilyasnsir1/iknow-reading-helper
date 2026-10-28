@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preparation · iKnow! Reading Helper</title>
+  <link rel="stylesheet" href="queue.css"><script src="core.js" defer></script><script src="queue.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><img src="icons/icon128.png" width="52" height="52" alt=""><div><p class="eyebrow">iKnow! Reading Helper</p><h1>Your preparation</h1></div></header>
+    <section id="empty" class="panel" hidden><h2>Your courses. Your choice.</h2><p>Open a course series, choose your courses and additions, then select <strong>Prepare selected</strong>. Track progress here even after closing the series page.</p><a class="button" href="https://iknow.jp/content/japanese" target="_blank" rel="noopener noreferrer">Open Japanese courses ↗</a></section>
+    <section id="queue" class="panel" hidden>
+      <div class="queue-top"><span id="status" class="badge">Loading…</span><span id="course-count"></span></div>
+      <h2 id="series-title"></h2><div id="features" class="features" aria-label="Selected additions"></div>
+      <div class="current"><span class="orbit" aria-hidden="true"></span><div><p id="current-title"></p><p id="phase" role="status" aria-live="polite"></p></div></div>
+      <progress id="course-progress" aria-label="Series progress" value="0" max="1"></progress>
+      <div class="metrics"><p id="totals"></p><p id="eta"></p></div>
+      <p id="error" role="status" hidden></p>
+      <div class="actions"><button id="pause" type="button" hidden>Pause</button><button id="resume" type="button" hidden>Resume</button><button id="refresh" class="secondary" type="button">Refresh</button></div>
+      <ol id="courses" class="course-list" aria-label="Selected courses"></ol>
+    </section>
+    <p id="connection" role="status" aria-live="polite">Loading preparation…</p>
+    <footer>Prepared locally · Progress stays saved</footer>
+  </main>
+</body>
+</html>

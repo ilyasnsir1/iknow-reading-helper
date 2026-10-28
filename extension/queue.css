@@ -1,0 +1,29 @@
+:root { color-scheme: light; font: 14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; background: #f7f6f3; color: #303243; }
+* { box-sizing: border-box; }
+body { margin: 0; } main { max-width: 800px; padding: 48px 24px 28px; margin: 0 auto; }
+[hidden] { display: none !important; }
+header { display: flex; align-items: center; gap: 15px; margin-bottom: 28px; } header img { object-fit: contain; }
+.eyebrow { font-size: 11px; font-weight: 650; letter-spacing: .08em; color: #a65f35; margin: 0 0 3px; }
+h1 { font-size: 27px; line-height: 1.25; letter-spacing: -.6px; margin: 0; font-weight: 600; } h2 { font-size: 23px; line-height: 1.4; font-weight: 550; letter-spacing: -.4px; margin: 14px 0; }
+.panel { padding: 28px; background: #fff; border: 1px solid #e5e1dc; border-radius: 19px; box-shadow: 0 7px 28px #2a293708; }
+.panel>p { color: #74727f; } .queue-top, .metrics { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 9px; }
+.badge { font-size: 11px; padding: 4px 9px; border-radius: 6px; color: #636078; background: #f0eef6; }
+.badge[data-status="complete"] { color: #4f7260; background: #edf5ef; } .badge[data-status="paused"] { color: #936d45; background: #fbf3e6; }
+#course-count { color: #817d89; font-size: 12px; padding-top: 3px; }
+.features { display: flex; gap: 7px; flex-wrap: wrap; } .features span { padding: 4px 8px; font-size: 11px; border: 1px solid #e6e2ec; border-radius: 6px; color: #767083; }
+.current { display: flex; align-items: center; gap: 13px; padding: 24px 0 16px; }
+.current p { margin: 0; } #current-title { font-weight: 550; } #phase { color: #817b8c; font-size: 12px; margin-top: 3px; }
+.orbit { display: block; flex: 0 0 24px; width: 24px; height: 24px; border: 1px solid #e5dfee; border-top: 2px solid #9b8bab; border-radius: 50%; animation: orbit 2s linear infinite; }
+body:not([data-status="running"]) .orbit { animation-play-state: paused; }
+progress { appearance: none; display: block; width: 100%; height: 5px; border: 0; background: #eeebf2; border-radius: 5px; overflow: hidden; }
+progress::-webkit-progress-bar { background: #eeebf2; } progress::-webkit-progress-value { background: #8e819f; } progress::-moz-progress-bar { background: #8e819f; }
+.metrics p { font-size: 11px; color: #837d8b; margin: 9px 0 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 22px 0; } button, .button { appearance: none; background: #505068; color: #fff; padding: 10px 16px; border: 1px solid #505068; border-radius: 9px; font: 500 12px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; text-decoration: none; cursor: pointer; display: inline-block; }
+button.secondary { color: #777181; background: #fff; border-color: #ded9e4; } button:disabled { opacity: .5; cursor: default; outline: none; } button:not(:disabled):focus-visible, a:focus-visible { outline: 2px solid #969ba8; outline-offset: 3px; }
+.course-list { list-style: none; padding: 0; margin: 22px 0 0; border-top: 1px solid #efecf1; } .course-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #efecf1; color: #79727e; font-size: 12px; }
+.course-list li span:first-child { color: #57515e; } .course-list li[data-status="running"] span:first-child { color: #514569; font-weight: 600; } .course-list li[data-status="error"] span:last-child { color: #a66346; }
+#error { color: #a66346; font-size: 12px; background: #fff8f2; border-radius: 8px; padding: 11px 13px; }
+#connection, footer { text-align: center; color: #a09aa5; font-size: 11px; margin: 19px 0; } footer { margin-top: 24px; }
+@keyframes orbit { to { transform: rotate(360deg); } }
+@media (max-width: 600px) { main { padding: 26px 15px; } .panel { padding: 21px; } h1 { font-size: 23px; } h2 { font-size: 20px; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

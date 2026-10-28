@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnostics · iKnow! Reading Helper</title>
+  <link rel="stylesheet" href="diagnostics.css">
+  <script src="diagnostics.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/icon128.png" width="48" height="48" alt="">
+      <div><p class="eyebrow">iKnow! Reading Helper</p><h1>Diagnostics</h1></div>
+    </header>
+    <p class="intro">Create a local report for troubleshooting. Includes versions, installation status and recent errors. Review before sharing.</p>
+    <section class="card" aria-label="Export a diagnostic report">
+      <div class="export-row">
+        <div><h2>A report you can share</h2><p class="muted">No model preparation or automatic upload.</p></div>
+        <button id="export-diagnostics" type="button"><span class="spinner" aria-hidden="true"></span><span>Export diagnostics</span></button>
+      </div>
+      <p id="diagnostics-status" role="status" aria-live="polite">Ready when you are.</p>
+      <details id="report-preview" hidden>
+        <summary>View report</summary>
+        <pre id="report-text" tabindex="0" aria-label="Diagnostic report JSON"></pre>
+      </details>
+    </section>
+    <p class="footnote">The report can still be exported when the local helper is unavailable. Keep the file and a short description of what happened together.</p>
+  </main>
+</body>
+</html>

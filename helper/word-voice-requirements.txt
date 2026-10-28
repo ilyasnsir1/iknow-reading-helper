@@ -1,0 +1,10 @@
+# Windows CPython 3.12 wheels. Existing NumPy and typing-extensions are reused.
+# Open JTalk's dictionary and one Mei voice are inside the first wheel.
+pyopenjtalk-plus==0.4.1.post10 --hash=sha256:c3c033fae4ef69311885781191bf213662e56f19ec415736e05b26f60a20e5d6
+pydantic==2.12.5 --hash=sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d
+pydantic-core==2.41.5 --hash=sha256:1962293292865bca8e54702b08a4f26da73adc83dd1fcf26fbc875b35d81c815
+annotated-types==0.7.0 --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53
+typing-inspection==0.4.2 --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7
+sudachipy==0.6.10 --hash=sha256:4a79b92b0776613481481c1ed0d2e92994b233ed5d29aa365789a1ba521de0a4
+# Optional small Japanese phoneme aligner for future original-recording timing.
+PySegmentKit==0.2.1 --hash=sha256:8c448d77cf309258af3b95517d021ade14ebb41d841c4bd3fb3444c63520aa50

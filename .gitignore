@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.log
+*.zip
+*.7z*
+*.aivm*
+*.gguf
+*.onnx
+*.bin
+runtime/
+python-packages/
+downloads/
+neural/
+profiles/
+work/
+.codex/

@@ -1,0 +1,157 @@
+/* Explicit application updates through the installed local helper. */
+(() => {
+  "use strict";
+  const KEY = "iknowReaderUpdateState", HOST = "de.iknow.lesehilfe";
+  const version = chrome.runtime.getManifest().version;
+  const statuses = new Set(["idle", "current", "available", "checking", "downloading", "installing", "complete", "error", "unconfigured", "busy"]);
+  const working = value => ["downloading", "installing"].includes(value?.status);
+  const validVersion = value => typeof value === "string" && /^\d{1,5}(?:\.\d{1,5}){1,3}$/.test(value) ? value : null;
+  let state = { status: "idle", currentVersion: version, message: "" };
+  let claimed = false, installClaimed = false, polling = null, reloadScheduled = false, configPromise = null;
+  function trusted(sender) {
+    try {
+      const own = new URL(chrome.runtime.getURL("popup.html")), url = new URL(sender?.url || "");
+      return sender?.id === chrome.runtime.id && url.protocol === own.protocol && url.host === own.host && url.pathname === own.pathname;
+    } catch { return false; }
+  }
+  function normalize(value) {
+    if (!value || typeof value !== "object" || !statuses.has(value.status)) throw Error("The helper returned an invalid update status.");
+    return { status: value.status, currentVersion: version, latestVersion: validVersion(value.latestVersion),
+      message: String(value.message || "").slice(0, 320), progress: Number.isFinite(value.progress) ? Math.min(1, Math.max(0, value.progress)) : null,
+      checkedAt: Number.isFinite(value.checkedAt) ? value.checkedAt : state.checkedAt || null,
+      lastAttemptAt: Number.isFinite(value.lastAttemptAt) && value.lastAttemptAt > 0 ? value.lastAttemptAt : state.lastAttemptAt || null,
+      refreshTabs: value.refreshTabs === true || state.refreshTabs === true,
+      installAttempted: value.installAttempted === true || state.installAttempted === true,
+      reloadedVersion: validVersion(value.reloadedVersion) || state.reloadedVersion || null };
+  }
+  async function save(value) {
+    state = { ...state, ...value, currentVersion: version };
+    await chrome.storage.local.set({ [KEY]: state });
+    return state;
+  }
+  function native(action, timeout = 45000) {
+    return new Promise((resolve, reject) => {
+      let port, settled = false;
+      const requestId = crypto.randomUUID();
+      const finish = (error, result) => {
+        if (settled) return; settled = true; clearTimeout(timer);
+        try { port?.disconnect(); } catch { /* Already closed. */ }
+        if (error) reject(error); else resolve(result);
+      };
+      const timer = setTimeout(() => finish(Error("The update helper did not respond. Try again when it is available.")), timeout);
+      try {
+        port = chrome.runtime.connectNative(HOST);
+        port.onMessage.addListener(message => {
+          if (message?.requestId !== requestId) return;
+          if (message.type === "error") { finish(Error("This helper does not support updates yet. Install the initial updater version from your project folder.")); return; }
+          if (message.type !== "update:result") return;
+          try {
+            const next = normalize(message.state);
+            if (message.ok !== true && !["error", "busy", "unconfigured", "downloading", "installing"].includes(next.status)) throw Error("The helper could not verify this update.");
+            finish(null, { ok: message.ok === true, state: next });
+          }
+          catch (error) { finish(error); }
+        });
+        port.onDisconnect.addListener(() => finish(Error(chrome.runtime.lastError?.message || "The local update helper disconnected.")));
+        port.postMessage({ type: "update:" + action, requestId, manual: action !== "status" });
+      } catch (error) { finish(error); }
+    });
+  }
+  async function finishInstall(next) {
+    const target = next.latestVersion || state.latestVersion;
+    if (!validVersion(target)) throw Error("The installed update has no valid version.");
+    await save({ ...next, latestVersion: target });
+    if (target === version) {
+      await save({ status: "current", installAttempted: false, refreshTabs: true, message: "Updated. Refresh your open iKnow pages." }); return;
+    }
+    if (state.reloadedVersion === target) {
+      await save({ status: "error", refreshTabs: false, message: "The update files are installed, but Brave is still running the previous version. Reload Reading Helper at brave://extensions, then reopen this popup." }); return;
+    }
+    if (reloadScheduled) return;
+    reloadScheduled = true;
+    await save({ status: "complete", reloadedVersion: target, refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
+    setTimeout(() => chrome.runtime.reload(), 500);
+  }
+  async function pollOnce() {
+    const reply = await native("status");
+    if (reply.state.status === "complete") await finishInstall(reply.state);
+    else if (!(working(state) && reply.state.status === "idle")) await save(reply.state);
+  }
+  function poll() {
+    if (polling || !working(state)) return;
+    const started = Date.now();
+    polling = (async () => {
+      let failures = 0;
+      while (working(state) && Date.now() - started < 12 * 60 * 1000) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(15000, 2000 * 2 ** Math.min(failures, 3))));
+        try { await pollOnce(); failures = 0; }
+        catch (error) {
+          failures++;
+          if (Date.now() - started > 11 * 60 * 1000) await save({ status: "error", message: String(error.message || error).slice(0, 320) });
+        }
+      }
+      if (working(state)) await save({ status: "error", message: "The update is taking longer than expected. Check its status again before retrying." });
+    })().finally(() => { polling = null; });
+  }
+  const ready = chrome.storage.local.get(KEY).then(async stored => {
+    if (stored[KEY] && statuses.has(stored[KEY].status)) state = { ...state, ...normalize(stored[KEY]) };
+    if (state.latestVersion === version && ["complete", "available"].includes(state.status)) {
+      await save({ status: "current", installAttempted: false, message: state.refreshTabs ? "Updated. Refresh your open iKnow pages." : "You are up to date." });
+    } else if (state.status === "checking") await save({ status: "idle", message: "" });
+    else if (state.status === "complete") await finishInstall(state);
+    poll();
+  }).catch(() => { state = { status: "error", currentVersion: version, message: "Update status could not be loaded." }; });
+  async function autoCheck() {
+    if (!configPromise) configPromise = fetch(chrome.runtime.getURL("update-config.json")).then(response => response.ok ? response.json() : null).catch(() => null);
+    const config = await configPromise;
+    if (config?.enabled !== true || claimed || working(state) || state.status === "error" || state.status === "busy" || Date.now() - (state.lastAttemptAt || 0) < 24 * 60 * 60 * 1000) return { ok: true, state };
+    // Save failed attempts too; an offline popup must not repeatedly spawn hosts.
+    await save({ lastAttemptAt: Date.now() });
+    return run("check", true);
+  }
+  async function run(action, automatic = false) {
+    await ready;
+    if (action === "status") {
+      if (state.installAttempted && !working(state) && !claimed) {
+        try { await pollOnce(); } catch { /* Keep the previous actionable status. */ }
+      }
+      return { ok: true, state };
+    }
+    if (action === "auto-check") return autoCheck();
+    if (action === "refresh") {
+      const tabs = await chrome.tabs.query({ url: ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"] });
+      await Promise.allSettled(tabs.filter(tab => Number.isInteger(tab.id)).map(tab => chrome.tabs.reload(tab.id)));
+      await save({ refreshTabs: false, message: "Your open iKnow pages have been refreshed." });
+      return { ok: true, state };
+    }
+    if (claimed || working(state)) return { ok: false, state, code: "update_busy" };
+    claimed = true; installClaimed = action === "install";
+    const previous = { ...state };
+    try {
+      if (action === "install") {
+        if (state.status !== "available" || !validVersion(state.latestVersion)) return { ok: false, state, code: "update_check_required" };
+        if (await globalThis.IKnowReaderUpdateActivity?.()) return { ok: false, state: { ...state, status: "busy", message: "Pause course and word preparation before installing an update." }, code: "preparation_active" };
+      }
+      await save({ status: action === "check" ? "checking" : "downloading", installAttempted: action === "install" || state.installAttempted === true, message: action === "check" ? "Checking for updates…" : "Downloading and verifying update…", progress: null });
+      if (action === "install") poll();
+      const reply = await native(action, action === "install" ? 10 * 60 * 1000 : 45000);
+      if (action === "check") reply.state.checkedAt = Date.now();
+      if (automatic && !reply.ok) { await save(previous); return { ok: false, state }; }
+      if (reply.state.status === "complete") await finishInstall(reply.state);
+      else await save(reply.state);
+      return { ok: reply.ok, state };
+    } catch (error) {
+      if (automatic) { await save(previous); return { ok: false, state }; }
+      await save({ status: "error", latestVersion: previous.latestVersion, message: String(error.message || error).slice(0, 320) });
+      return { ok: false, state };
+    } finally { claimed = false; installClaimed = false; poll(); }
+  }
+  globalThis.IKnowReaderUpdates = Object.freeze({ get busy() { return installClaimed || working(state); } });
+  chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (!String(message?.type || "").startsWith("ikr:update:")) return;
+    const action = message.type.slice("ikr:update:".length);
+    if (!trusted(sender) || !["status", "auto-check", "check", "install", "refresh"].includes(action)) { respond({ ok: false, code: "update_forbidden" }); return; }
+    void run(action).then(respond, () => respond({ ok: false, state: { ...state, status: "error", message: "Updates are unavailable. Try again." } }));
+    return true;
+  });
+})();
