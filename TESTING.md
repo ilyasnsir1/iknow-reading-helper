@@ -81,3 +81,22 @@ helper verified and installed the new release through the detached runner. A
 fresh helper confirmed 1.34.1; all 123 installed file hashes matched the signed
 release and cache/personal-file sentinels were retained. No browser registration
 or personal installation was changed by this isolated test.
+
+## Version 1.35.0 update notice
+
+The popup's update notice uses the original four-pose fox atlas. Eight isolated
+Brave checks cover concealed horizontal relocation, peeking from multiple
+places, mouse catch/duck/return, unchanged banner layout, keyboard/pointer
+navigation, reduced motion and lifecycle cleanup. The actual scene code runs
+against locally fulfilled requests and a bounded Chrome transport fixture;
+thousands of natural animation frames verify that horizontal travel happens
+only when the whole actor is clipped behind the banner. No native helper,
+installed extension or personal cache is used by these scene checks.
+
+```powershell
+node tests/test-fox-hide-seek.cjs
+```
+
+The existing six real-extension popup groups separately verify the new notice's
+scroll/focus behavior and retained check/install/progress/reload workflow. Native
+responses and runtime.reload remain explicit fixtures in that browser test.

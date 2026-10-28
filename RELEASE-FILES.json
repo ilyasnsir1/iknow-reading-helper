@@ -1,5 +1,5 @@
 {
-  "version": "1.34.1",
+  "version": "1.35.0",
   "sha256": {
     ".gitignore": "cd946c2dc52a51f345d7745bd0dc0fcdd4efe03195711123fcd821a96b0f8528",
     "ALIGNMENT-MODES.md": "576a25a0e4f2619b643fdc9d38723f4c963a97161439dd67611c55e91899b7a1",
@@ -48,16 +48,17 @@
     "extension/icons/lantern16.png": "c360dc7bf53cf747890ba351f1405bb444f84e178d3224a2edb2a12888732991",
     "extension/icons/lantern32.png": "4d815f4ddb4e0f3a4c79769462446408cce8445eef1b15196537ee0b9a84b226",
     "extension/icons/lantern48.png": "9286a525d5d7f8a7bc95e1c2c27816e0d0200fb746301054be08240211b07f72",
-    "extension/manifest.json": "bb46890b89653abc2bf962cf3fa25219742b48f78b23b62d52e11d701a684472",
+    "extension/manifest.json": "3e4088714c44ecc956217d6aef1b393cb34496dabe2e5164c83078bff3b4b837",
     "extension/meaning-notes.js": "9cea73d978e188517506dd53e318fadf93422e89433ced1188f71781acfbbd8a",
     "extension/near-arm-art.js": "defe3fd11688dd0313f48aa3eef4d5e169a7660eda77746e08cefc5a37638b00",
     "extension/neural-speech-source.js": "6bdfb020c890bf2daa700a70221a63cccf6ae4ccbad7d4599a648b3d293bc13e",
     "extension/packs-ui.js": "9c6646d7a8f3f9f66748c2edeaea6e044a4e850250487ecfcddf1420db6866ef",
     "extension/panel-layout.css": "d7a6268a67d0f0e445bf30e5df56861e7968e152fac9b53dd031ad84dde4a984",
     "extension/panel-layout.js": "cd857acdf2b087c704a62d12cba9178188735ac7f7a048678fcab3aa19bff9c4",
-    "extension/popup-updates.js": "d2d13fa4fb25a4ae3a732963b791d255fbe1eea4ccc3174a23451ae4ac74d154",
-    "extension/popup.css": "e7dde568d69d4a42a1c88b052ef2008a509e784e46cd06cdedbca7c14b75ee3f",
-    "extension/popup.html": "4dfbd219540f58300b5960b209768e62064d2b5db3a4cb368f5a4e8699184b11",
+    "extension/popup-fox.js": "ccc933eb3afcb7f014a15c13e97adce3fcc862ee64ca5889726aaa6f04d38aa8",
+    "extension/popup-updates.js": "d92d654b27928a969b858ca81207c674fc922bc4a2967bad5a34e035ca55712b",
+    "extension/popup.css": "0fdacffd288c1f1c650859eb0a36cb40181081590d8a18a3aa4a7cb6c34fdfdb",
+    "extension/popup.html": "0272e3ede602e7bf7fe644f3f9dfd3127ea571c442659773eb33e39881ffff69",
     "extension/popup.js": "9b80183e2088012aa31cb8700452792ceaa0af28f85abdca41860e82295f53b6",
     "extension/queue.css": "1cd415e9b15143e8446ffbf2faec520654b09a4ff1669ab8d5bee0b4ce8cf5a7",
     "extension/queue.html": "44ca3f928772b6d5f7d80de85fb938a8b44776ca44e7d9cfc9a2f6aa92693b70",
@@ -117,11 +118,11 @@
     "helper/word_speech.py": "e7096e0e8e42708ed41dc218c5b252926a8b50ccd56a14f8b983f9811da67579",
     "helper/word_voice_jobs.py": "4899c76db76915e244bf1b51533686c51ee076bb43586ec5975833ddfa17d388",
     "MEANING-NOTES.md": "025c88f6a0d44469fdfc7ff904359c1411ef5cf3114a904820da72718b6ff22e",
-    "README.md": "da577751cd2ef9ffe00103078652fc21c495d0e14246ca5a81abb290a32dc973",
+    "README.md": "e49f713a13701bb577213b907ec21a61a902bc90541728ac74815d540bb039ac",
     "RECORDING-A-FRESH-INSTALL.md": "62c2d21c423f2e9931b95caf4aabe204a79ce71ad0457121291e88b176239830",
     "SHARE-WITH-A-FRIEND.md": "1f68f6827b56720d274dbbdc9d1eb19855b0a3d4ee6782a31a7cc49c3d398922",
     "START-HERE.md": "1d0efb3a14e3015618614d6ee2c20b766dc3af55e200e6af33cc9e944409960e",
-    "UPDATES.md": "f84d8f88127844aac4d97bed36c5fbd0fd79ba25a87d35951037571d46bfdfa0",
+    "UPDATES.md": "bbbacc14467d11d25ef2ef0705340edc20345e263b067b3c2dab0c5cdac791c0",
     "VOICE-OPTIONS.md": "ebc55f1a8c34ddd502b35e26a4f7fbe31c32cfce3b7a614a2d46f9d88099f739"
   }
 }

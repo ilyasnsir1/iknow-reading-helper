@@ -68,6 +68,17 @@ const until = async (predicate, message, timeout = 20000) => { const at = Date.n
     await worker.evaluate(() => { __updateTest.mode = "available"; });
     await popup.locator("#check-updates").click();
     await until(async () => await popup.locator("#install-update").isVisible(), "available update");
+    await popup.setViewportSize({ width: 376, height: 600 });
+    const beforeNavigation = await worker.evaluate(() => __updateTest.calls.length);
+    await popup.locator("#update-notice").click();
+    await until(async () => popup.evaluate(() => {
+      const panel = document.querySelector("#app-updates"), bounds = panel.getBoundingClientRect();
+      return document.activeElement === panel && bounds.top >= 0 && bounds.bottom <= innerHeight;
+    }), "real extension banner navigates to visible focused updates");
+    assert.match(popup.url(), /#app-updates$/);
+    assert.equal(await worker.evaluate(() => __updateTest.calls.length), beforeNavigation);
+    await popup.setViewportSize({ width: 700, height: 1000 });
+    pass("The fox notice scrolls and focuses the Updates section in a real extension popup without starting native work");
     await worker.evaluate(() => { __updateTest.busy = true; });
     const before = await worker.evaluate(() => __updateTest.calls.length);
     await popup.locator("#install-update").click();

@@ -9,6 +9,7 @@
     <script src="course-packs.js" defer></script>
     <script src="packs-ui.js" defer></script>
     <script src="popup.js" defer></script>
+    <script src="popup-fox.js" defer></script>
     <script src="popup-updates.js" defer></script>
   </head>
   <body>
@@ -21,7 +22,10 @@
         </div>
       </header>
 
-      <a id="update-notice" class="update-notice" href="#app-updates" hidden><span id="update-notice-text"></span><span aria-hidden="true">↓</span></a>
+      <div id="update-notice-wrap" class="update-notice-wrap" hidden>
+        <span class="update-fox-window" aria-hidden="true"><span class="update-fox-peek" data-pose="idle" data-phase="off"><span class="update-fox-face update-fox-idle"></span><span class="update-fox-face update-fox-blink"></span><span class="update-fox-face update-fox-happy"></span><span class="update-fox-face update-fox-wave"></span><span class="update-fox-startle"></span></span></span>
+        <a id="update-notice" class="update-notice" href="#app-updates" hidden><span id="update-notice-text"></span></a>
+      </div>
 
       <form id="settings" aria-busy="true">
         <label class="master setting-row" for="enabled">
@@ -167,7 +171,7 @@
         </fieldset>
       </form>
 
-      <section id="app-updates" class="app-updates" aria-labelledby="updates-title" aria-busy="false">
+      <section id="app-updates" class="app-updates" aria-labelledby="updates-title" aria-busy="false" tabindex="-1">
         <div class="update-heading"><h2 id="updates-title">Updates</h2><span id="update-version"></span></div>
         <p id="update-status" role="status" aria-live="polite" hidden></p>
         <progress id="update-progress" max="1" aria-label="Update progress" hidden></progress>

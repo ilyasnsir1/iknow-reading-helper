@@ -1,5 +1,13 @@
 # Updates
 
+Version 1.35.0 decorates available-update notices with the original pixel fox.
+It moves between hiding places only while fully concealed behind the notice.
+Move the mouse near an exposed fox to make it duck and return later. Clicking
+the notice still opens the Updates section; it does not begin installation.
+The notice also supports keyboard navigation and reduced motion. An older
+installed version uses its existing notice when offering 1.35.0; the new fox
+notice becomes available after installing this version.
+
 The first installation still uses the unpacked extension and `helper/Setup.cmd`.
 Keep the complete folder in a permanent location. Existing users need to adopt
 the updater-enabled version once before in-app updates are available.

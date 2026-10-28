@@ -1,6 +1,8 @@
-# iKnow! Reading Helper · 1.34.1
+# iKnow! Reading Helper · 1.35.0
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.35.0 adds the original pixel fox to the update notice. It peeks from different places behind the banner and ducks away when the mouse catches it. Clicking the notice scrolls smoothly to Updates and focuses the section. Reduced motion keeps a static fox; hidden popups and off-screen notices stop the scene. Install this release through the popup updater, then reopen the popup and refresh iKnow pages. No model setup is required.
 
 Version 1.34.1 fixes live series progress and measured remaining-time estimates. The bar includes the active course; untimed audio is named separately until its speed is measured. Diagnostics include the queue's progress and estimate scope. If the connected helper is older than 1.16.0, run helper/Setup.cmd from this folder and choose 3: Check / repair before using updates.
 
