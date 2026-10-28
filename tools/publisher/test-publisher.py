@@ -5,6 +5,7 @@ import argparse
 import base64
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -94,6 +95,59 @@ class PublisherChecks(unittest.TestCase):
         rejected = subprocess.run(command, capture_output=True, text=True)
         self.assertNotEqual(rejected.returncode, 0)
         self.assertIn('checksum or length', rejected.stderr)
+
+    def publish_with_fake_gh(self, *, existing_release):
+        self.build()
+        notes = self.case / 'notes.txt'
+        notes.write_text('Fixture publication. No network.\n')
+        fake_bin = self.case / 'fake-bin'
+        fake_bin.mkdir()
+        trace = self.case / 'gh-trace.txt'
+        (fake_bin / 'gh.cmd').write_bytes(b'''@echo off\r
+>>"%IKNOW_TEST_GH_TRACE%" echo %*\r
+if "%~1"=="api" (\r
+  echo false\r
+  exit /b 0\r
+)\r
+if "%~1 %~2"=="release view" (\r
+  if "%IKNOW_TEST_GH_EXISTS%"=="1" exit /b 0\r
+  echo gh: release not found 1>&2\r
+  exit /b 1\r
+)\r
+if "%~1 %~2"=="release create" exit /b 0\r
+if "%~1 %~2"=="release edit" exit /b 0\r
+echo Unexpected fixture command 1>&2\r
+exit /b 90\r
+''')
+        environment = os.environ.copy()
+        environment['PATH'] = str(fake_bin) + os.pathsep + environment.get('PATH', '')
+        environment['IKNOW_TEST_GH_TRACE'] = str(trace)
+        environment['IKNOW_TEST_GH_EXISTS'] = '1' if existing_release else '0'
+        command = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(HERE / 'publish-release.ps1'),
+                   '-ReleaseDirectory', str(self.case / 'out'), '-PackageDirectory', str(self.package), '-NotesFile', str(notes)]
+        result = subprocess.run(command, capture_output=True, text=True, env=environment)
+        return result, trace.read_text().splitlines()
+
+    def test_publish_missing_release_stderr_continues_to_create_and_publish(self):
+        # Windows PowerShell can promote native stderr to an exception under
+        # ErrorActionPreference=Stop even though a missing release is expected.
+        result, trace = self.publish_with_fake_gh(existing_release=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split()[:2] for line in trace], [
+            ['api', 'repos/test-owner/test-repo'], ['release', 'view'],
+            ['release', 'create'], ['release', 'edit'],
+        ])
+        self.assertIn('--draft', trace[2])
+        self.assertIn('--draft=false', trace[3])
+        self.assertIn('Published https://github.com/test-owner/test-repo/releases/tag/v1.34.0', result.stdout)
+
+    def test_publish_existing_release_refuses_create_or_replacement(self):
+        result, trace = self.publish_with_fake_gh(existing_release=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('already has a release', result.stderr)
+        self.assertEqual([line.split()[:2] for line in trace], [
+            ['api', 'repos/test-owner/test-repo'], ['release', 'view'],
+        ])
 
     def test_mismatched_signing_key_rejected(self):
         # A different pinned public key must fail before any signature can ship.

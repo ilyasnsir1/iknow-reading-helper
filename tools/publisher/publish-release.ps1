@@ -50,8 +50,15 @@ if ($DryRun) {
 $isPrivate = & gh api ('repos/' + $destination) --jq '.private'
 if ($LASTEXITCODE -ne 0) { throw 'Could not access the selected GitHub repository.' }
 if ([string]$isPrivate -ne 'false') { throw 'This distribution workflow requires a public download repository.' }
-& gh release view $tag --repo $destination *> $null
-if ($LASTEXITCODE -eq 0) { throw 'This version already has a release. Publish a new version instead of replacing signed assets.' }
+# Windows PowerShell promotes native stderr to an error under Stop, even when
+# a missing release is the expected result of this existence probe.
+$probePreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = 'Continue'
+    & gh release view $tag --repo $destination *> $null
+    $releaseExists = $LASTEXITCODE -eq 0
+} finally { $ErrorActionPreference = $probePreference }
+if ($releaseExists) { throw 'This version already has a release. Publish a new version instead of replacing signed assets.' }
 & gh release create $tag @assets --repo $destination --target main --draft --title ('iKnow! Reading Helper ' + $manifest.version) --notes-file ([IO.Path]::GetFullPath($NotesFile))
 if ($LASTEXITCODE -ne 0) { throw 'Could not upload the draft release. Inspect the draft before retrying.' }
 & gh release edit $tag --repo $destination --draft=false --latest

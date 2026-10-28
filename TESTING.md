@@ -16,8 +16,9 @@ personal model cache, registry registration or saved courses.
   popup reopening during installation, native-port closure, settings retention,
   page refresh and a single reload handoff. Native responses and the final
   runtime.reload call are controlled fixtures in these browser checks.
-- 8 publisher cases: deterministic archives, pinned-key signing, full-file
-  checksums, unsafe files, unexpected models/credentials and tampered releases.
+- 10 publisher cases: deterministic archives, pinned-key signing, full-file
+  checksums, unsafe files, unexpected models/credentials, tampered releases and
+  the real PowerShell publication flow with a bounded fake GitHub CLI.
 
 Run the checked-in focused tests from this repository with Python 3.11+ and
 Node.js 18+; Windows PowerShell is required for the RSA/transaction cases:
@@ -40,5 +41,14 @@ also passed in the development workspace. The public focused suite above is
 limited to update distribution; it does not claim every course/model operation
 can succeed without an internet connection or adequate memory. Model/dependency
 installation remains an explicit Setup action when release notes require it.
+
+After publication, an isolated real native-host test also installed the public
+signed 1.34.0 release from GitHub without authentication. The actual detached
+runner completed, all 123 installed file hashes matched the signed manifest,
+and a fresh helper reported the current version. Existing model, prepared
+course and word-audio cache sentinels and a personal file were retained. This
+test used a normal Windows temporary path with Unicode folder names and did not
+change browser registration or perform a real browser runtime.reload; those
+browser interactions remain bounded fixtures in the separate Brave tests.
 
 See tools/publisher/README.md for release staging, signing and publishing.
