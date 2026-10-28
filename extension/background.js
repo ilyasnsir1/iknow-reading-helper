@@ -818,4 +818,4 @@ globalThis.IKnowReaderUpdateActivity = async () => {
     [...states.values()].some(value => ["running", "connecting", "queued"].includes(value.status)) ||
     globalThis.IKnowReaderNeuralActivity?.() === true || globalThis.IKnowReaderWordPreparationActivity?.() === true;
 };
-importScripts("updates.js");
+importScripts("update-refresh.js", "update-discovery.js", "updates.js");

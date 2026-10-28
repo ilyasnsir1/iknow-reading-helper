@@ -3,11 +3,23 @@
   "use strict";
   const KEY = "iknowReaderUpdateState", HOST = "de.iknow.lesehilfe";
   const version = chrome.runtime.getManifest().version;
+  const CHECK_INTERVAL = 60 * 60 * 1000;
   const statuses = new Set(["idle", "current", "available", "checking", "downloading", "installing", "complete", "error", "unconfigured", "busy"]);
   const working = value => ["downloading", "installing"].includes(value?.status);
   const validVersion = value => typeof value === "string" && /^\d{1,5}(?:\.\d{1,5}){1,3}$/.test(value) ? value : null;
   let state = { status: "idle", currentVersion: version, message: "" };
   let claimed = false, installClaimed = false, polling = null, reloadScheduled = false, configPromise = null;
+  const refresher = globalThis.IKnowReaderUpdateRefresh?.create({ chrome, getVersion: () => version, getState: () => state,
+    save: value => save(value), getActivity: async () => await globalThis.IKnowReaderUpdateActivity?.() === true });
+  function storedRefreshMarkers(value) {
+    const markers = {};
+    for (const key of ["autoRefreshTarget", "autoRefreshCompleteVersion"]) if (validVersion(value?.[key])) markers[key] = value[key];
+    const plan = value?.autoRefreshPlan;
+    if (plan && validVersion(plan.version)) markers.autoRefreshPlan = { version: plan.version,
+      remaining: Array.isArray(plan.remaining) ? [...new Set(plan.remaining.filter(id => Number.isInteger(id) && id >= 0))].slice(0, 2000) : [],
+      claimed: Array.isArray(plan.claimed) ? [...new Set(plan.claimed.filter(id => Number.isInteger(id) && id >= 0))].slice(0, 2000) : [] };
+    return markers;
+  }
   function trusted(sender) {
     try {
       const own = new URL(chrome.runtime.getURL("popup.html")), url = new URL(sender?.url || "");
@@ -30,6 +42,7 @@
     state = { ...state, ...value, currentVersion: version };
     if (previousStatus !== state.status) globalThis.IKnowReaderDiagnosticHistory?.record("updates", "transition", { status: state.status, code: state.code, message: state.message }, state.status === "error");
     await chrome.storage.local.set({ [KEY]: state });
+    globalThis.IKnowReaderUpdateDiscovery?.render(state);
     return state;
   }
   function native(action, timeout = 45000) {
@@ -65,14 +78,17 @@
     if (!validVersion(target)) throw Error("The installed update has no valid version.");
     await save({ ...next, latestVersion: target });
     if (target === version) {
-      await save({ status: "current", installAttempted: false, refreshTabs: true, message: "Updated. Refresh your open iKnow pages." }); return;
+      await save({ status: "current", installAttempted: false, autoRefreshTarget: target,
+        refreshTabs: state.autoRefreshCompleteVersion !== target, message: state.autoRefreshCompleteVersion === target ? "Your iKnow pages are up to date." : "Updated. Refreshing your open iKnow pages…" });
+      await refresher?.run(); return;
     }
     if (state.reloadedVersion === target) {
       await save({ status: "error", refreshTabs: false, message: "The update files are installed, but Brave is still running the previous version. Reload Reading Helper at brave://extensions, then reopen this popup." }); return;
     }
     if (reloadScheduled) return;
     reloadScheduled = true;
-    await save({ status: "complete", reloadedVersion: target, refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
+    await save({ status: "complete", reloadedVersion: target, autoRefreshTarget: target, autoRefreshPlan: null,
+      refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
     setTimeout(() => chrome.runtime.reload(), 500);
   }
   async function pollOnce() {
@@ -97,17 +113,24 @@
     })().finally(() => { polling = null; });
   }
   const ready = chrome.storage.local.get(KEY).then(async stored => {
-    if (stored[KEY] && statuses.has(stored[KEY].status)) state = { ...state, ...normalize(stored[KEY]) };
+    if (stored[KEY] && statuses.has(stored[KEY].status)) state = { ...state, ...normalize(stored[KEY]), ...storedRefreshMarkers(stored[KEY]) };
     if (state.latestVersion === version && ["complete", "available"].includes(state.status)) {
-      await save({ status: "current", installAttempted: false, message: state.refreshTabs ? "Updated. Refresh your open iKnow pages." : "You are up to date." });
+      // Adopt the successful install marker written by older updater versions
+      // too. A same-version developer reload alone carries no such intent.
+      const installed = state.status === "complete" || state.installAttempted || state.reloadedVersion === version;
+      await save({ status: "current", installAttempted: false,
+        ...(installed && state.refreshTabs ? { autoRefreshTarget: version } : {}),
+        message: state.refreshTabs ? "Updated. Refreshing your open iKnow pages…" : "You are up to date." });
     } else if (state.status === "checking") await save({ status: "idle", message: "" });
     else if (state.status === "complete") await finishInstall(state);
+    await refresher?.run();
     poll();
   }).catch(() => { state = { status: "error", currentVersion: version, message: "Update status could not be loaded." }; });
   async function autoCheck() {
     if (!configPromise) configPromise = fetch(chrome.runtime.getURL("update-config.json")).then(response => response.ok ? response.json() : null).catch(() => null);
     const config = await configPromise;
-    if (config?.enabled !== true || claimed || working(state) || state.status === "error" || state.status === "busy" || Date.now() - (state.lastAttemptAt || 0) < 24 * 60 * 60 * 1000) return { ok: true, state };
+    if (config?.enabled !== true || claimed || working(state) || refresher?.busy ||
+      Date.now() - (state.lastAttemptAt || 0) < CHECK_INTERVAL || await globalThis.IKnowReaderUpdateActivity?.() === true) return { ok: true, state };
     // Save failed attempts too; an offline popup must not repeatedly spawn hosts.
     await save({ lastAttemptAt: Date.now() });
     return run("check", true);
@@ -122,12 +145,13 @@
     }
     if (action === "auto-check") return autoCheck();
     if (action === "refresh") {
+      if (refresher) return refresher.run({ manual: true });
       const tabs = await chrome.tabs.query({ url: ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"] });
       await Promise.allSettled(tabs.filter(tab => Number.isInteger(tab.id)).map(tab => chrome.tabs.reload(tab.id)));
       await save({ refreshTabs: false, message: "Your open iKnow pages have been refreshed." });
       return { ok: true, state };
     }
-    if (claimed || working(state)) return { ok: false, state, code: "update_busy" };
+    if (claimed || working(state) || refresher?.busy) return { ok: false, state, code: "update_busy" };
     claimed = true; installClaimed = action === "install";
     const previous = { ...state };
     try {
@@ -135,7 +159,9 @@
         if (state.status !== "available" || !validVersion(state.latestVersion)) return { ok: false, state, code: "update_check_required" };
         if (await globalThis.IKnowReaderUpdateActivity?.()) return { ok: false, state: { ...state, status: "busy", message: "Pause course and word preparation before installing an update." }, code: "preparation_active" };
       }
-      await save({ status: action === "check" ? "checking" : "downloading", installAttempted: action === "install" || state.installAttempted === true, message: action === "check" ? "Checking for updates…" : "Downloading and verifying update…", progress: null });
+      await save({ status: action === "check" ? automatic ? state.status : "checking" : "downloading", installAttempted: action === "install" || state.installAttempted === true,
+        ...(action === "check" ? { lastAttemptAt: Date.now() } : {}),
+        message: action === "check" ? automatic ? state.message : "Checking for updates…" : "Downloading and verifying update…", progress: null });
       if (action === "install") poll();
       const reply = await native(action, action === "install" ? 10 * 60 * 1000 : 45000);
       if (action === "check") reply.state.checkedAt = Date.now();
@@ -150,12 +176,27 @@
       return { ok: false, state };
     } finally { claimed = false; installClaimed = false; poll(); }
   }
-  globalThis.IKnowReaderUpdates = Object.freeze({ get busy() { return installClaimed || working(state); } });
+  globalThis.IKnowReaderUpdates = Object.freeze({ get busy() { return installClaimed || working(state) || refresher?.busy === true; } });
+  function trustedPresence(sender) {
+    try {
+      const url = new URL(sender?.url || "");
+      return sender?.id === chrome.runtime.id && Number.isInteger(sender.tab?.id) && (!sender.frameId || sender.frameId === 0) &&
+        url.protocol === "https:" && !url.port && ["iknow.jp", "en.iknow.jp", "ja.iknow.jp"].includes(url.hostname) &&
+        /^\/(?:courses\/\d+|series\/\d+|content\/japanese\/series\/\d+)\/?$/.test(url.pathname);
+    } catch { return false; }
+  }
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (!String(message?.type || "").startsWith("ikr:update:")) return;
     const action = message.type.slice("ikr:update:".length);
+    if (action === "presence") {
+      if (!trustedPresence(sender)) { respond({ ok: false, code: "update_forbidden" }); return; }
+      void ready.then(async () => { await refresher?.run(); await autoCheck(); return { ok: true }; }).then(respond, () => respond({ ok: false }));
+      return true;
+    }
     if (!trusted(sender) || !["status", "auto-check", "check", "install", "refresh"].includes(action)) { respond({ ok: false, code: "update_forbidden" }); return; }
     void run(action).then(respond, () => respond({ ok: false, state: { ...state, status: "error", message: "Updates are unavailable. Try again." } }));
     return true;
   });
+  globalThis.IKnowReaderUpdateDiscovery?.start({ ready, getState: () => state, autoCheck,
+    isBusy: () => claimed || working(state) || refresher?.busy === true, onActivity: () => refresher?.run() });
 })();

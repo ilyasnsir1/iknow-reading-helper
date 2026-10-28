@@ -41,10 +41,10 @@ function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "cur
   await Promise.all([daily.send("auto-check"), daily.send("auto-check"), daily.send("auto-check")]);
   assert.deepEqual(daily.calls, ["update:check"]);
   await daily.send("auto-check"); assert.equal(daily.calls.length, 1);
-  daily.clock.now += 24 * 60 * 60 * 1000 + 1; await daily.send("auto-check");
+  daily.clock.now += 60 * 60 * 1000 + 1; await daily.send("auto-check");
   assert.equal(daily.calls.length, 2); assert.equal(daily.stats.configReads, 1);
   const disabled = fixture({ enabled: false }); await disabled.send("auto-check"); await disabled.send("auto-check"); assert.equal(disabled.calls.length, 0);
-  console.log("PASS Own-popup automatic check is daily, concurrent/repeated popups share its persisted limit, and disabled configuration starts no native host");
+  console.log("PASS Own-popup automatic check is hourly, concurrent/repeated popups share its persisted limit, and disabled configuration starts no native host");
 
   const offline = fixture({ mode: "error", ok: false });
   const quiet = await offline.send("auto-check"); assert.equal(quiet.state.status, "idle"); assert.equal(quiet.state.message, "");

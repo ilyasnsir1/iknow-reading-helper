@@ -15,9 +15,10 @@ const out = path.join(__dirname, "extension-updates-evidence"); fs.mkdirSync(out
 const passed = [], errors = [], pass = value => { passed.push(value); console.log("PASS", value); };
 const until = async (predicate, message, timeout = 20000) => { const at = Date.now(); while (!await predicate()) { if (Date.now() - at > timeout) throw Error("Timed out: " + message); await new Promise(done => setTimeout(done, 25)); } };
 (async () => {
+  const isolated = require("./fixtures/isolate-extension.cjs")(ext, out);
   const context = await chromium.launchPersistentContext(path.join(out, "profile-" + Date.now()), {
     executablePath: process.env.IKNOW_BROWSER_PATH || path.join(process.env.PROGRAMFILES || "C:/Program Files", "BraveSoftware/Brave-Browser/Application/brave.exe"), headless: true,
-    ignoreDefaultArgs: ["--disable-extensions"], args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`], viewport: { width: 700, height: 1000 }
+    ignoreDefaultArgs: ["--disable-extensions"], args: [`--disable-extensions-except=${isolated}`, `--load-extension=${isolated}`], viewport: { width: 700, height: 1000 }
   });
   context.on("page", page => page.on("pageerror", error => errors.push(error.message)));
   try {

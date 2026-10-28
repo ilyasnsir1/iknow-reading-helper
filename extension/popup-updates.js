@@ -18,7 +18,8 @@
     notice.hidden = !available && !["downloading", "installing", "complete"].includes(last.status) && last.refreshTabs !== true;
     noticeWrap.hidden = notice.hidden; noticeWrap.dataset.state = last.status;
     globalThis.IKnowReaderUpdateFox?.setState(last.status, !notice.hidden);
-    noticeText.textContent = available ? `Update available · ${last.latestVersion}` : last.refreshTabs && last.status === "current" ? "Update installed · Refresh iKnow pages" : last.status === "complete" ? "Update installed · Reloading…" : "Installing update…";
+    const refreshing = last.status === "current" && last.refreshTabs && last.autoRefreshTarget === chrome.runtime.getManifest().version;
+    noticeText.textContent = available ? `Update available · ${last.latestVersion}` : refreshing ? "Update installed · Finishing page refresh…" : last.refreshTabs && last.status === "current" ? "Update installed · Refresh iKnow pages" : last.status === "complete" ? "Update installed · Reloading…" : "Installing update…";
     text.textContent = last.message || (available ? `Version ${last.latestVersion} is available.` : last.status === "current" ? "You are up to date." : "");
     text.hidden = !text.textContent;
     check.disabled = sending || busy;

@@ -4,7 +4,8 @@ const fs=require("node:fs"),path=require("node:path"),assert=require("node:asser
 const {chromium}=require(path.join(process.env.USERPROFILE,".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 const extension=path.resolve(__dirname,"../extension"),out=path.join(__dirname,"diagnostics-evidence");fs.mkdirSync(out,{recursive:true});
 (async()=>{
- const context=await chromium.launchPersistentContext(path.join(out,"profile-"+Date.now()),{executablePath:"C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe",headless:true,acceptDownloads:true,ignoreDefaultArgs:["--disable-extensions"],args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`],viewport:{width:1000,height:850}});
+ const isolated=require("./fixtures/isolate-extension.cjs")(extension,out);
+ const context=await chromium.launchPersistentContext(path.join(out,"profile-"+Date.now()),{executablePath:"C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe",headless:true,acceptDownloads:true,ignoreDefaultArgs:["--disable-extensions"],args:[`--disable-extensions-except=${isolated}`,`--load-extension=${isolated}`],viewport:{width:1000,height:850}});
  const errors=[],requests=[];context.on("page",p=>p.on("pageerror",error=>errors.push(error.message)));context.on("request",r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
  try{
   const worker=context.serviceWorkers()[0]||await context.waitForEvent("serviceworker"),id=new URL(worker.url()).host;

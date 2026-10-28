@@ -1,6 +1,8 @@
-# iKnow! Reading Helper · 1.35.3
+# iKnow! Reading Helper · 1.36.0
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.36.0 discovers updates during browser startup and use, and shows NEW on the pinned extension icon. Checks share a one-hour cooldown and never install updates automatically. After an explicitly installed update loads its target version, open iKnow pages refresh automatically; active preparation or iKnow audio defers the refresh. Failed/interrupted refreshes keep a manual retry. No browser permission or model is added. Helper 1.19.0 is unchanged.
 
 Version 1.35.3 removes PowerShell from update signature verification and diagnostic exports. The helper calls Windows CNG directly with the same pinned RSA/SHA-256 publisher key and rejects modified releases. This removes the encoded-command subprocess blocked by some endpoint security products. It includes the preparation and complete diagnostic improvements described below. Helper 1.19.0 is included; no model download is required. An older installation whose verifier is already blocked requires a one-time reviewed recovery at its existing folder before it can adopt the fix.
 

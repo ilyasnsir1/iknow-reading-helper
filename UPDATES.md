@@ -1,5 +1,30 @@
 # Updates
 
+Version 1.36.0 checks for releases during browser startup and ordinary use. A
+verified newer release shows **NEW** on the extension icon and its version in
+the tooltip. Pin Reading Helper in Brave to keep this notice visible. The fox
+notice remains at the top of the popup and leads to Install update.
+
+Automatic checks share a persisted one-hour attempt cooldown across worker
+restarts, popups, tab changes and visible iKnow pages. Prior errors can retry
+after the cooldown; offline failures stay quiet and preserve an already verified
+available notice. While a course page stays visible it sends a lightweight
+presence signal every fifteen minutes. Hidden pages stop this signal. These
+are activity-based checks, not an always-running timer or a guarantee of
+instant discovery while the browser is idle/closed. No model is started and no
+browser permission is added. Installation still requires an explicit click.
+
+After successful installation, the extension reloads and the new worker checks
+that its actual version matches the completed target. It then automatically
+refreshes open pages on the three allowed iKnow hosts. Preparation and audible
+iKnow playback defer the refresh; later browser/course activity retries it.
+Unrelated websites are not reloaded. Per-tab claims/completion are persisted
+before the side effect to avoid automatic duplicate reloads after a worker
+interruption. If an acknowledgement is ambiguous or a page cannot reload, a
+manual Refresh iKnow pages action remains available for unresolved pages.
+A developer reload or failed installation does not trigger this flow.
+
+
 Version 1.35.3 removes PowerShell from runtime update verification and support
 exports. Windows CNG is called directly through its system library; the same
 pinned RSA key, SHA-256 and PKCS#1 signature checks remain mandatory. No
@@ -45,10 +70,10 @@ available, choose **Install update**. Public release downloads require no GitHub
 account. Updates are installed only after this explicit action. Complete or
 pause course preparation and word-audio preparation first.
 
-Opening the popup can check the release metadata at most once per day. A new
-version is announced near the top of the popup; failed background checks stay
-quiet. The manual check remains available. Neither type of check downloads a
-model, starts course preparation or installs an update automatically.
+The manual Check for updates action remains available for an immediate check.
+Neither automatic nor manual metadata checks download a model, prepare a
+course or install an update. An older installed release retains its existing
+check workflow until it adopts 1.36.0.
 
 The local helper checks the release signature against the publisher key pinned
 in the installed package, checks the archive and each managed file, and updates
@@ -57,8 +82,8 @@ transaction. Unexpected local modifications are preserved and reported instead
 of silently overwritten. Settings, saved course additions and model downloads
 remain in their existing locations.
 
-After installation, the extension reloads. Reload open iKnow pages to use the new
-content scripts. If the helper is missing, run the existing setup. An update that
+After installation, the extension reloads and the verified new version refreshes
+open iKnow pages automatically, with a manual retry if needed. If the helper is missing, run the existing setup. An update that
 requires a new runtime dependency or model may require its matching setup step;
 ordinary extension/helper updates do not download the existing models again.
 An update that expands browser permissions requires manual installation so its
