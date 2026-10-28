@@ -43,7 +43,7 @@
         port = chrome.runtime.connectNative(HOST);
         port.onMessage.addListener(message => {
           if (message?.requestId !== requestId) return;
-          if (message.type === "error") { finish(Error("This helper does not support updates yet. Install the initial updater version from your project folder.")); return; }
+          if (message.type === "error") { finish(Error("The connected helper does not support updates. Run helper/Setup.cmd from the current application folder, choose 3: Check / repair, then reload Reading Helper and your iKnow pages.")); return; }
           if (message.type !== "update:result") return;
           try {
             const next = normalize(message.state);

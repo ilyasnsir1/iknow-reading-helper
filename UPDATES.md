@@ -4,6 +4,14 @@ The first installation still uses the unpacked extension and `helper/Setup.cmd`.
 Keep the complete folder in a permanent location. Existing users need to adopt
 the updater-enabled version once before in-app updates are available.
 
+If Diagnostics shows helper 1.13.0 while the extension is 1.34.0 or later, the
+browser is still connected to an older helper. Pause preparation, run
+helper/Setup.cmd from the current application folder, choose **3: Check / repair**,
+and reload Reading Helper and iKnow pages. If a native connection still uses the
+old helper, close Brave fully and reopen it. The connected helper must be at
+least 1.16.0 for this updater. The popup button alone does not confirm that the
+helper has been updated. Existing compatible models are retained.
+
 Open the extension popup and choose **Check for updates**. When a version is
 available, choose **Install update**. Public release downloads require no GitHub
 account. Updates are installed only after this explicit action. Complete or

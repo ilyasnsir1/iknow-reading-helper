@@ -388,6 +388,21 @@ function persistQueue() {
   queueWrites = task.catch(() => {});
   return task;
 }
+function queueStages(queue = seriesQueue) {
+  return [...(queue?.features.german || queue?.features.colors ? ["language"] : []), ...(queue?.features.audio ? ["audio"] : [])];
+}
+function queueStageTotal(course, stage, queue = seriesQueue) {
+  const exact = course.stageTotals?.[stage];
+  if (Number.isFinite(exact) && exact >= 0) return exact;
+  return course.sentenceCount || queue?.typicalSize || null;
+}
+function queueStageCompleted(course, stage, queue = seriesQueue) {
+  const total = queueStageTotal(course, stage, queue);
+  if (total === null) return 0;
+  if (["complete", "skipped", "error"].includes(course.status)) return total;
+  const record = course.stageProgress?.[stage];
+  return Math.max(0, Math.min(total, Number.isFinite(record?.completed) ? record.completed : 0));
+}
 function recalculateQueue() {
   if (!seriesQueue) return;
   const q = seriesQueue;
@@ -396,26 +411,53 @@ function recalculateQueue() {
   q.skippedCourses = q.courses.filter(course => course.status === "skipped").length;
   q.failedCourses = q.courses.filter(course => course.status === "error" || course.partial).length;
   q.completedCourses = q.courses.filter(course => ["complete", "skipped"].includes(course.status)).length;
-  if (q.status !== "running" || !["language", "audio"].includes(q.stage)) { q.etaSeconds = null; return; }
+  const stages = queueStages(q);
+  // Each selected course/phase contributes one share. Sentence events advance
+  // the current share immediately; a course need not finish before the bar moves.
+  // Errors are processed work, not successful saves (failedCourses stays separate).
+  q.progressFraction = q.courses.reduce((sum, course) => {
+    if (["complete", "skipped", "error"].includes(course.status)) return sum + 1;
+    const fraction = stages.reduce((done, stage) => {
+      const total = queueStageTotal(course, stage, q);
+      return done + (total === 0 ? 1 : total ? queueStageCompleted(course, stage, q) / total : 0);
+    }, 0) / Math.max(1, stages.length);
+    return sum + fraction;
+  }, 0) / Math.max(1, q.courses.length);
+  q.progressFraction = Math.max(0, Math.min(1, q.progressFraction));
+  q.etaSeconds = null; q.etaScope = null; q.etaStages = []; q.unestimatedStages = [];
+  if (q.status !== "running") return;
   let milliseconds = 0;
+  const remaining = Object.fromEntries(stages.map(stage => [stage, 0]));
+  const unknown = new Set();
   for (let index = q.currentIndex; index < q.courses.length; index++) {
     const course = q.courses[index];
     if (["complete", "skipped", "error"].includes(course.status)) continue;
-    const count = course.sentenceCount || q.typicalSize;
-    if (!count) { q.etaSeconds = null; return; }
-    for (const stage of [...(q.features.german || q.features.colors ? ["language"] : []), ...(q.features.audio ? ["audio"] : [])]) {
-      const sample = q.timings?.[stage];
-      if (!sample || sample.units < 3) { q.etaSeconds = null; return; }
-      const current = index === q.currentIndex;
-      const done = current && q.stage === stage ? Math.min(count, q.completed || 0) : current && q.stage === "audio" && stage === "language" ? count : 0;
-      milliseconds += Math.max(0, count - done) * sample.milliseconds / sample.units;
+    for (const stage of stages) {
+      const total = queueStageTotal(course, stage, q);
+      if (total === null) { unknown.add(stage); continue; }
+      remaining[stage] += Math.max(0, total - queueStageCompleted(course, stage, q));
     }
   }
-  q.etaSeconds = Math.ceil(milliseconds / 1000);
+  for (const stage of stages) {
+    if (!remaining[stage] && !unknown.has(stage)) continue;
+    const sample = q.timings?.[stage];
+    if (unknown.has(stage) || !Number.isFinite(sample?.units) || sample.units < 3 || !Number.isFinite(sample?.milliseconds) || sample.milliseconds <= 0) {
+      q.unestimatedStages.push(stage); continue;
+    }
+    q.etaStages.push(stage);
+    milliseconds += remaining[stage] * sample.milliseconds / sample.units;
+  }
+  // An unsampled future audio phase does not erase the useful measured language
+  // estimate. The UI labels this as a partial estimate until all rates are known.
+  if (q.etaStages.length) {
+    q.etaSeconds = Math.ceil(milliseconds / 1000);
+    q.etaScope = q.unestimatedStages.length ? "measured" : "total";
+  }
 }
 async function updateQueueFromState(id) {
   const q = seriesQueue, state = states.get(id);
   if (!q || q.status !== "running" || q.courses[q.currentIndex]?.id !== id || !state?.fromQueue) return;
+  const course = q.courses[q.currentIndex];
   const now = Date.now(), previous = state.lastProgress;
   if (["language", "audio"].includes(state.stage)) {
     if (previous?.stage === state.stage && state.completed > previous.completed) {
@@ -427,7 +469,17 @@ async function updateQueueFromState(id) {
       }
     }
     if (!previous || previous.stage !== state.stage || state.completed !== previous.completed) state.lastProgress = { stage: state.stage, completed: state.completed, at: now };
+    course.stageProgress ||= {};
+    course.stageTotals ||= {};
+    course.stageTotals[state.stage] = state.total || queueStageTotal(course, state.stage, q);
+    course.stageProgress[state.stage] = { completed: Math.max(course.stageProgress[state.stage]?.completed || 0, state.completed || 0), total: state.total || 0 };
+    if (state.stage === "audio" && queueStages(q).includes("language")) {
+      const total = queueStageTotal(course, "language", q);
+      if (total !== null) course.stageProgress.language = { completed: total, total };
+    }
   }
+  Object.assign(course, { stage: state.stage, completed: state.completed || 0, total: state.total || 0,
+    updatedAt: now, code: state.code || "", message: state.message });
   Object.assign(q, { stage: state.stage, completed: state.completed || 0, total: state.total || 0, message: state.message, summary: state.summary });
   recalculateQueue(); await persistQueue();
 }
@@ -436,6 +488,8 @@ async function finishQueueCourse(id, summary) {
   if (!q || q.status !== "running" || q.courses[q.currentIndex]?.id !== id || !states.get(id)?.fromQueue) return;
   const course = q.courses[q.currentIndex];
   course.status = "complete"; course.summary = summary;
+  Object.assign(course, { stage: "done", completed: course.sentenceCount || q.total || 0,
+    total: course.sentenceCount || q.total || 0, updatedAt: Date.now() });
   course.partial = ["translationExcluded", "wordExcluded", "audioExcluded", "groupsExcluded"].some(key => summary?.[key] > 0);
   q.currentIndex++; q.stage = "model"; q.completed = 0; q.total = 0;
   recalculateQueue(); await persistQueue(); void pumpQueue();
@@ -444,6 +498,7 @@ async function failQueueCourse(id, message) {
   if (seriesQueue?.status !== "running" || seriesQueue.courses[seriesQueue.currentIndex]?.id !== id || !states.get(id)?.fromQueue) return;
   seriesQueue.courses[seriesQueue.currentIndex].status = "error";
   seriesQueue.courses[seriesQueue.currentIndex].error = String(message).slice(0, 300);
+  Object.assign(seriesQueue.courses[seriesQueue.currentIndex], { code: states.get(id)?.code || "preparation_failed", updatedAt: Date.now() });
   seriesQueue.currentIndex++; recalculateQueue(); await persistQueue(); void pumpQueue();
 }
 async function pauseQueue(message = "Preparation paused. Completed data is kept.", error = false) {
@@ -623,10 +678,22 @@ async function pumpQueue() {
         course.status = "error"; course.error = String(error.message).slice(0, 300); q.currentIndex++; recalculateQueue(); await persistQueue(); continue;
       } finally { clearTimeout(timeout); }
       if (generation !== pumpGeneration || q.status !== "running") return;
-      const expected = AutoCore.expectedSource(source); course.sentenceCount = Object.keys(expected.sentences).length; q.typicalSize = course.sentenceCount;
+      const expected = AutoCore.expectedSource(source), sourceSignature = AutoCore.fingerprint(JSON.stringify(expected));
+      const previousProgress = course.sourceSignature === sourceSignature || !course.sourceSignature && course.sentenceCount === Object.keys(expected.sentences).length ? course.stageProgress : null;
+      course.sourceSignature = sourceSignature;
+      course.sentenceCount = Object.keys(expected.sentences).length; q.typicalSize = course.sentenceCount;
+      course.stageTotals = { language: course.sentenceCount, audio: Object.values(expected.sentences).filter(value => value.audioPath).length };
       const stored = await chrome.storage.local.get(AutoPacks.STORAGE_KEY);
       if (generation !== pumpGeneration || q.status !== "running") return;
       const merged = AutoPacks.merge(globalThis.IKnowReaderData, globalThis.IKnowReaderAudioData, stored[AutoPacks.STORAGE_KEY]);
+      // Restore saved work before the model starts. Per-phase totals retain
+      // audio-only courses and sentences without a recording accurately.
+      const availability = AutoCore.courseAvailability(merged.data, merged.audio, source);
+      course.stageProgress = Object.fromEntries(queueStages(q).map(stage => {
+        const progress = AutoCore.preparationProgress({ stage }, availability, q.features);
+        const total = queueStageTotal(course, stage, q) || 0;
+        return [stage, { completed: Math.min(total, Math.max(progress?.ready || 0, previousProgress?.[stage]?.completed || 0)), total }];
+      }));
       if (AutoCore.completeness(merged.data, merged.audio, source, q.features).complete) {
         course.status = "skipped"; q.currentIndex++; recalculateQueue(); await persistQueue(); continue;
       }
@@ -666,9 +733,13 @@ async function queueCommand(message, sender) {
   if (action === "resume") {
     if (!seriesQueue) throw new Error("There is no series preparation yet.");
     if (seriesQueue.status === "complete") {
-      for (const course of seriesQueue.courses) if (course.partial || course.status === "error") { course.status = "pending"; delete course.error; delete course.partial; }
+      for (const course of seriesQueue.courses) if (course.partial || course.status === "error") {
+        course.status = "pending";
+        delete course.error; delete course.partial; delete course.stageProgress;
+      }
       seriesQueue.currentIndex = seriesQueue.courses.findIndex(course => course.status === "pending");
       if (seriesQueue.currentIndex < 0) return { ok: true, queue: publicQueue() };
+      seriesQueue.stage = "model"; seriesQueue.completed = 0; seriesQueue.total = 0;
     }
     seriesQueue.status = "running"; seriesQueue.error = ""; pumpGeneration++; recalculateQueue(); await persistQueue(); void pumpQueue(); return { ok: true, queue: publicQueue() };
   }
@@ -694,11 +765,26 @@ const queueReady = chrome.storage.local.get(QUEUE_KEY).then(async stored => {
   const saved = stored[QUEUE_KEY];
   if (!saved || saved.schemaVersion !== 1 || !Array.isArray(saved.courses) || !saved.courses.length || saved.courses.length > 100 || !saved.courses.every(course => courseId(course.id)) || !selected(saved.features)) return;
   seriesQueue = { ...saved, features: features(saved.features), timings: saved.timings || {} };
+  // Earlier releases kept only the active counters on the queue itself. Carry
+  // them into the per-course phase records before recalculating a restored bar.
+  const current = seriesQueue.courses[seriesQueue.currentIndex];
+  if (current && ["language", "audio"].includes(seriesQueue.stage) && Number.isFinite(seriesQueue.total) && seriesQueue.total > 0) {
+    current.stageTotals ||= {};
+    current.stageProgress ||= {};
+    const stage = seriesQueue.stage, total = seriesQueue.total;
+    current.stageTotals[stage] ??= total;
+    current.stageProgress[stage] ||= { completed: Math.max(0, Math.min(total, seriesQueue.completed || 0)), total };
+    if (stage === "audio" && queueStages(seriesQueue).includes("language")) {
+      const languageTotal = queueStageTotal(current, "language", seriesQueue) || total;
+      current.stageProgress.language ||= { completed: languageTotal, total: languageTotal };
+    }
+    Object.assign(current, { stage, completed: seriesQueue.completed || 0, total, updatedAt: current.updatedAt || seriesQueue.updatedAt || null });
+  }
   if (saved.status === "running") {
     seriesQueue.status = "paused"; seriesQueue.message = "Brave was restarted. You can resume the series.";
     for (const course of seriesQueue.courses) if (course.status === "running") course.status = "pending";
     recalculateQueue(); await persistQueue();
-  }
+  } else recalculateQueue();
 }).catch(() => {});
 
 globalThis.IKnowReaderUpdateActivity = async () => {

@@ -52,3 +52,25 @@ change browser registration or perform a real browser runtime.reload; those
 browser interactions remain bounded fixtures in the separate Brave tests.
 
 See tools/publisher/README.md for release staging, signing and publishing.
+
+## Version 1.34.1 series progress
+
+Six worker regression groups reproduce an eight-course queue starting with
+119/196 sentences in its first course. They cover continuous phase fractions,
+measured language estimates before audio has a rate, cached work, legacy 1.34.0
+snapshots, pause/resume/restart, failed-course retries and zero-audio courses.
+Seven isolated Brave groups exercise the production series and queue views,
+including 119 to 165/196, phase/course boundaries, truthful partial estimates,
+older snapshots, pause/reopen/resume and unrelated-series isolation.
+
+```powershell
+node tests/test-series-queue-progress.cjs
+node tests/test-series-live-progress.cjs
+```
+
+The source-outage, saved-availability and update popup/policy regressions also
+passed. Seven diagnostics groups in the development workspace check safe queue
+counts, scope, fractional progress and bounded numeric timing fields. These
+focused tests use controlled source, native and clock fixtures; they do not
+claim a timed-out model on another PC is repaired until that PC uses the current
+helper and is checked again.

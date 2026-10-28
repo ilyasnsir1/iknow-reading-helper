@@ -241,7 +241,35 @@
     }
     return true;
   }
-  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges });
+  function queueProgress(queue) {
+    if (Number.isFinite(queue?.progressFraction)) return Math.min(1, Math.max(0, queue.progressFraction));
+    const count = queue?.totalCourses || queue?.courses?.length || 0;
+    if (!count) return 0;
+    const processed = queue.processedCourses ?? queue.completedCourses ?? 0;
+    const mask = normalizeFeatures(queue.features), stages = [...(mask.german || mask.colors ? ["language"] : []), ...(mask.audio ? ["audio"] : [])];
+    const phase = ["translation", "groups"].includes(queue.stage) ? "language" : queue.stage;
+    const index = stages.indexOf(phase), course = queue.courses?.[queue.currentIndex];
+    const active = course && !["complete", "skipped", "error"].includes(course.status);
+    const fraction = active && index >= 0 && stages.length ? (index + (queue.total > 0 ? Math.min(1, Math.max(0, (queue.completed || 0) / queue.total)) : 0)) / stages.length : 0;
+    return Math.min(1, Math.max(0, (processed + fraction) / count));
+  }
+  function queueEstimate(queue) {
+    const mask = normalizeFeatures(queue?.features);
+    const names = { language: mask.german && mask.colors ? "German & meanings" : mask.german ? "German" : "Meaning colors", audio: "Audio timings" };
+    const seconds = queue?.etaSeconds;
+    const duration = seconds < 60 ? "less than a minute" : Math.ceil(seconds / 60) < 60 ? `about ${Math.ceil(seconds / 60)} min` : `about ${Math.floor(Math.ceil(seconds / 60) / 60)} h ${Math.ceil(seconds / 60) % 60} min`;
+    const known = (queue?.etaStages || []).filter(stage => names[stage]).map(stage => names[stage]);
+    const unknown = (queue?.unestimatedStages || []).filter(stage => names[stage]);
+    const pending = unknown.map(stage => `${names[stage]} estimate ${queue.stage === stage ? "after a few sentences" : "after it starts"}`).join(" · ");
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return `${queue.etaScope === "measured" ? `${known.join(" & ") || "Measured steps"} remaining` : "Estimated time left"}: ${duration}${pending ? ` · ${pending}` : ""}`;
+    }
+    if (queue?.stage === "source") return "Loading course data…";
+    if (queue?.stage === "model") return "Starting local preparation…";
+    const waiting = unknown.filter(stage => stage !== queue?.stage).map(stage => `${names[stage]} estimate after it starts`).join(" · ");
+    return `Measuring ${names[queue?.stage] || "preparation"} speed…${waiting ? ` · ${waiting}` : ""}`;
+  }
+  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IKnowReaderCore = api;
 })();

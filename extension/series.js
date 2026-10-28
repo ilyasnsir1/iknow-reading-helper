@@ -66,15 +66,10 @@
   const status = node("div", "ikr-series-status"); status.hidden = true;
   const statusTitle = node("p", "ikr-series-status-title"), statusDetail = node("p", "ikr-series-status-detail"), eta = node("p", "ikr-series-eta");
   statusDetail.setAttribute("role", "status"); statusDetail.setAttribute("aria-live", "polite");
-  const progress = node("progress", "ikr-series-progress"); progress.setAttribute("aria-label", "Prepared courses");
-  status.append(statusTitle, statusDetail, progress, eta); card.append(eyebrow, heading, detail, features, savedCheck, picker, actions, status);
+  const progressLabel = node("p", "ikr-series-progress-label");
+  const progress = node("progress", "ikr-series-progress"); progress.setAttribute("aria-label", "Overall preparation progress");
+  status.append(statusTitle, statusDetail, progressLabel, progress, eta); card.append(eyebrow, heading, detail, features, savedCheck, picker, actions, status);
 
-  function etaText(seconds) {
-    if (!Number.isFinite(seconds) || seconds < 0) return "Estimated time left: calculating";
-    if (seconds < 60) return "Estimated time left: less than a minute";
-    const minutes = Math.ceil(seconds / 60);
-    return minutes < 60 ? `Estimated time left: about ${minutes} min` : `Estimated time left: about ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-  }
   function selectedReady(id, mask = Core.preparationFeatures(settings)) {
     const saved = availability[id];
     if (!saved) return false;
@@ -179,21 +174,25 @@
     status.hidden = !own && !commandError;
     if (commandError) {
       statusTitle.textContent = "Preparation interrupted"; statusDetail.textContent = commandError;
-      statusDetail.classList.add("ikr-series-error"); progress.hidden = eta.hidden = true; return;
+      statusDetail.classList.add("ikr-series-error"); progressLabel.hidden = progress.hidden = eta.hidden = true; return;
     }
-    progress.hidden = false;
+    progressLabel.hidden = progress.hidden = false;
     if (!own) return;
     const count = queue.totalCourses || queue.courses?.length || 0;
     const current = Math.min(count, Math.max(1, (queue.currentIndex || 0) + 1));
     const course = queue.courses?.[queue.currentIndex];
     statusTitle.textContent = queue.status === "complete" ? queue.failedCourses ? "Preparation finished with missing additions" : "Selected courses saved" : queue.status === "paused" ? "Preparation paused" : queue.status === "error" ? "Preparation interrupted" : `Course ${current} of ${count}`;
-    const phase = { model: "Starting", language: "German & meanings", translation: "German", groups: "Meaning colors", audio: "Audio timings", done: "Saved" }[queue.stage] || "Preparing";
+    const activeMask = Core.normalizeFeatures(queue.features);
+    const phase = { model: "Starting", language: activeMask.german && activeMask.colors ? "German & meanings" : activeMask.german ? "German" : "Meaning colors", translation: "German", groups: "Meaning colors", audio: "Audio timings", done: "Saved" }[queue.stage] || "Preparing";
     const savedProgress = Core.preparationProgress(queue, availability[course?.id], queue.features);
     const sentenceCount = savedProgress ? ` · ${savedProgress.ready} of ${savedProgress.total} sentences ready` : "";
     statusDetail.textContent = queue.error || (own ? queue.status === "complete" ? `${queue.processedCourses ?? count} courses processed${queue.failedCourses ? ` · ${queue.failedCourses} with missing additions` : ""}` : `${course?.title || queue.message || "Your course"} · ${phase}${sentenceCount}` : queue.title || "View progress in the queue.");
     statusDetail.classList.toggle("ikr-series-error", Boolean(queue.error));
-    progress.max = Math.max(1, count); progress.value = Math.min(count, queue.processedCourses ?? queue.completedCourses ?? 0);
-    eta.hidden = queue.status !== "running"; eta.textContent = eta.hidden ? "" : etaText(queue.etaSeconds);
+    const fraction = Core.queueProgress(queue), processed = queue.processedCourses ?? queue.completedCourses ?? 0;
+    progress.max = 1; progress.value = fraction;
+    const overview = `${Math.round(fraction * 100)}% overall · ${processed} of ${count} courses processed`;
+    progressLabel.textContent = overview; progress.setAttribute("aria-valuetext", overview);
+    eta.hidden = queue.status !== "running"; eta.textContent = eta.hidden ? "" : Core.queueEstimate(queue);
   }
   async function flushMask() {
     clearTimeout(saveTimer); const pending = pendingMask; pendingMask = null;

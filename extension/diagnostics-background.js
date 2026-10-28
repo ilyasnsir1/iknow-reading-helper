@@ -81,6 +81,13 @@
       preparation: { courses: states.slice(0, 100).map(state), queue: queue ? {
         status: code(queue.status || "unknown"), stage: code(queue.stage || "unknown"), totalCourses: count(queue.totalCourses),
         processedCourses: count(queue.processedCourses), failedCourses: count(queue.failedCourses),
+        currentIndex: count(queue.currentIndex), completed: count(queue.completed), total: count(queue.total),
+        progressFraction: Number.isFinite(queue.progressFraction) ? Math.min(1, Math.max(0, queue.progressFraction)) : null,
+        etaSeconds: Number.isFinite(queue.etaSeconds) && queue.etaSeconds >= 0 ? Math.ceil(queue.etaSeconds) : null,
+        etaScope: ["total", "measured"].includes(queue.etaScope) ? queue.etaScope : null,
+        etaStages: (Array.isArray(queue.etaStages) ? queue.etaStages : []).filter(stage => ["language", "audio"].includes(stage)),
+        unestimatedStages: (Array.isArray(queue.unestimatedStages) ? queue.unestimatedStages : []).filter(stage => ["language", "audio"].includes(stage)),
+        timings: Object.fromEntries(Object.entries(queue.timings || {}).filter(([stage]) => ["language", "audio"].includes(stage)).map(([stage, sample]) => [stage, { units: count(sample?.units), milliseconds: Number.isFinite(sample?.milliseconds) ? Math.max(0, Math.min(604800000, Math.round(sample.milliseconds))) : 0 }])),
         courses: (Array.isArray(queue.courses) ? queue.courses : []).slice(0, 100).map(state)
       } : null }, recentErrors: { scope: "current-background-session", items: recent.map(item => ({ ...item })) },
       helper: await nativeSnapshot(),

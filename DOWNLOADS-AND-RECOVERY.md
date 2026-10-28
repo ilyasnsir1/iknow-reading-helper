@@ -1,5 +1,17 @@
 # Preparation, progress and recovery
 
+Series and queue progress includes work inside the current course, with an
+explicit percentage alongside the processed-course count. A new queue restores
+the selected modules' saved checkpoints before model work starts. A processed
+sentence is not necessarily a complete saved result when an addition failed.
+
+Remaining time uses measured processing speeds. While only German/meaning
+processing has been measured, its remaining time is labelled separately and
+audio is marked as awaiting its first measurements. Once all remaining steps
+have measured speeds, the estimate covers the full queue. Future course sizes
+that have not been loaded yet use the current typical size, so estimates can
+change as their actual source becomes available.
+
 Preparation starts only after you choose courses/additions and explicitly start it. Completed validated results are saved incrementally. Resume reuses compatible saved work; it does not intentionally delete successful results or start a whole course from zero.
 
 The course step's sentence count and progress bar show **saved, source-validated results**, including results from earlier runs. They do not count mere attempts as successes. For example,79 saved audio timings out of187 show79/187 in both the step and Audio status. German+colors progress requires both German and its color links on the same sentence. Word meanings are counted separately when still missing. The time beside the course bar estimates **this step**, using newly saved results; it resets after pause/stage changes/cache jumps and is approximate.

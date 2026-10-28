@@ -79,6 +79,7 @@
 .ikr-series-status-detail, .ikr-series-eta { margin: 3px 0; color: #73717f; font-size: 11px; }
 .ikr-series-error { color: #a2573b; }
 .ikr-series-progress { display: block; width: min(100%,440px); height: 4px; margin: 12px 0; border: 0; appearance: none; border-radius: 4px; overflow: hidden; background: #e6e3ed; }
+.ikr-series-progress-label { margin: 10px 0 0; color: #747081; font-size: 11px; line-height: 1.5; }
 .ikr-series-progress::-webkit-progress-bar { background: #e6e3ed; }
 .ikr-series-progress::-webkit-progress-value { background: #77738f; }
 .ikr-series-progress::-moz-progress-bar { background: #77738f; }

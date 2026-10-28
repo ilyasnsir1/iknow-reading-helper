@@ -4,12 +4,6 @@
   const KEY = "iknowReaderQueue", Core = globalThis.IKnowReaderCore;
   let queue = null, busy = false;
   const $ = id => document.getElementById(id);
-  function remaining(seconds) {
-    if (!Number.isFinite(seconds) || seconds < 0) return "Estimated time left: calculating";
-    if (seconds < 60) return "Less than a minute left";
-    const minutes = Math.ceil(seconds / 60);
-    return minutes < 60 ? `About ${minutes} min left` : `About ${Math.floor(minutes / 60)} h ${minutes % 60} min left`;
-  }
   function render() {
     $("empty").hidden = Boolean(queue); $("queue").hidden = !queue;
     $("connection").textContent = "";
@@ -28,9 +22,11 @@
     const phase = { model: "Starting local helper", language: mask.german && mask.colors ? "German & meanings" : mask.german ? "German" : "Meaning colors", translation: "German", groups: "Meaning colors", audio: "Audio timings", done: "Saved" }[queue.stage] || "Preparing";
     $("phase").textContent = queue.status === "complete" ? "Saved additions appear when you open your courses." : `${phase}${queue.total > 0 ? ` · ${Math.min(queue.completed || 0, queue.total)} of ${queue.total} sentences` : ""}`;
     const processed = queue.processedCourses ?? queue.completedCourses ?? 0;
-    $("course-progress").max = Math.max(1, total); $("course-progress").value = Math.min(total, processed);
-    $("totals").textContent = `${processed} of ${total} courses processed${queue.skippedCourses ? ` · ${queue.skippedCourses} already saved` : ""}${queue.failedCourses ? ` · ${queue.failedCourses} with missing additions` : ""}`;
-    $("eta").hidden = queue.status !== "running"; $("eta").textContent = $("eta").hidden ? "" : remaining(queue.etaSeconds);
+    const fraction = Core.queueProgress(queue);
+    $("course-progress").max = 1; $("course-progress").value = fraction;
+    $("course-progress").setAttribute("aria-valuetext", `${Math.round(fraction * 100)}% overall, ${processed} of ${total} courses processed`);
+    $("totals").textContent = `${Math.round(fraction * 100)}% overall · ${processed} of ${total} courses processed${queue.skippedCourses ? ` · ${queue.skippedCourses} already saved` : ""}${queue.failedCourses ? ` · ${queue.failedCourses} with missing additions` : ""}`;
+    $("eta").hidden = queue.status !== "running"; $("eta").textContent = $("eta").hidden ? "" : Core.queueEstimate(queue);
     $("error").hidden = !queue.error; $("error").textContent = queue.error || "";
     $("pause").hidden = queue.status !== "running"; $("resume").hidden = !(["paused", "error"].includes(queue.status) || queue.status === "complete" && queue.failedCourses > 0);
     $("resume").textContent = queue.status === "complete" ? "Retry missing" : "Resume";
