@@ -27,7 +27,7 @@ from process_resources import worker_threads
 for _thread_variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_thread_variable] = str(worker_threads())
 
-HOST_VERSION = "1.19.0"
+HOST_VERSION = "1.20.0"
 MAX_INPUT = 16 * 1024 * 1024
 MAX_RESULT = 8 * 1024 * 1024
 CACHE_ROOT = Path(os.environ.get("IKNOW_READER_CACHE", str(Path(os.environ.get("LOCALAPPDATA", Path.home())) / "iKnowLesehilfe"))).resolve()
@@ -398,9 +398,21 @@ def handle(message):
         send({"type": "diagnostics-result", "requestId": request_id, "ok": True,
               "report": diagnostics.collect(CACHE_ROOT, HOST_VERSION, active_checks=message.get("extended") is True)})
         return
+    if kind in {"components:status", "components:start", "components:pause", "components:resume"}:
+        import component_manager
+        def component_busy():
+            import updater
+            return updater.installing(CACHE_ROOT) or any(job.thread.is_alive() for job in list(jobs.values())) or any(
+                getattr(getattr(sys.modules.get(name), "_requests", None), "unfinished_tasks", 0)
+                for name in ("neural_speech", "word_speech"))
+        component_manager.handle(message, CACHE_ROOT, send, busy=component_busy)
+        return
     if kind in {"update:check", "update:status", "update:install"}:
         import updater
         def update_busy():
+            import component_manager
+            if component_manager.is_active(CACHE_ROOT):
+                return True
             if any(job.thread.is_alive() for job in list(jobs.values())):
                 return True
             # Queue.unfinished_tasks includes the word currently synthesized,
@@ -414,6 +426,13 @@ def handle(message):
         updater.handle(message, CACHE_ROOT, send, HOST_VERSION, busy=update_busy)
         return
     if kind in {"prepare", "word-neural", "word-speech", "word-neural-prepare"}:
+        import component_manager
+        if component_manager.is_active(CACHE_ROOT):
+            send({"type": {"word-neural": "word-neural-result", "word-speech": "word-speech-result", "word-neural-prepare": "word-neural-prepare-result"}.get(kind, "error"),
+                  "requestId": request_id, "courseId": message.get("courseId"), "ok": False,
+                  "code": "component_installing", "message": "Wait for the model download or installation to finish.",
+                  "error": "Wait for the model download or installation to finish."})
+            return
         import updater
         if updater.installing(CACHE_ROOT):
             envelope = {"type": {"word-neural": "word-neural-result", "word-speech": "word-speech-result",
@@ -560,7 +579,7 @@ def main():
                 # Update metadata/status and version pings do not need numerical
                 # DLLs or voice imports. Load dependencies on the stdin thread
                 # before other work to preserve the existing Windows CRT rule.
-                if isinstance(message, dict) and message.get("type") not in {"update:check", "update:status", "update:install", "ping", "diagnostics"}:
+                if isinstance(message, dict) and message.get("type") not in {"update:check", "update:status", "update:install", "components:status", "components:start", "components:pause", "components:resume", "ping", "diagnostics"}:
                     warm_dependencies()
                 handle(message)
             except (ValueError, TypeError, UnicodeError) as error:

@@ -1,5 +1,11 @@
 # Updates
 
+Version 1.37.0 ships a signed in-app component catalogue and Models & voices
+manager. After initial helper setup, supported optional models/runtimes can be
+downloaded, paused, resumed or verified without rerunning a terminal. Programme
+and catalogue changes arrive through the application update; large component
+installation remains a separate explicit action. See [Models & voices](MODELS-AND-VOICES.md).
+
 Version 1.36.0 checks for releases during browser startup and ordinary use. A
 verified newer release shows **NEW** on the extension icon and its version in
 the tooltip. Pin Reading Helper in Brave to keep this notice visible. The fox
@@ -84,7 +90,9 @@ remain in their existing locations.
 
 After installation, the extension reloads and the verified new version refreshes
 open iKnow pages automatically, with a manual retry if needed. If the helper is missing, run the existing setup. An update that
-requires a new runtime dependency or model may require its matching setup step;
+requires a supported runtime dependency or model offers its download through
+Models & voices after first-time helper setup. Other setup changes are described
+in that release's notes;
 ordinary extension/helper updates do not download the existing models again.
 An update that expands browser permissions requires manual installation so its
 new access can be reviewed. Dependency/setup scripts are never run silently by

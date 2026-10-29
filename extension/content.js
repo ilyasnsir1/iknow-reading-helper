@@ -197,6 +197,7 @@
   }
   function clearItem(state) {
     AudioFollow?.removeItem(state);
+    state.studyTools?.remove();
     for (const node of [state.line, state.germanLine]) if (node) { node.remove(); owned.delete(node); }
     state.response?.classList.remove("ikr-item-english");
   }
@@ -785,6 +786,7 @@
     updateRomanText(state);
     updateTranslation(state);
     AudioFollow?.register(state);
+    globalThis.IKnowReaderCourseStudy?.sentence(state, courseId, course?.title);
     sentenceStates.set(container, state);
   }
   function renderItems() {
@@ -813,6 +815,7 @@
         const state = { id, line, response };
         AudioFollow?.registerItem(state, item, cueLink);
         syncItemGerman(state, item);
+        globalThis.IKnowReaderCourseStudy?.word(state, item, courseId, course?.title);
         itemStates.set(row, state);
       }
       const candidates = [...row.querySelectorAll(".item-sentences > .sentence")];

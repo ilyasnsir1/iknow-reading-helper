@@ -308,6 +308,23 @@ def _stop_owned(child):
             child.kill(); child.wait(timeout=5)
 
 
+def _component_maintenance(root):
+    directory = Path(root) / "components"
+    if not (Path(root) / "neural/component-maintenance").is_file():
+        return False
+    try:
+        value = json.loads((directory / "job.json").read_text(encoding="utf-8"))
+        if value.get("componentId") != "voices" or value.get("status") not in {"running", "pausing"}:
+            return False
+        probe = FileLock(directory / "worker.lock")
+        try:
+            return not probe.acquire()
+        finally:
+            probe.release()
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def serve(root):
     """Independent supervisor: only this process may stop its owned child."""
     root = Path(root)
@@ -328,6 +345,10 @@ def serve(root):
                                      stdout=log, stderr=log, close_fds=True, **_hidden_options())
         while child.poll() is None:
             time.sleep(2)
+            if _component_maintenance(root):
+                # The explicit component installer holds synthesis/start locks;
+                # only this supervisor may stop the engine child it owns.
+                return
             try:
                 idle = time.time() - (directory / "last-used").stat().st_mtime
             except OSError:
@@ -403,6 +424,17 @@ def _wav_result(payload, voice, cached):
 def _cache_key(reading, written, speed, voice):
     identity = {"version": VERSION, "reading": reading, "written": written, "speed": speed,
                 "voice": voice, "speaker": VOICES[voice], "parameters": PARAMETERS}
+    # Preserve compatible existing WAVs. A later signed catalogue changing an
+    # engine/model hash must use a different key even if its speaker UUID stays.
+    from component_catalog import COMPONENTS
+    baseline = {"Word voice engine": "ae0a52d58bc5423451229fb2f3348693c9a1121c83f0542bfb826c6e68a4fc0d",
+                "Mao Plain": "f87ccea2e8e2de0e0bfe52e803945af903b4086bf25621a015111628f00e4119",
+                "Nise": "6ff7eaa61c24d37434e2c6ab672fc3ba189ecc9118c08918a486ed5316e5c9d3"}
+    current = {artifact["name"]: artifact["sha256"] for artifact in COMPONENTS["voices"]["artifacts"]}
+    names = ("Word voice engine", VOICES[voice].get("modelName", VOICES[voice]["name"]))
+    revisions = {name: current.get(name) for name in names if current.get(name) != baseline.get(name)}
+    if revisions:
+        identity["modelRevisions"] = revisions
     return hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 

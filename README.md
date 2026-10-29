@@ -1,6 +1,8 @@
-# iKnow! Reading Helper · 1.36.0
+# iKnow! Reading Helper · 1.37.0
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.37.0 adds explicit component downloads in [Models & voices](MODELS-AND-VOICES.md), with resumable verified downloads and rollback, plus a [study library and speaking practice](STUDY.md). Save course words/sentences, reveal Romaji and repeat complete original recordings with a pause to speak. Record a short local take to compare; no automatic pronunciation grade is claimed. Helper 1.20.0 is included. Browser permissions and compatible voice caches are unchanged. New component metadata comes through app updates, but large downloads remain explicit.
 
 Version 1.36.0 discovers updates during browser startup and use, and shows NEW on the pinned extension icon. Checks share a one-hour cooldown and never install updates automatically. After an explicitly installed update loads its target version, open iKnow pages refresh automatically; active preparation or iKnow audio defers the refresh. Failed/interrupted refreshes keep a manual retry. No browser permission or model is added. Helper 1.19.0 is unchanged.
 

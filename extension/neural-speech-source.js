@@ -46,7 +46,7 @@
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message?.type !== 'ikr:word:neural') return;
     if (!trusted(sender) || !validReading(message.text) || !validJapanese(message.japanese) || !['female','male'].includes(message.voice) || ![.7,.85,1].includes(message.speed)) { respond({ok:false,code:'invalid_word'}); return; }
-    if (globalThis.IKnowReaderUpdates?.busy) { respond({ok:false,code:'update_in_progress',error:'Reading Helper is installing an update.'}); return; }
+    if (globalThis.IKnowReaderUpdates?.busy || globalThis.IKnowReaderComponents?.busy) { respond({ok:false,code:'update_in_progress',error:'Reading Helper is installing an update or model.'}); return; }
     const key = `${message.voice}:${message.speed}:${message.text}:${message.japanese || ''}`;
     if (cache.has(key)) { const value = cache.get(key); cache.delete(key); cache.set(key, value); respond({...value,cached:true}); return; }
     const existing = [...pending.values()].find(value => value.key === key);

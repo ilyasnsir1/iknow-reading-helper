@@ -1,6 +1,7 @@
 /* Local preparation bridge. Executable code and models never come from a course pack. */
 "use strict";
-importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostic-history.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js");
+importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostic-history.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js", "components-source.js", "study-store.js");
+globalThis.IKnowReaderStudyStore?.listenBackground();
 
 const AutoCore = globalThis.IKnowReaderCore;
 const AutoPacks = globalThis.IKnowReaderPacks;
@@ -327,7 +328,7 @@ async function command(message, sender) {
   // A stale content script from an earlier release must not start a job merely
   // because its course was opened. Only the explicit course action sends this.
   if (message.manual !== true) throw new Error("Choose additions and start preparation on the course page.");
-  if (globalThis.IKnowReaderUpdates?.busy) throw new Error("An update is being installed. Try again after Reading Helper reloads.");
+  if (globalThis.IKnowReaderUpdates?.busy || globalThis.IKnowReaderComponents?.busy) throw new Error("An update or model installation is in progress. Try again when it finishes.");
   const mask = features(message.features);
   if (!selected(mask)) return { ok: true, state: publicState(states.get(id) || publish(id, { status: "idle", features: mask, summary: null, message: "Romaji is available immediately." })) };
   const key = preparationKey(message.source, mask), previous = states.get(id);
@@ -748,7 +749,7 @@ async function pumpAutos() {
 }
 async function queueCommand(message, sender) {
   const action = message.type.slice("ikr:queue:".length);
-  if (["start", "resume"].includes(action) && globalThis.IKnowReaderUpdates?.busy) throw new Error("An update is being installed. Try again after Reading Helper reloads.");
+  if (["start", "resume"].includes(action) && (globalThis.IKnowReaderUpdates?.busy || globalThis.IKnowReaderComponents?.busy)) throw new Error("An update or model installation is in progress. Try again when it finishes.");
   const senderUrl = sender?.url || sender?.tab?.url || "";
   const readOnly = ["open", "status"].includes(action) && sender?.id === chrome.runtime.id && (seriesIdFromUrl(senderUrl) || AutoCore.courseIdFromUrl(senderUrl));
   if (!readOnly && !trustedQueue(sender, action === "start" ? message.seriesId : undefined)) throw new Error("Series preparation is only available on a series page.");
@@ -814,8 +815,9 @@ const queueReady = chrome.storage.local.get(QUEUE_KEY).then(async stored => {
 
 globalThis.IKnowReaderUpdateActivity = async () => {
   await queueReady;
+  await globalThis.IKnowReaderComponents?.reconcile();
   return seriesQueue?.status === "running" || pendingAuto.size > 0 || transfers.size > 0 || nativeStopping.size > 0 ||
     [...states.values()].some(value => ["running", "connecting", "queued"].includes(value.status)) ||
-    globalThis.IKnowReaderNeuralActivity?.() === true || globalThis.IKnowReaderWordPreparationActivity?.() === true;
+    globalThis.IKnowReaderNeuralActivity?.() === true || globalThis.IKnowReaderWordPreparationActivity?.() === true || globalThis.IKnowReaderComponents?.busy === true;
 };
 importScripts("update-refresh.js", "update-discovery.js", "updates.js");

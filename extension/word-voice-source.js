@@ -25,7 +25,7 @@
   const start = type === 'word-neural-prepare';
   if (!trusted(sender) || start && (message.manual !== true || !/^[1-9][0-9]{0,8}$/.test(String(message.courseId)) || !['female','male'].includes(message.voice) || ![1,.85,.7].includes(message.speed) || !/^(?:[a-f0-9]{8}|[a-f0-9]{64})$/.test(message.sourceSignature || '') || !Array.isArray(message.words) || !message.words.length || message.words.length > 2000 || !message.words.every(word => word && reading(word.text) && japanese(word.japanese))) || !start && !/^[a-f0-9]{64}$/.test(message.jobId || '')) { respond({ok:false,code:'invalid_word_prepare'}); return; }
   if (pending.size >= 12) { respond({ok:false,code:'word_prepare_busy'}); return; }
-  if (start && globalThis.IKnowReaderUpdates?.busy) { respond({ok:false,code:'update_in_progress',error:'Reading Helper is installing an update.'}); return; }
+  if (start && (globalThis.IKnowReaderUpdates?.busy || globalThis.IKnowReaderComponents?.busy)) { respond({ok:false,code:'update_in_progress',error:'Reading Helper is installing an update or model.'}); return; }
   const requestId = crypto.randomUUID(); let resolve;
   const work = new Promise(done => { resolve = done; });
   const timer = setTimeout(() => { pending.delete(requestId); resolve({ok:false,code:'word_prepare_timeout'}); },15000);

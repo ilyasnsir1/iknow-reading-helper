@@ -207,5 +207,7 @@
   if (chrome.tabs?.query) void chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => {
     try { const url = new URL(tabs[0]?.url || ""); if (url.protocol === "https:" && /^(?:(?:en|ja)\.)?iknow\.jp$/.test(url.hostname) && !url.port) wordCourseId = url.pathname.match(/^\/courses\/(\d+)(?:\/|$)/)?.[1] || null; } catch { }
     updateWordPreparation(current);
+    const studyLink = document.getElementById("study-link");
+    if (studyLink && wordCourseId) studyLink.href = chrome.runtime.getURL(`study.html?course=${wordCourseId}`);
   }).catch(() => {});
 })();

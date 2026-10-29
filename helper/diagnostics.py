@@ -27,6 +27,7 @@ MAX_REPORT = 512 * 1024
 FIXED_LOGS = (
     "logs/setup-latest.log", "logs/llama.log", "logs/llama.previous.log", "neural/engine.log",
     "neural/supervisor.log", "neural/course-jobs/worker.log",
+    "components/worker.log", "components/install.log",
 )
 PACKAGE_NAMES = {"numpy", "av", "ctranslate2", "faster-whisper", "onnxruntime",
                  "tokenizers", "huggingface-hub", "requests", "pyopenjtalk-plus"}
@@ -277,6 +278,21 @@ def collect(cache_root, helper_version, *, active_checks=False, app_root=None):
             report["updates"]["activeCheck"] = update_diagnostics.collect(root, app_root=app, deadline=time.monotonic() + 20, allow_network=True)
         except (ImportError, OSError, ValueError, TypeError) as error:
             report["updates"]["activeCheck"] = {"status": "unavailable", "error": diagnostic_checks.error_code(error)}
+    try:
+        import component_manager
+        components = component_manager.snapshot(root)
+        job = components.get("job") or {}
+        safe_job = _small_status(job, redact)
+        for key in ("componentId", "phase"):
+            if isinstance(job.get(key), str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,79}", job[key]):
+                safe_job[key] = job[key]
+        for key in ("downloadedBytes", "totalBytes", "fileIndex", "fileCount", "progress", "etaSeconds"):
+            if type(job.get(key)) in (int, float) and math.isfinite(job[key]) and 0 <= job[key] <= 10**15:
+                safe_job[key] = job[key]
+        report["components"] = {"catalogVersion": components["catalogVersion"], "active": components["active"],
+                                "components": components["components"], "job": safe_job}
+    except (OSError, ValueError, TypeError) as error:
+        report["components"] = {"status": "unavailable", "error": diagnostic_checks.error_code(error)}
     report["collection"] = {"activeChecksRequested": active_checks is True, "durationMs": round((time.monotonic() - started) * 1000),
                             "modelsStarted": False, "preparationStarted": False, "updatesInstalled": False}
     while len(json.dumps(report, ensure_ascii=False).encode("utf-8")) > MAX_REPORT:

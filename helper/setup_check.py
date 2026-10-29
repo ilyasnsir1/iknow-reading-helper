@@ -176,7 +176,7 @@ def _snapshot(base, required, root):
     return next((path for path in candidates if _contained(path, root) and all(_contained(path / name, root) and _file(path / name) for name in required)), None)
 
 
-def _python(root, packages, metadata):
+def _python(root, packages, metadata, audio_packages=None):
     directory = root / "runtime/python"
     detected = directory.exists() or (packages / "pip").exists()
     problems = []
@@ -192,7 +192,8 @@ def _python(root, packages, metadata):
             problems.append("Private Python search paths leave the local storage directory.")
     except (OSError, UnicodeError, ValueError):
         problems.append("Private Python search paths cannot be read.")
-    _packages(packages, _requirements("neural-voice-requirements.txt"), metadata, problems)
+    audio_packages = audio_packages or packages
+    _packages(audio_packages, _requirements("neural-voice-requirements.txt"), _metadata(audio_packages), problems)
     return _component(detected, problems)
 
 
@@ -304,7 +305,8 @@ def _verify(result, expected, root):
                 try:
                     module = importlib.import_module(name)
                     origin = getattr(module, "__file__", None)
-                    if not isinstance(origin, str) or not _contained(Path(origin), root / "python-packages"):
+                    allowed = [root / "python-packages", *_component_packages(root)]
+                    if not isinstance(origin, str) or not any(_contained(Path(origin), directory) for directory in allowed):
                         raise ImportError("The library did not load from this installation's private packages")
                     if name == "pyopenjtalk" and str(getattr(module, "__version__", "")).replace("-post", ".post") != "0.4.1.post10":
                         raise ImportError("Unexpected legacy voice version")
@@ -316,12 +318,35 @@ def _verify(result, expected, root):
         sys.dont_write_bytecode = previous
 
 
+def _component_packages(root):
+    directory = root / "runtime/python"
+    try:
+        lines = (directory / "python312._pth").read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeError):
+        return []
+    paths = []
+    for line in lines:
+        value = line.strip()
+        if not value or value.startswith(("#", "import ")):
+            continue
+        path = (directory / value).resolve()
+        if _contained(path, root / "components/packages") and path.is_dir() and re.fullmatch(r"[a-f0-9]{64}", path.name):
+            paths.append(path)
+    return paths
+
+
 def audit(cache_root, verify_audio=False, expected=None):
     root = Path(cache_root).resolve()
     packages = root / "python-packages"
     metadata = _metadata(packages)
-    result = {"schemaVersion": SCHEMA_VERSION, "python": _python(root, packages, metadata),
-              "course": _course(root, packages, metadata), "neural": _neural(root),
+    audio_packages = next((path for path in _component_packages(root) if (path / "numpy/__init__.py").is_file()), packages)
+    config = _read_json(root / "runtime-config.json") or {}
+    candidate = Path(config.get("dependencies", str(packages)))
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    course_packages = candidate if candidate == packages or candidate.resolve() in _component_packages(root) else packages
+    result = {"schemaVersion": SCHEMA_VERSION, "python": _python(root, packages, metadata, audio_packages),
+              "course": _course(root, course_packages, _metadata(course_packages)), "neural": _neural(root),
               "legacy": _legacy(root, packages, metadata)}
     if verify_audio:
         _verify(result, expected, root)

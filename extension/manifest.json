@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "iKnow! Reading Helper",
-  "version": "1.36.0",
+  "version": "1.37.0",
   "description": "Romaji, meaning colors, German translations and word audio for iKnow Japanese courses.",
   "permissions": [
     "storage",
@@ -78,6 +78,8 @@
         "near-arm-art.js",
         "automation.js",
         "panel-layout.js",
+        "study-store.js",
+        "course-study.js",
         "content.js"
       ],
       "css": [
@@ -85,7 +87,8 @@
         "automation.css",
         "series.css",
         "companion.css",
-        "panel-layout.css"
+        "panel-layout.css",
+        "course-study.css"
       ],
       "run_at": "document_idle"
     },

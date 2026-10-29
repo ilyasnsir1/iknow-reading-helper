@@ -124,11 +124,15 @@ The public project includes application code, reviewed seed data, setup scripts 
 
 Finish or pause course preparation and word preparation before installing. Changed local application files cause the updater to stop instead of overwriting them. Models, settings, prepared courses, generated speech and unrelated files are retained. A failed or interrupted installation has a recovery status; see [UPDATES.md](UPDATES.md).
 
-Application updates do not silently run setup or download different voice models. If a release requires new runtime dependencies or voice files, its notes must say so; run **helper/Setup.cmd → Check / repair** or the explicitly requested setup choice. Compatible installed components are reused.
+Application updates do not silently download different voice models. After initial helper setup, open **Models & voices** to explicitly install or update supported components from the signed catalogue. Compatible installed files are reused; paused/interrupted downloads can resume. First-time helper registration and repairs beyond the supported component catalogue still use **helper/Setup.cmd**. See [Models & voices](MODELS-AND-VOICES.md).
 
 If the application folder moves, Brave must load the extension from the new `extension` folder. Then run **`Setup.cmd` → Check / repair** to update the local helper connection. An unpacked extension ID can differ between PCs or paths; setup registers the ID on the receiving PC. Do not copy someone else's native-host registration or edit their ID into your own files.
 
 Older **`Setup-neural-voice.cmd`** and **`Einrichten.cmd`** entry points remain for compatibility with earlier instructions. The current installation needs only **`Setup.cmd`**.
+
+## Saved-item and speaking practice
+
+Bookmark a course word/sentence or use its practice icon, then open **Study library & speaking practice**. Repeat the original recording with a pause and record a short local take to compare. This mode does not automatically grade pronunciation. See [Study](STUDY.md).
 
 ## If something does not work
 
