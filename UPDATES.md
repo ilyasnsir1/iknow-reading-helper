@@ -11,14 +11,33 @@ verified newer release shows **NEW** on the extension icon and its version in
 the tooltip. Pin Reading Helper in Brave to keep this notice visible. The fox
 notice remains at the top of the popup and leads to Install update.
 
-Automatic checks share a persisted one-hour attempt cooldown across worker
-restarts, popups, tab changes and visible iKnow pages. Prior errors can retry
-after the cooldown; offline failures stay quiet and preserve an already verified
-available notice. While a course page stays visible it sends a lightweight
-presence signal every fifteen minutes. Hidden pages stop this signal. These
-are activity-based checks, not an always-running timer or a guarantee of
-instant discovery while the browser is idle/closed. No model is started and no
-browser permission is added. Installation still requires an explicit click.
+Version 1.37.1 replaces the original one-hour cooldown with a persisted
+45-second interval shared across worker restarts, popups and tab activity.
+Visible iKnow courses and series align their next wake with the shared due time;
+normally a new release is discovered within about one minute while a
+page stays visible and the connection/helper are available. Hidden pages stop
+their signal. These are activity-based checks, not a push subscription or a
+guarantee of discovery while the browser is idle/closed. No model is started and
+no browser permission is added. Metadata checks continue during preparation;
+installation still requires an explicit click and paused preparation.
+
+Discovery reads the small signed public latest-release manifest directly,
+avoiding GitHub REST requests on every check. Unchanged metadata reuses only
+cached signature bytes; Windows CNG verifies those bytes against the pinned
+publisher key every time. New signatures use a version-pinned URL to avoid
+pairing files from different releases. Explicit installation still checks
+release asset membership through the REST API and verifies the full archive.
+Helper 1.21.0 is included in the application update; no extra setup is required.
+
+Repeated failed automatic attempts back off from one to two, four, eight and
+at most sixty minutes. A verified available notice remains visible while
+offline; explicit Check for updates can retry immediately. A successful check
+restores the normal interval. Correcting the PC clock backwards cannot block
+discovery until the old timestamp catches up. Export diagnostics includes the
+attempt time, last result/error, retry interval and next eligible check, plus
+bounded check-start/check-finish history. New releases discovered while the
+previous install is waiting to refresh its pages retain their NEW notice while
+that earlier refresh finishes once.
 
 After successful installation, the extension reloads and the new worker checks
 that its actual version matches the completed target. It then automatically

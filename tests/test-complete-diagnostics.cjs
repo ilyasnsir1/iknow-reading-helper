@@ -25,7 +25,9 @@ async function fixture(initial={},mode="ready") {
  return {api,history,sandbox,events,data,messages,command,get connections(){return connections;},get writes(){return writes;},close(){for(const timer of timers)clearTimeout(timer);}};
 }
 (async()=>{
- let f=await fixture();assert.equal(f.connections,0);assert.equal(f.writes,0);
+ const attemptedAt=Date.now()-1000;
+ let f=await fixture({iknowReaderUpdateState:{status:"current",currentVersion:"1.35.1",lastAttemptAt:attemptedAt,
+  discovery:{intervalMs:300000,retryIntervalMs:600000,nextCheckAt:attemptedAt+600000,failureCount:2,lastCheckMode:"automatic",lastCheckOutcome:"failed",lastCheckFinishedAt:attemptedAt+10,lastErrorCode:"update_check_failed",lastErrorMessage:"unavailable C:\\Users\\Secret\\host.cmd"}}});assert.equal(f.connections,0);assert.equal(f.writes,0);
  const one=f.api.exportReport({states:[{courseId:"19053",status:"error",stage:"language",completed:41,total:200,message:"timeout",stageTotals:{language:200},stageProgress:{language:{completed:41,total:200}}}]}),two=f.api.exportReport({});
  assert.equal(one,two);let {report}=await one;
  assert.equal(f.connections,1);assert.equal(f.messages[0].extended,true);assert.equal(report.diagnosticFormatVersion,2);assert.equal(report.collection.helperExtended,true);
@@ -33,6 +35,10 @@ async function fixture(initial={},mode="ready") {
  assert.equal(report.helper.report.events.events[159].details.nested.failure.chain[0].frames[0].function,"generate");
  assert.equal(report.helper.report.localChecks.managedFiles.status,"modified");assert.equal(report.helper.report.updates.activeCheck.providers.legacyCsp.hresult,-2146893802);
  assert.equal(report.preparation.courses[0].stageProgress.language.completed,41);assert.equal(f.disconnections,undefined);
+ assert.equal(report.updates.lastAttemptAt,attemptedAt);assert.equal(report.updates.discovery.intervalMs,300000);
+ assert.equal(report.updates.discovery.nextCheckAt,attemptedAt+600000);assert.equal(report.updates.discovery.failureCount,2);
+ assert.equal(report.updates.discovery.lastCheckMode,"automatic");assert.equal(report.updates.discovery.lastCheckOutcome,"failed");
+ assert.ok(!report.updates.discovery.lastErrorMessage.includes("Secret"));
  console.log("PASS One explicit export requests extended checks, shares concurrent requests and retains all160 helper events, nested exception frames, integrity facts and Windows verifier evidence");
  f.history.state({courseId:"19053",requestId:"fixture-request",status:"running",stage:"language",completed:0,total:200});
  for(let i=1;i<100;i++)f.history.state({courseId:"19053",requestId:"fixture-request",status:"running",stage:"language",completed:i,total:200});

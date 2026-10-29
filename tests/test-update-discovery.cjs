@@ -42,7 +42,7 @@ function fixture({ version = "1.35.3", style = "promise", state = { status: "idl
   releaseReady(); await waiting; assert.equal(restored.count(), 0); assert.equal(restored.values.text, "NEW");
   restored.busy(false); restored.signals.startup.emit(); await tick(); assert.equal(restored.count(), 1);
   restored.signals.installed.emit({ reason: "install" }); await tick(); assert.equal(restored.count(), 2);
-  console.log("PASS Listeners register before storage is ready; the restored badge remains visible while preparation is busy, then startup/install can check");
+  console.log("PASS Listeners register before storage is ready; the restored badge remains visible while an update is busy, then startup/install can check");
 
   let releaseCheck; const checkPending = new Promise(resolve => { releaseCheck = resolve; });
   const concurrent = fixture({ check: async () => checkPending });
@@ -87,7 +87,7 @@ function fixture({ version = "1.35.3", style = "promise", state = { status: "idl
   const asyncBusy = fixture(); asyncBusy.options.isBusy = async () => true; await asyncBusy.start(); assert.equal(asyncBusy.count(), 0);
   const failed = fixture({ check: async () => { throw Error("Offline helper"); } }); await failed.start();
   failed.signals.startup.emit(); await tick(); assert.equal(failed.count(), 2); assert.equal(failed.values.text, "");
-  console.log("PASS Discovery skips active update/preparation work and consumes automatic failures without an error badge");
+  console.log("PASS Discovery skips active update/page-refresh work and consumes automatic failures without an error badge");
 
   const badge = fixture();
   for (const latestVersion of ["1.35.4", "1.36.0", "1.100.0", "2.0"]) {

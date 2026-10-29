@@ -312,12 +312,15 @@ def config(app_root=APP_ROOT):
     return value
 
 
-def safe_url(url, settings, api=False):
+def safe_url(url, settings, api=False, *, latest_metadata=False):
     parts = urllib.parse.urlsplit(str(url))
     if parts.scheme != "https" or parts.username or parts.password or parts.port not in (None, 443) or parts.fragment:
         raise UpdateError("The release download address is invalid.")
     prefix = "/repos/" + settings["owner"] + "/" + settings["repository"] + "/releases/"
-    if api:
+    if latest_metadata:
+        valid = not api and parts.hostname == "github.com" and not parts.query and parts.path == (
+            "/" + settings["owner"] + "/" + settings["repository"] + "/releases/latest/download/update-manifest.json")
+    elif api:
         valid = parts.hostname == "api.github.com" and parts.path.startswith(prefix)
     else:
         prefix = "/" + settings["owner"] + "/" + settings["repository"] + "/releases/download/"
@@ -337,7 +340,12 @@ class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def download(url, limit, target=None, progress=None):
-    request = urllib.request.Request(url, headers={"User-Agent": "iKnow-Reading-Helper-Updater/1", "Accept": "application/vnd.github+json" if "api.github.com" in url else "application/octet-stream"})
+    headers = {"User-Agent": "iKnow-Reading-Helper-Updater/1", "Accept": "application/vnd.github+json" if "api.github.com" in url else "application/octet-stream"}
+    if urllib.parse.urlsplit(url).path.endswith("/update-manifest.json"):
+        # Latest release discovery must revalidate the moving GitHub redirect;
+        # immutable signatures and archives retain their ordinary cache policy.
+        headers.update({"Cache-Control": "no-cache, max-age=0", "Pragma": "no-cache"})
+    request = urllib.request.Request(url, headers=headers)
     opener = urllib.request.build_opener(ReleaseRedirect())
     started = time.monotonic()
     payload = bytearray() if target is None else None
@@ -523,6 +531,66 @@ def remember_diagnostic_metadata(cache, app_root, settings, raw, signature):
         pass
 
 
+def _cached_signature(cache, app_root, settings, raw):
+    """Reuse only public signature bytes, never a previous trust decision."""
+    if cache is None:
+        return None
+    try:
+        with (update_root(cache, app_root) / "diagnostic-metadata.json").open("rb") as stream:
+            saved = stream.read(768 * 1024 + 1)
+        if len(saved) > 768 * 1024:
+            return None
+        value = strict_json(saved)
+        if (not isinstance(value, dict) or value.get("schema") != 1 or value.get("owner") != settings["owner"]
+                or value.get("repository") != settings["repository"]
+                or value.get("trustedKeySha256") != hashlib.sha256(settings["publicKeyXml"].encode("utf-8")).hexdigest()):
+            return None
+        previous = base64.b64decode(value.get("rawBase64", ""), validate=True)
+        signature = base64.b64decode(value.get("signatureBase64", ""), validate=True)
+        return signature if previous == raw and 0 < len(signature) <= 4096 else None
+    except (OSError, ValueError, TypeError, KeyError, RecursionError):
+        return None
+
+
+def get_latest_release(settings, installed, helper_version, *, cache=None, app_root=APP_ROOT, on_metadata=None):
+    """Discover signed public metadata without consuming GitHub REST quota.
+
+    The moving latest URL supplies candidate data only. Even unchanged cached
+    signature bytes are verified again against the current pinned publisher
+    key. Installation separately rechecks release membership with get_release.
+    """
+    prefix = "https://github.com/" + settings["owner"] + "/" + settings["repository"]
+    metadata = download(safe_url(prefix + "/releases/latest/download/update-manifest.json", settings,
+                                 latest_metadata=True), min(MAX_METADATA, 512 * 1024))
+    candidate = strict_json(metadata)
+    if not isinstance(candidate, dict):
+        raise UpdateError("The release manifest format is unsupported.")
+    declared = candidate.get("version")
+    version(declared)
+    version_prefix = prefix + "/releases/download/v" + declared + "/"
+    signature = _cached_signature(cache, app_root, settings, metadata)
+    verified = False
+    if signature is not None:
+        try:
+            verify_signature(metadata, signature, settings["publicKeyXml"])
+            verified = True
+        except UpdateError:
+            # A stale/tampered support cache cannot suppress a fresh signature
+            # lookup or become an authority for a later trust decision.
+            pass
+    if not verified:
+        signature = download(safe_url(version_prefix + "update-manifest.sig", settings), 4096)
+    if on_metadata is not None:
+        on_metadata(metadata, signature)
+    if not verified:
+        verify_signature(metadata, signature, settings["publicKeyXml"])
+    manifest = validate_manifest(metadata, settings, installed, helper_version)
+    expected_archive = version_prefix + urllib.parse.quote(manifest["asset"]["name"], safe="")
+    if manifest["asset"]["url"] != expected_archive:
+        raise UpdateError("The signed archive does not belong to this release version.")
+    return manifest, metadata, signature
+
+
 def get_release(settings, installed, helper_version, *, on_metadata=None):
     endpoint = "https://api.github.com/repos/" + settings["owner"] + "/" + settings["repository"] + "/releases/latest"
     raw = download(safe_url(endpoint, settings, api=True), MAX_METADATA)
@@ -680,8 +748,8 @@ def _check(cache, helper_version, app_root=APP_ROOT):
         settings = config(app_root)
     except UpdateError as error:
         return save_state(cache, {"status": "unconfigured", "currentVersion": installed, "latestVersion": installed, "message": str(error)}, app_root)
-    manifest, raw, signature = get_release(settings, installed, helper_version,
-                                         on_metadata=lambda raw, sig: remember_diagnostic_metadata(cache, app_root, settings, raw, sig))
+    manifest, raw, signature = get_latest_release(settings, installed, helper_version, cache=cache, app_root=app_root,
+        on_metadata=lambda raw, sig: remember_diagnostic_metadata(cache, app_root, settings, raw, sig))
     available = version(manifest["version"]) > version(installed)
     return save_state(cache, {"status": "available" if available else "current", "currentVersion": installed,
                              "latestVersion": manifest["version"], "message": "A new version is ready to install." if available else "You are up to date."}, app_root)

@@ -42,13 +42,38 @@ function fixture(options = {}) {
   console.log("PASS Concurrent startup/popup calls and worker restarts reload each matching tab once for the loaded target");
 
   for (const state of [
-    { autoRefreshTarget: null }, { autoRefreshTarget: "9.0.0" }, { status: "error" }, { status: "available" },
+    { autoRefreshTarget: null }, { autoRefreshTarget: "9.0.0" }, { status: "error" },
+    { status: "available", latestVersion: "1.36.0", autoRefreshTarget: null },
+    { status: "available", latestVersion: "1.36.0", autoRefreshTarget: "1.36.0" },
     { autoRefreshCompleteVersion: VERSION }, { status: "installing" }
   ]) {
     const f = fixture({ state }); await f.run(); assert.deepEqual(f.reloads, []); assert.equal(f.writes.length, 0);
   }
   const older = fixture({ version: "1.35.3" }); await older.run(); assert.deepEqual(older.reloads, []);
   console.log("PASS Old loaded versions, unverified targets, failed/incomplete installs and already completed versions never automatically refresh");
+
+  const nextMessage = "A new version is ready to install.";
+  const pending = fixture({ state: { status: "available", latestVersion: "1.36.0", message: nextMessage } });
+  pending.active(true); assert.equal((await pending.run()).code, "preparation_active");
+  assert.equal(pending.state().message, nextMessage); assert.deepEqual(pending.reloads, []);
+  pending.active(false); pending.tabs.get(2).audible = true;
+  assert.equal((await pending.run()).code, "iknow_audio_active"); assert.equal(pending.state().message, nextMessage);
+  pending.tabs.get(2).audible = false; await pending.run();
+  assert.deepEqual(pending.reloads, [1, 2, 3]); assert.equal(pending.state().autoRefreshCompleteVersion, VERSION);
+  assert.equal(pending.state().refreshTabs, false); assert.equal(pending.state().status, "available");
+  assert.equal(pending.state().latestVersion, "1.36.0"); assert.equal(pending.state().message, nextMessage);
+  pending.restart(); await pending.run(); assert.deepEqual(pending.reloads, [1, 2, 3]);
+  assert.equal(pending.state().message, nextMessage);
+  const discoveredDuring = fixture();
+  discoveredDuring.onReload(id => { if (id === 1) discoveredDuring.patch({ status: "available", latestVersion: "1.36.0", message: nextMessage }); });
+  await discoveredDuring.run(); assert.deepEqual(discoveredDuring.reloads, [1, 2, 3]);
+  assert.equal(discoveredDuring.state().autoRefreshCompleteVersion, VERSION); assert.equal(discoveredDuring.state().message, nextMessage);
+  const nextPartial = fixture({ state: { status: "available", latestVersion: "1.36.0", message: nextMessage } });
+  nextPartial.failures.add(2); assert.equal((await nextPartial.run()).code, "refresh_incomplete");
+  assert.equal(nextPartial.state().message, nextMessage); assert.equal(nextPartial.state().status, "available");
+  nextPartial.failures.clear(); await nextPartial.run(); assert.deepEqual(nextPartial.reloads, [1, 2, 3, 2]);
+  assert.equal(nextPartial.state().message, nextMessage);
+  console.log("PASS A newer available update preserves its notice while the prior verified install finishes a deferred refresh once; missing/wrong targets remain ineligible");
 
   const filtered = fixture({ tabs: [
     { id: 1, url: "https://iknow.jp/courses/1" }, { id: 2, url: "http://iknow.jp/courses/1" },

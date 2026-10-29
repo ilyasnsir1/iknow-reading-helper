@@ -137,7 +137,7 @@ class UpdateDiagnosticTests(unittest.TestCase):
         prefix = "https://github.com/example/example/releases/download/v1.35.0/"
         release = {"draft": False, "prerelease": False, "assets": [{"name": name, "browser_download_url": prefix + name} for name in ("update-manifest.json", "update-manifest.sig")]}
         failure = updater.SignatureVerificationError("fixture", "signature_runtime_error", {"exitCode": 3})
-        with patch.object(updater, "download", side_effect=[json.dumps(release).encode(), self.raw, self.signature]), patch.object(updater, "verify_signature", side_effect=failure):
+        with patch.object(updater, "download", side_effect=[self.raw, self.signature]), patch.object(updater, "verify_signature", side_effect=failure):
             with self.assertRaises(updater.SignatureVerificationError):
                 updater._check(self.cache, "1.17.0", self.app)
         stored = updater.read_json(updater.update_root(self.cache, self.app) / "diagnostic-metadata.json")

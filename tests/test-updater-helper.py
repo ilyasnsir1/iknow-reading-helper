@@ -306,7 +306,7 @@ class UpdaterTests(unittest.TestCase):
         replies, finished = [], threading.Event()
         def send(reply):
             replies.append(reply); finished.set()
-        with patch.object(module, "get_release", return_value=(manifest, b"", b"")):
+        with patch.object(module, "get_latest_release", return_value=(manifest, b"", b"")):
             module.handle({"type": "update:check", "requestId": "dead-operation-check"}, cache, send, "1.16.0")
             self.assertTrue(finished.wait(5))
         self.assertTrue(replies[0]["ok"], replies)

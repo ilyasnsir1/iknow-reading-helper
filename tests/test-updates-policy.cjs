@@ -11,7 +11,7 @@ function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "cur
       stats.active++; const messages = [], disconnects = []; let active = true;
       return { onMessage: { addListener: value => messages.push(value) }, onDisconnect: { addListener: value => disconnects.push(value) },
         disconnect() { if (!active) return; active = false; stats.active--; for (const callback of disconnects) callback(); },
-        postMessage(message) { calls.push(message.type); setTimeout(() => { if (!active) return; for (const callback of messages) callback({ type: "update:result", requestId: message.requestId, ok: next.ok,
+        postMessage(message) { calls.push(message.type); if (next.mode === "throw") throw Error("Native host unavailable"); setTimeout(() => { if (!active) return; for (const callback of messages) callback({ type: "update:result", requestId: message.requestId, ok: next.ok,
           state: { status: next.mode, latestVersion: "1.35.0", message: "Fixture result" } }); }, 1); } };
     } }, storage: { local: { get: async key => ({ [key]: stored[key] }), set: async value => { Object.assign(stored, structuredClone(value)); } } },
     tabs: { query: async () => [], reload: async () => {} } };
@@ -41,16 +41,31 @@ function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "cur
   await Promise.all([daily.send("auto-check"), daily.send("auto-check"), daily.send("auto-check")]);
   assert.deepEqual(daily.calls, ["update:check"]);
   await daily.send("auto-check"); assert.equal(daily.calls.length, 1);
-  daily.clock.now += 60 * 60 * 1000 + 1; await daily.send("auto-check");
+  daily.clock.now += 45000 + 1; await daily.send("auto-check");
   assert.equal(daily.calls.length, 2); assert.equal(daily.stats.configReads, 1);
   const disabled = fixture({ enabled: false }); await disabled.send("auto-check"); await disabled.send("auto-check"); assert.equal(disabled.calls.length, 0);
-  console.log("PASS Own-popup automatic check is hourly, concurrent/repeated popups share its persisted limit, and disabled configuration starts no native host");
+  console.log("PASS Own-popup automatic checks share a 45-second persisted limit; concurrent/repeated popups and disabled configuration start no extra host");
 
   const offline = fixture({ mode: "error", ok: false });
   const quiet = await offline.send("auto-check"); assert.equal(quiet.state.status, "idle"); assert.equal(quiet.state.message, "");
   await offline.send("auto-check"); assert.equal(offline.calls.length, 1);
   assert.equal((await offline.send("check")).state.status, "error");
+  assert.equal(offline.stored[KEY].discovery.lastCheckMode, "manual");
+  assert.equal(offline.stored[KEY].discovery.lastCheckOutcome, "failed");
   console.log("PASS Failed automatic check remains quiet, records its attempt and does not repeat on every popup; explicit check reports errors");
+
+  const exception = fixture({ initial: { [KEY]: { status: "available", latestVersion: "1.35.0" } }, mode: "throw" });
+  await exception.send("auto-check");
+  assert.equal(exception.stored[KEY].status,"available");assert.equal(exception.stored[KEY].latestVersion,"1.35.0");
+  assert.equal(exception.stored[KEY].lastAttemptAt,exception.clock.now);assert.equal(exception.stored[KEY].discovery.failureCount,1);
+  await exception.send("auto-check");assert.equal(exception.calls.length,1);
+  const exceptionRestart = fixture({ initial: exception.stored, mode:"throw" });await exceptionRestart.send("auto-check");assert.equal(exceptionRestart.calls.length,0);
+  await exception.send("check");assert.equal(exception.stored[KEY].discovery.lastCheckMode,"manual");assert.equal(exception.stored[KEY].discovery.lastCheckOutcome,"failed");
+  assert.equal(exception.stats.active,0);
+  const unconfigured=fixture({mode:"unconfigured"});await unconfigured.send("auto-check");
+  assert.equal(unconfigured.stored[KEY].checkedAt,undefined);assert.equal(unconfigured.stored[KEY].discovery.failureCount,1);
+  assert.equal(unconfigured.stored[KEY].discovery.lastCheckOutcome,"failed");
+  console.log("PASS Native exceptions retain verified availability and the persisted attempt, close their port and expose diagnostic failure details; unconfigured helpers are not counted as successful checks");
 
   const falseAvailable = fixture({ mode: "available", ok: false });
   assert.equal((await falseAvailable.send("check")).state.status, "error"); assert.equal((await falseAvailable.send("install")).code, "update_check_required");
