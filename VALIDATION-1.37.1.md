@@ -1,8 +1,9 @@
-# Validation: 1.37.1 (local, unpublished)
+# Validation: 1.37.1 (superseded by 1.37.2)
 
 Extension 1.37.1; helper 1.21.0. No permission changes. The registered
 1.37.0 installation, Desktop sharing copy, native registration and actual model/
-learning caches were not changed. No commits or release assets were pushed.
+learning caches were not changed. The package was subsequently published; its
+post-publication observation and correction are recorded below.
 
 ## Automatic discovery
 
@@ -77,3 +78,14 @@ normally detects a later release within about one minute when the
 helper and network respond. Hidden/idle/closed browsers cannot guarantee instant
 delivery. Repeated failures intentionally increase that interval. Install
 remains explicit. Public publication requires the user's separate instruction.
+
+## Post-publication observation
+
+1.37.1 was published with explicit user authorization. In the public update
+test the old 1.37.0 installer verified and installed all new files, but the
+subsequent fast discovery received an older signed latest manifest for about
+33 seconds and rejected it as older than the newly installed version. A
+separate public probe eventually observed 1.37.1. This is an actual test failure,
+not a successful end-to-end public result for 1.37.1. Version 1.37.2 fixes stale
+discovery handling and adds a public time bucket to the moving metadata URL;
+its actual public upgrade tests pass from both 1.37.0 and 1.37.1.

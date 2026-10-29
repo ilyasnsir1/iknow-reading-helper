@@ -20,6 +20,30 @@ worker restart and post-install refresh tests remain applicable and pass.
 `tests/test-updater-helper.py` retains the real Windows transaction, rollback,
 cross-process locks, permission-boundary and explicit downgrade checks.
 
-Build, signature verification and isolated staged/public native update results
-are recorded after packaging/publication below. User installation paths, native
-registration, model files and learning caches are not used by the test fixtures.
+The separate unpacked package and signed assets contain 146 managed files and
+a 12,202,451-byte ZIP. Publisher signature/digest checks and source/package hash
+comparison pass; browser permissions and extension identity match 1.37.0.
+Staged native update tests from both exact earlier published archives (1.37.0
+and 1.37.1) pass, retaining model/course/voice sentinels and user notes.
+
+Published 2026-10-29T01:43:07Z after explicit user authorization. The real public
+latest-metadata probe observed 1.37.2 on its first request in 1.297 seconds,
+using the public time-bucket URL and pinned Windows CNG verification. Public
+anonymous GitHub/native updates from 1.37.0 and 1.37.1 both pass: exact publisher
+signature, ZIP, detached runner, all 146 installed file hashes, retained model/
+course/voice sentinels and personal notes, then a second check reports current
+with metadataVersion 1.37.2 and metadataStale false.
+
+Local evidence (ignored, not distributed):
+
+- `work/public-discovery-evidence/20261029T014310Z/results.json`
+- `work/live-github-update-evidence/20261029T014309313819Z/results.json` (1.37.0)
+- `work/live-github-update-evidence/20261029T014324959601Z/results.json` (1.37.1)
+
+These public tests use disposable installations and actual network/native
+transactions, not the user's browser profile/registration. Actual browser
+runtime reload and automatic tab refresh are covered separately by the isolated
+Brave fixtures. The registered 1.37.0 files, Desktop 1.34.1 sharing copy, native
+registration, real model files and learning caches remained unchanged; protected
+managed baselines were verified again after publication. No hard delivery
+guarantee is claimed for GitHub/network delays or inactive browsers.
