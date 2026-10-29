@@ -20,6 +20,7 @@
   const node = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text !== undefined) n.textContent = text; return n; };
   const setText = (element, text) => { if (element.textContent !== text) element.textContent = text; };
   const card = node("section", "ikr-series-card ikr-owned"); card.setAttribute("aria-label", "Prepare courses");
+  const themePicker = node("span", "ikr-series-theme"); card.append(themePicker);
   const eyebrow = node("p", "ikr-series-eyebrow", "iKnow! Reading Helper"), heading = node("h2", "", "Prepare your courses");
   const detail = node("p", "ikr-series-detail", ""), features = node("div", "ikr-series-features");
   const savedCheck = node("div", "ikr-saved-check"); savedCheck.hidden = true;
@@ -312,7 +313,7 @@
     }
     courses = [...found.values()];
     if (!card.isConnected && first) {
-      const list = document.querySelector(".series_list") || document.querySelector(".series-courses .courses") || first.closest(".courses, .goals, .course-list, ul, ol, table") || first.closest(".course, .goal, article") || first.parentElement; list.before(card);
+      const list = document.querySelector(".series_list") || document.querySelector(".series-courses .courses") || first.closest(".courses, .goals, .course-list, ul, ol, table") || first.closest(".course, .goal, article") || first.parentElement; list.before(card); globalThis.IKnowReaderTheme?.mount(themePicker);
     }
     const nextKey = courses.map(course => course.id).join(":");
     if (nextKey !== coursesKey) { coursesKey = nextKey; scheduleAvailability(); }

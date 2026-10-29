@@ -269,7 +269,6 @@
     if (!Object.keys(Core.DEFAULTS).some(key => previous[key] !== settings[key])) { updateStatus(); return; }
     const root = document.documentElement;
     const enabledChanged = previous.enabled !== settings.enabled;
-    const pronunciationChanged = previous.pronunciation !== settings.pronunciation;
     const languageChanged = previous.translationLanguage !== settings.translationLanguage;
     const alignmentChanged = previous.alignmentMode !== settings.alignmentMode;
     const interactive = settings.enabled && settings.groupInfo && settings.colorMode !== "off";
@@ -291,12 +290,11 @@
     }
     // Bold and the three reading visibility switches are CSS-only. Sentence
     // content, meaning controls and audio targets do not change for those.
-    if (pronunciationChanged || interactionChanged || languageChanged) for (const state of sentenceStates.values()) {
-      if (pronunciationChanged) updateRomanText(state);
-      else if (interactionChanged) syncInteractivity(state);
+    if (interactionChanged || languageChanged) for (const state of sentenceStates.values()) {
+      if (interactionChanged) syncInteractivity(state);
       if (languageChanged) updateTranslation(state);
       if (interactionChanged && !interactive) state.dismissInfo?.();
-      else if (interactionChanged || pronunciationChanged) updateInfo(state);
+      else if (interactionChanged) updateInfo(state);
     }
     renderToolbar();
     const audioChanged = enabledChanged || ["audioFollow", "wordAudio", "wordAudioMode", "wordAudioSpeed", "wordNeuralVoice"].some(key => previous[key] !== settings[key]);
@@ -305,7 +303,7 @@
         audioError = message;
         updateStatus();
       }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice });
-    if (pronunciationChanged || interactionChanged) AudioFollow?.refresh({ wordsOnly: !pronunciationChanged });
+    if (interactionChanged) AudioFollow?.refresh({ wordsOnly: true });
     if (settings.enabled && !previous.enabled) schedule();
     if (enabledChanged) updateAutomation();
   }
@@ -360,7 +358,7 @@
     const container = document.querySelector(".course-content-container");
     if (!container) return;
     if (toolbar?.isConnected) return;
-    if (toolbar) { owned.delete(toolbar); toolbar.remove(); }
+    if (toolbar) { globalThis.IKnowReaderTheme?.unmount(toolbar); owned.delete(toolbar); toolbar.remove(); }
     automation?.destroy(); automation = null;
     panelLayout?.destroy(); panelLayout = null;
     toolbar = own(create("div", "ikr-toolbar"));
@@ -391,7 +389,9 @@
       const option = create("option", "", label); option.value = value; languageSelect.append(option);
     }
     languageSelect.addEventListener("change", () => { void saveSetting("translationLanguage", languageSelect.value); });
-    translationLabel.append(languageSelect); menus.append(translationLabel); toolbar.append(menus);
+    translationLabel.append(languageSelect); menus.append(translationLabel);
+    const themePicker = create("span", ""); menus.append(themePicker);
+    toolbar.append(menus);
     const retry = create("button", "", "Reload");
     retry.type = "button"; retry.dataset.retry = "true"; retry.hidden = true;
     retry.addEventListener("click", () => {
@@ -404,6 +404,7 @@
     toolbar.append(status);
     // Outside the React-owned .course-content so its search/sort events remain intact.
     container.before(toolbar);
+    globalThis.IKnowReaderTheme?.mount(themePicker);
     panelLayout = globalThis.IKnowReaderPanelLayout?.create({ toolbar, before: container }) || null;
     automation = globalThis.IKnowReaderAutomation?.create({
       anchor: toolbar,
@@ -526,7 +527,9 @@
     highlightRanges(node, groups, "ja", state);
   }
   function romanValues(state) {
-    return state.romanTokens.map((token, index) => settings.pronunciation && state.record?.pronunciation?.[index] !== undefined ? state.record.pronunciation[index] : token.text);
+    // Display the source's Latn, including its particle and number spellings.
+    // Spoken readings belong to playback; stored preparation cannot replace it.
+    return state.romanTokens.map(token => token.text);
   }
   function groupLabels(record, sentence, values, language = "en") {
     const en = plain(sentence.response?.text);
@@ -871,7 +874,7 @@
         preparationChoices = { german: false, colors: false, audio: false };
         completenessCache = null; availabilityCache = null;
       }
-      if (!courseId) { automation?.destroy(); automation = null; panelLayout?.destroy(); panelLayout = null; if (toolbar) { toolbar.remove(); owned.delete(toolbar); toolbar = null; } return; }
+      if (!courseId) { automation?.destroy(); automation = null; panelLayout?.destroy(); panelLayout = null; if (toolbar) { globalThis.IKnowReaderTheme?.unmount(toolbar); toolbar.remove(); owned.delete(toolbar); toolbar = null; } return; }
       ensureToolbar(); renderToolbar();
       document.documentElement.classList.toggle("ikr-active", settings.enabled);
       if (!settings.enabled && !course) return;

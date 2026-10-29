@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study · iKnow! Reading Helper</title><link rel="stylesheet" href="study.css"><script src="study-store.js" defer></script><script src="study.js" defer></script></head>
-<body><main>
+<html lang="en" class="ikr-theme-page" data-ikr-theme="paper"><head><link rel="stylesheet" href="theme.css"><script src="theme.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study · iKnow! Reading Helper</title><link rel="stylesheet" href="study.css"><script src="study-store.js" defer></script><script src="study-course-filter.js" defer></script><script src="study.js" defer></script><link rel="stylesheet" href="theme-pages.css"><link rel="stylesheet" href="study-layout.css"></head>
+<body data-ikr-page="study"><main>
   <header class="page-header"><div class="brand"><img src="icons/icon128.png" alt="" width="46" height="46"><div><p class="eyebrow">iKnow! Reading Helper</p><h1>Your study space</h1></div></div><a id="course-link" href="https://iknow.jp/content/japanese" target="_blank" rel="noopener noreferrer">Open iKnow <span aria-hidden="true">↗</span></a></header>
   <div class="workspace">
     <aside class="library" aria-label="Saved study items"><div class="library-heading"><h2>Saved for later</h2><span id="library-count">0</span></div>
@@ -11,7 +11,7 @@
     <section class="practice" aria-label="Study and pronunciation practice">
       <div id="empty" class="empty"><span aria-hidden="true" class="empty-mark">あ</span><h2>A little practice, at your pace.</h2><p>Save a word or sentence from an iKnow course to bring it here.</p><p id="empty-filter" hidden>No saved items match these filters.</p></div>
       <article id="study-card" hidden>
-        <div class="item-top"><p id="item-source" class="eyebrow"></p><button id="remove-item" class="icon-button" type="button" aria-label="Remove this item from your saved library" title="Remove saved item">×</button></div>
+        <div class="item-top"><p id="item-source" class="eyebrow"></p><button id="remove-item" class="icon-button" type="button" aria-label="Remove this item from your saved library" title="Remove saved item"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"/></svg></button></div>
         <p id="japanese" class="japanese" lang="ja"></p><p id="kana" class="kana" lang="ja"></p>
         <div class="reading-header"><span>Reading</span><button id="reveal-all" class="text-button" type="button">Reveal all Romaji</button></div><div id="romaji" class="romaji" aria-label="Reveal individual Romaji words"></div>
         <details class="translation" open><summary>Meaning</summary><p id="english" lang="en"></p><p id="german" lang="de"></p></details>

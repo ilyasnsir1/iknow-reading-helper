@@ -118,7 +118,8 @@
         if (generation !== captureGeneration || target !== selected) return;
         clearTimeout(captureTimer); captureTimer = null; recorder = null; captureState = "idle";
         if (chunks.length && !tooLarge) {
-          takeUrl = URL.createObjectURL(new Blob(chunks, { type: active.mimeType || "audio/webm" })); take.src = takeUrl;
+          const blob = new Blob(chunks, { type: active.mimeType || "audio/webm" });
+          takeUrl = URL.createObjectURL(blob); take.src = takeUrl;
           $("record-status").textContent = "Your take is ready. Listen to both recordings and compare.";
         } else $("record-status").textContent = tooLarge ? "The recording was too large. Try a shorter take." : "No audio was recorded. Try again.";
         updateMediaControls();
@@ -162,7 +163,8 @@
       $("item-source").textContent = `${item.kind === "word" ? useContext && item.context ? "Word in context" : "Word" : "Sentence"} · ${item.courseTitle || `Course ${item.courseId}`}`;
       $("japanese").textContent = value.japanese; $("kana").textContent = value.kana; $("kana").hidden = !value.kana;
       $("english").textContent = value.english; $("english").hidden = !value.english; $("german").textContent = value.german; $("german").hidden = !value.german;
-      $("context-row").hidden = !item.context; $("use-context").checked = useContext; renderReading(value.romaji);
+      $("context-row").hidden = !item.context; $("use-context").checked = useContext;
+      renderReading(value.romaji);
       if (!value.audioUrl) $("audio-status").textContent = "No original recording was saved for this item.";
       $("course-link").href = `https://iknow.jp/courses/${item.courseId}`; $("course-link").textContent = "Open course ↗";
     }

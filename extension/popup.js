@@ -11,7 +11,7 @@
     kanaVisible: true,
     colorMode: "hover",
     alignmentMode: "phrases",
-    pronunciation: true,
+    pronunciation: false,
     fontSize: 16,
     sentenceBold: false,
     groupInfo: false,
@@ -27,7 +27,7 @@
     prepareColors: false,
     prepareAudio: false
   });
-  const BOOLEAN_KEYS = ["enabled", "wordRomaji", "sentenceRomaji", "followPanels", "kanaVisible", "pronunciation", "sentenceBold", "groupInfo", "audioFollow", "wordAudio"];
+  const BOOLEAN_KEYS = ["enabled", "wordRomaji", "sentenceRomaji", "followPanels", "kanaVisible", "sentenceBold", "groupInfo", "audioFollow", "wordAudio"];
   const STORED_BOOLEAN_KEYS = [...BOOLEAN_KEYS, "prepareGerman", "prepareColors", "prepareAudio"];
   const COLOR_MODES = ["off", "hover", "all"];
   const ALIGNMENT_MODES = ["phrases", "words"];

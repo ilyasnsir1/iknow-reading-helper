@@ -9,7 +9,7 @@ import shutil
 
 DOCS = ('README.md', 'START-HERE.md', 'SHARE-WITH-A-FRIEND.md', 'VOICE-OPTIONS.md',
         'RECORDING-A-FRESH-INSTALL.md', 'MEANING-NOTES.md', 'ALIGNMENT-MODES.md',
-        'DIAGNOSTICS.md', 'DOWNLOADS-AND-RECOVERY.md', 'UPDATES.md', 'MODELS-AND-VOICES.md', 'STUDY.md', '.gitignore')
+        'DIAGNOSTICS.md', 'DOWNLOADS-AND-RECOVERY.md', 'UPDATES.md', 'MODELS-AND-VOICES.md', 'STUDY.md', 'THEMES.md', '.gitignore')
 
 
 def stage(source, output):

@@ -18,6 +18,7 @@
   let clip = null;
   let nativeStartedAt = 0;
   let preparedRequestId = null;
+  const nativeControl = node => node?.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container");
 
   function finishClip(reason = "stopped", error = "") {
     const previous = clip;
@@ -78,7 +79,7 @@
     void clipPlayer.play().catch(() => { if (clip === current) finishClip("error", "play"); });
   }
   function playWord(request) {
-    if (!wordEnabled || typeof request.requestId !== "string" || request.requestId.length > 100 || typeof request.src !== "string" || request.src.length > 4000) return;
+    if (!wordEnabled || request.requestId !== preparedRequestId || typeof request.requestId !== "string" || request.requestId.length > 100 || !Number.isFinite(request.intentTime) || typeof request.src !== "string" || request.src.length > 4000) return;
     let url;
     try { url = new URL(request.src, location.href); } catch { return; }
     if (url.protocol !== "https:" || !/^assets\d*\.iknow\.jp$/i.test(url.hostname) || !url.pathname.startsWith("/assets/") || !/\.mp3$/i.test(url.pathname) || url.username || url.password || url.hash) return;
@@ -160,14 +161,15 @@
     }, location.origin);
   }
   function cancelTick() { if (frame !== null) cancelAnimationFrame(frame); frame = null; }
+  function needsTick() { return active && !active.paused && !active.ended && (enabled || wordEnabled && active === clipPlayer && clip && !clip.voice); }
   function tick(now) {
     frame = null;
-    if ((!enabled && !wordEnabled) || !active || active.paused || active.ended) return;
+    if (!needsTick()) return;
     if (clip && active === clipPlayer && clip.end !== null && active.currentTime >= clip.end - (clip.pcm ? 0 : .008)) { finishClip("ended"); return; }
     if (now - lastSend >= 35) { emit(active, "time"); lastSend = now; }
     frame = requestAnimationFrame(tick);
   }
-  function startTick() { cancelTick(); lastSend = 0; if ((enabled || wordEnabled) && active && !active.paused) frame = requestAnimationFrame(tick); }
+  function startTick() { cancelTick(); lastSend = 0; if (needsTick()) frame = requestAnimationFrame(tick); }
   function watch(media) {
     if (watched.has(media)) return;
     watched.add(media); ids.set(media, ++sequence);
@@ -187,28 +189,38 @@
   Object.defineProperty(HTMLMediaElement.prototype, "play", {
     configurable: true, writable: true,
     value: function play(...args) {
-      if (this instanceof HTMLAudioElement) { if (this !== clipPlayer) { nativeStartedAt = performance.now(); preparedRequestId = null; finishClip(); } watch(this); }
+      // Native playback must never depend on extension bookkeeping succeeding.
+      // No promise, network request, model or timing preparation precedes play.
+      try {
+        if (this instanceof HTMLAudioElement) {
+          if (this !== clipPlayer) { nativeStartedAt = performance.now(); preparedRequestId = null; finishClip(); }
+          if (enabled || wordEnabled) watch(this);
+        }
+      } catch { /* Preserve the site's original play return value and errors. */ }
       return Reflect.apply(nativePlay, this, args);
     }
   });
   window.addEventListener("message", event => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.type === "IKR_WORD_AUDIO_PREPARE_V1") {
-      if (wordEnabled && Number.isFinite(event.data.intentTime) && event.data.intentTime >= nativeStartedAt) { preparedRequestId = event.data.requestId; finishClip(); if (active) active.pause(); }
+      if (wordEnabled && typeof event.data.requestId === "string" && event.data.requestId.length <= 100 && Number.isFinite(event.data.intentTime) && event.data.intentTime >= nativeStartedAt) { preparedRequestId = event.data.requestId; finishClip(); }
       return;
     }
     if (event.data?.type === "IKR_WORD_AUDIO_PLAY_V1") { playWord(event.data); return; }
     if (event.data?.type === "IKR_WORD_VOICE_PLAY_V1") { playVoice(event.data); return; }
-    if (event.data?.type === "IKR_WORD_AUDIO_STOP_V1") { preparedRequestId = null; finishClip(); return; }
+    if (event.data?.type === "IKR_WORD_AUDIO_STOP_V1") {
+      if (typeof event.data.requestId === "string" && event.data.requestId !== preparedRequestId && event.data.requestId !== clip?.requestId) return;
+      preparedRequestId = null; finishClip(); return;
+    }
     if (event.data?.type !== "IKR_NATIVE_AUDIO_CONFIG_V1") return;
     enabled = event.data.enabled === true;
     wordEnabled = event.data.wordEnabled === true;
-    if (!wordEnabled) finishClip();
+    if (!wordEnabled) { preparedRequestId = null; finishClip(); }
     if (!enabled && !wordEnabled) cancelTick();
     else if (active && !active.paused && !active.ended) { emit(active, "playing"); startTick(); }
   });
   document.addEventListener("click", event => {
-    if (event.button === 0 && event.target.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container")) { nativeStartedAt = performance.now(); finishClip(); }
+    if (event.button === 0 && nativeControl(event.target)) { nativeStartedAt = performance.now(); preparedRequestId = null; finishClip(); }
   }, true);
   document.addEventListener("visibilitychange", () => { if (document.hidden) finishClip(); });
   window.addEventListener("pagehide", () => { finishClip(); cancelTick(); });

@@ -3,7 +3,7 @@
   "use strict";
   const DEFAULTS = Object.freeze({
     enabled: true, wordRomaji: true, sentenceRomaji: true, followPanels: false,
-    kanaVisible: true, colorMode: "hover", alignmentMode: "phrases", pronunciation: true, fontSize: 16,
+    kanaVisible: true, colorMode: "hover", alignmentMode: "phrases", pronunciation: false, fontSize: 16,
     sentenceBold: false, groupInfo: false, audioFollow: false, wordAudio: false, wordAudioPolicy: 5, translationLanguage: "en", autoPrepare: false,
     prepareGerman: false, prepareColors: false, prepareAudio: false,
     wordAudioMode: "neural", wordAudioSpeed: 1, wordNeuralVoice: "female"
@@ -14,7 +14,7 @@
     const output = { ...DEFAULTS };
     // Legacy automatic preparation is always off. Preparation choices are
     // retained for the explicit series queue; course choices live on the page.
-    for (const key of ["enabled", "wordRomaji", "sentenceRomaji", "followPanels", "kanaVisible", "pronunciation", "sentenceBold", "groupInfo", "audioFollow", "wordAudio", "prepareGerman", "prepareColors", "prepareAudio"]) {
+    for (const key of ["enabled", "wordRomaji", "sentenceRomaji", "followPanels", "kanaVisible", "sentenceBold", "groupInfo", "audioFollow", "wordAudio", "prepareGerman", "prepareColors", "prepareAudio"]) {
       if (typeof input[key] === "boolean") output[key] = input[key];
     }
     if (["off", "hover", "all"].includes(input.colorMode)) output.colorMode = input.colorMode;

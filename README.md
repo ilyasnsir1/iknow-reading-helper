@@ -1,6 +1,12 @@
-# iKnow! Reading Helper · 1.37.2
+# iKnow! Reading Helper · 1.40.2
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.39.0 separates the app theme (pages and popup) from the independently saved iKnow panel theme, whose default is Original. Study uses coordinated sidebar/practice surfaces, the saved list fills available height, and the course menu is more compact. Round palette artwork, subdued drag handles and themed dividers complete the UI corrections.
+
+Version 1.38.2 refines the three additional themes with cool-to-warm preparation gradients, distinct warmer control panels and quieter shadows. Small study/language buttons on iKnow's white course rows stay light with a restrained theme tint. Original retains its exact existing palette.
+
+Version 1.38.1 preserves the existing default design and adds three optional dark themes. The four synchronized [themes](THEMES.md): Original, Midnight, Tokyo Neon and Kyoto Forest. Choose a theme in the popup, a standalone page header or the course toolbar. The same preference updates the extension's pages and its panels on iKnow without preparing any course data. Focus indicators stay inside controls, the Study course menu handles long titles, the remove icon is centered, and save/practice buttons respond only to their own hover. Helper 1.21.1 and browser permissions are unchanged.
 
 Version 1.37.2 makes the 45-second discovery route resilient to GitHub's temporarily stale latest-release redirect. A public time bucket refreshes the request URL; a previous signed release observed just after installation does not produce a downgrade error or erase a newer notice. Actual installation still refuses downgrades. Helper 1.21.1 is included.
 

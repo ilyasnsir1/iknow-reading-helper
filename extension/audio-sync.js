@@ -101,7 +101,8 @@
   function stopWord() {
     cancelWordNotice();
     if (!wordPlayback) return;
-    clearWord(); window.postMessage({ type: "IKR_WORD_AUDIO_STOP_V1" }, location.origin);
+    const requestId = wordPlayback.requestId;
+    clearWord(); window.postMessage({ type: "IKR_WORD_AUDIO_STOP_V1", requestId }, location.origin);
   }
   function addWordTarget(state, node, index = null) {
     if (!node) return;
@@ -280,13 +281,19 @@
   document.addEventListener("pointermove", event => { if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 5) gesture.dragged = true; }, true);
   document.addEventListener("pointercancel", () => { gesture = null; }, true);
   document.addEventListener("click", event => {
+    // The site's controls always win, even if a future iKnow layout nests a
+    // speaker inside a decorated word. Do not prevent or defer its click.
+    if (event.target.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container")) { gesture = null; stopWord(); clear(); return; }
     const target = targetFrom(event), dragged = gesture?.dragged; gesture = null;
-    if (!target && event.target.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container")) { stopWord(); clear(); return; }
     if (!wordEnabled || !target || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || dragged) return;
     event.preventDefault(); event.stopPropagation(); playTarget(target);
   }, true);
   document.addEventListener("keydown", event => {
     if (event.key === "Escape" && (wordPlayback || wordNotice)) { stopWord(); return; }
+    if (event.target.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container")) {
+      if (["Enter", " "].includes(event.key)) { stopWord(); clear(); }
+      return;
+    }
     if (!wordEnabled || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !["Enter", " "].includes(event.key)) return;
     const target = targetFrom(event); if (!target) return;
     event.preventDefault(); event.stopPropagation(); playTarget(target);

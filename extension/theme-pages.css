@@ -1,0 +1,395 @@
+/* Shared surfaces for the extension's own pages. The palette lives in theme.css. */
+body[data-ikr-page="study"] .ikr-course-native {position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;clip-path:inset(50%)}
+body[data-ikr-page="study"] .filters {grid-template-columns:minmax(0,1fr) 110px}
+body[data-ikr-page="study"] .ikr-course-filter {width:100%;min-width:0;min-height:35px;display:flex;align-items:center;gap:12px;text-align:left;padding:8px 11px;border-radius:7px;font-size:11px}
+body[data-ikr-page="study"] .ikr-course-filter span {min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body[data-ikr-page="study"] .ikr-course-filter svg {width:13px;height:13px;flex:none;fill:none;stroke:var(--ikr-muted);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+body[data-ikr-page="study"] .ikr-course-options {position:fixed;z-index:2147483001;box-sizing:border-box;overflow:auto;padding:6px;border:1px solid var(--ikr-line);border-radius:10px;box-shadow:var(--ikr-shadow);background:var(--ikr-elevated);color:var(--ikr-text);scrollbar-width:thin}
+body[data-ikr-page="study"] .ikr-course-options[hidden] {display:none}
+body[data-ikr-page="study"] .ikr-course-options button {display:block;width:100%;padding:11px 13px;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.55 "Segoe UI",sans-serif;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ikr-text)}
+body[data-ikr-page="study"] .ikr-course-options [aria-selected="true"] {background:var(--ikr-accent-soft);color:var(--ikr-text)}
+html.ikr-theme-page:not([data-ikr-theme="paper"]) {
+  color-scheme: var(--ikr-scheme);
+  color: var(--ikr-text);
+  background: var(--ikr-bg);
+  --ink: var(--ikr-text);
+  --muted: var(--ikr-muted);
+  --line: var(--ikr-line);
+  --accent: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) {
+  color: var(--ikr-text);
+  background: var(--ikr-bg);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(h1, h2, h3, strong) {
+  color: var(--ikr-text);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.eyebrow, a) {
+  color: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.intro, .muted, .footnote, footer, .panel > p, .component-description, .job p) {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.card, .panel, .component, .workspace) {
+  background: var(--ikr-surface);
+  border-color: var(--ikr-line);
+  box-shadow: var(--ikr-shadow);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button, .button, input, select) {
+  border-color: var(--ikr-line);
+  color: var(--ikr-text);
+  background-color: var(--ikr-elevated);
+  box-shadow: none;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button, .button):not(:disabled):hover {
+  color: var(--ikr-text);
+  border-color: var(--ikr-line-strong);
+  background-color: var(--ikr-surface-hover);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(input, select) {
+  min-width: 0;
+  caret-color: var(--ikr-accent);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) input::placeholder {
+  color: var(--ikr-subtle);
+  opacity: 1;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) select {
+  padding-right: 38px;
+  text-overflow: ellipsis;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(select, option) {
+  color-scheme: var(--ikr-scheme);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) option {
+  color: var(--ikr-text);
+  background: var(--ikr-elevated);
+}
+
+/* Keep the focus indicator inside the existing edge, including keyboard use. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button, a, input, select, summary, pre):focus {
+  outline: none;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(input, select):focus,
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button, a, summary, pre):focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--ikr-focus);
+  box-shadow: inset 0 0 0 1px var(--ikr-focus);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button, .button):disabled {
+  color: var(--ikr-subtle);
+  background-color: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+  box-shadow: none;
+  cursor: default;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.primary, .actions > button:not(.secondary), .button) {
+  color: var(--ikr-on-accent);
+  background: var(--ikr-accent);
+  border-color: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.primary, .actions > button:not(.secondary), .button):not(:disabled):hover {
+  color: var(--ikr-on-accent);
+  background: var(--ikr-accent-hover);
+  border-color: var(--ikr-accent-hover);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.primary, .actions > button:not(.secondary), .button):disabled {
+  color: var(--ikr-subtle);
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) progress,
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) progress::-webkit-progress-bar {
+  background: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) progress::-webkit-progress-value {
+  background: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) progress::-moz-progress-bar {
+  background: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(details, .record-section, .review-footer, .translation, .course-list, .course-list li) {
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(summary, .status, .job-meta, .component-meta, .metrics p, .features span, .course-list li) {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(.error, #error) {
+  color: var(--ikr-danger);
+  border-color: color-mix(in srgb, var(--ikr-danger) 30%, var(--ikr-line));
+  background: color-mix(in srgb, var(--ikr-danger) 7%, var(--ikr-surface));
+}
+
+/* Study library and practice. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .library {
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.library-heading span, .reading-header > span, .review-footer > span, .assessment-note) {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .library-items {
+  scrollbar-color: var(--ikr-line-strong) transparent;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .library-item {
+  background: transparent;
+  border-color: transparent;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .library-item[aria-current="true"] {
+  background: var(--ikr-accent-soft);
+  border-color: color-mix(in srgb, var(--ikr-accent) 34%, var(--ikr-line));
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.library-item .saved-japanese, .japanese, .empty h2) {
+  color: var(--ikr-text);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.library-item .saved-meaning, .kana, .empty, .empty p, .section-heading p, .context-row, .loop-controls label, .status) {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .empty-mark {
+  color: var(--ikr-accent);
+  border-color: var(--ikr-line);
+  background: var(--ikr-surface-soft);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.translation p[lang="en"], .translation p[lang="de"], .section-heading h2) {
+  color: var(--ikr-text);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.text-button, .quiet) {
+  color: var(--ikr-accent);
+  border-color: transparent;
+  background: transparent;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.text-button, .quiet):not(:disabled):hover {
+  color: var(--ikr-accent-hover);
+  border-color: transparent;
+  background: transparent;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .reading-token {
+  color: var(--ikr-muted);
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line-strong);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .reading-token[aria-pressed="true"] {
+  color: var(--ikr-accent);
+  background: var(--ikr-accent-soft);
+  border-color: color-mix(in srgb, var(--ikr-accent) 35%, var(--ikr-line));
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ikr-muted);
+  line-height: 1;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .icon-button svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .icon-button:not(:disabled):hover {
+  color: var(--ikr-text);
+  border-color: transparent;
+  background: var(--ikr-surface-hover);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] :is(.record-indicator, .page-status) {
+  color: var(--ikr-danger);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .record-indicator::before {
+  background: var(--ikr-danger);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] input[type="checkbox"] {
+  accent-color: var(--ikr-accent);
+}
+
+/* Models and voices. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="models"] .job {
+  background: var(--ikr-status-background);
+  border-color: var(--ikr-status-border);
+}
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .panel {background:var(--ikr-status-background);border-color:var(--ikr-status-border)}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="models"] .loading {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="models"] .status[data-ready="true"] {
+  color: var(--ikr-positive);
+}
+
+/* Preparation queue. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] :is(#course-count, #phase, #connection) {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .badge {
+  color: var(--ikr-accent);
+  background: var(--ikr-accent-soft);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .badge[data-status="complete"] {
+  color: var(--ikr-positive);
+  background: color-mix(in srgb, var(--ikr-positive) 10%, var(--ikr-surface));
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .badge[data-status="paused"] {
+  color: var(--ikr-warning);
+  background: color-mix(in srgb, var(--ikr-warning) 10%, var(--ikr-surface));
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .features span {
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .orbit {
+  border-color: var(--ikr-line);
+  border-top-color: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .course-list li span:first-child {
+  color: var(--ikr-text);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .course-list li[data-status="running"] span:first-child {
+  color: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="queue"] .course-list li[data-status="error"] span:last-child {
+  color: var(--ikr-danger);
+}
+
+/* First-time setup. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="helper-setup"] main {
+  background: var(--ikr-surface);
+  border-color: var(--ikr-line);
+  box-shadow: var(--ikr-shadow);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="helper-setup"] li {
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="helper-setup"] li > span {
+  color: var(--ikr-accent);
+  background: var(--ikr-accent-soft);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="helper-setup"] li p {
+  color: var(--ikr-muted);
+}
+
+/* Word preparation. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="word-voice"] #status {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="word-voice"] #status[data-error="true"] {
+  color: var(--ikr-danger);
+}
+
+/* Support diagnostics. */
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] button {
+  color: var(--ikr-on-accent);
+  background: var(--ikr-accent);
+  border-color: var(--ikr-accent);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] button:not(:disabled):hover {
+  color: var(--ikr-on-accent);
+  background: var(--ikr-accent-hover);
+  border-color: var(--ikr-accent-hover);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] button:disabled {
+  color: var(--ikr-subtle);
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] #diagnostics-status {
+  color: var(--ikr-muted);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] #diagnostics-status[data-state="success"] {
+  color: var(--ikr-positive);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] #diagnostics-status[data-state="partial"] {
+  color: var(--ikr-warning);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] #diagnostics-status[data-state="error"] {
+  color: var(--ikr-danger);
+}
+
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="diagnostics"] pre {
+  color: var(--ikr-text);
+  border-color: var(--ikr-line);
+  background: var(--ikr-surface-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(input, select) {
+    transition: none;
+  }
+}
+
+/* Geometry/accessibility fixes remain available in the original theme. */
+body[data-ikr-page="study"] .icon-button {display:inline-grid;place-items:center;flex:0 0 28px;width:28px;height:28px;padding:0;line-height:1;vertical-align:middle}
+body[data-ikr-page="study"] .icon-button svg {display:block;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+body[data-ikr-page]:not([data-ikr-page="popup"]) :is(input,select):focus,
+body[data-ikr-page]:not([data-ikr-page="popup"]) :is(button,a,summary,pre):focus-visible {outline:none;outline-offset:0;border-color:#9793ad;box-shadow:inset 0 0 0 1px #9793ad}
+body[data-ikr-page="study"] select {padding-right:32px}
+body[data-ikr-page="study"] .ikr-course-filter {border:1px solid #e2dce7;background:#fff;color:#6c6278}
+html:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .ikr-course-filter {border-color:var(--ikr-line);background:var(--ikr-elevated);color:var(--ikr-text)}

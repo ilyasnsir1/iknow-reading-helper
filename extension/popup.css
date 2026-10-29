@@ -76,6 +76,8 @@ footer { display: flex; align-items: center; gap: 8px; justify-content: space-be
 .preparation-note { margin: 9px 2px; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .queue-link { display: block; padding: 10px 12px; border: 1px solid #e3ddd4; border-radius: 8px; background: #fff; color: #47475b; font-size: 11px; font-weight: 600; text-decoration: none; }
 .queue-link:hover { border-color: #bab7c5; background: #fdfcff; }
+.preparation-links .queue-link { border:0; border-radius:0; padding:12px 13px; background:transparent; }
+.preparation-links .queue-link + .queue-link { border-top:1px solid #efede8; }
 .pack-settings h2 { margin: 0 0 8px; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
 #import-course-pack { width: 100%; border: 1px solid #d8d1c7; border-radius: 7px; background: #fff; color: #34363e; padding: 9px 12px; font: inherit; font-weight: 550; cursor: pointer; }
 #import-course-pack:not(:disabled):hover { background: #fffdf9; border-color: #bfb2a1; }

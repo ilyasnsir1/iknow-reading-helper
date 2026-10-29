@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="en">
-  <head>
+<html lang="en" class="ikr-theme-page" data-ikr-theme="paper">
+  <head><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>iKnow! Reading Helper</title>
@@ -12,8 +12,8 @@
     <script src="popup.js" defer></script>
     <script src="popup-fox.js" defer></script>
     <script src="popup-updates.js" defer></script>
-  </head>
-  <body>
+  <link rel="stylesheet" href="theme-pages.css"><link rel="stylesheet" href="theme-popup.css"></head>
+  <body data-ikr-page="popup">
     <main>
       <header class="hero">
         <img class="wordmark" src="icons/icon128.png" width="55" height="55" alt="" aria-hidden="true">
@@ -102,14 +102,6 @@
               <input id="kanaVisible" name="kanaVisible" type="checkbox" role="switch">
               <span class="switch" aria-hidden="true"></span>
             </label>
-            <label class="setting-row" for="pronunciation">
-              <span class="setting-copy">
-                <span class="setting-title">Pronunciation help</span>
-                <span class="setting-description">wa instead of ha; spoken number readings</span>
-              </span>
-              <input id="pronunciation" name="pronunciation" type="checkbox" role="switch">
-              <span class="switch" aria-hidden="true"></span>
-            </label>
             <label class="setting-row" for="sentenceBold">
               <span class="setting-copy">
                 <span class="setting-title">Bold the focus word in sentences</span>
@@ -167,8 +159,10 @@
         </fieldset>
         <fieldset id="preparation-settings" disabled>
           <legend>Preparation</legend>
-          <a class="queue-link" href="queue.html" target="_blank">Series &amp; queue <span aria-hidden="true">↗</span></a>
-          <a class="queue-link" href="models.html" target="_blank">Models &amp; voices <span aria-hidden="true">↗</span></a>
+          <div class="card preparation-links">
+            <a class="queue-link" href="queue.html" target="_blank">Series &amp; queue <span aria-hidden="true">↗</span></a>
+            <a class="queue-link" href="models.html" target="_blank">Models &amp; voices <span aria-hidden="true">↗</span></a>
+          </div>
           <a class="setup-link" href="helper-setup.html" target="_blank">Set up the local helper <span aria-hidden="true">↗</span></a>
         </fieldset>
         <fieldset id="study-settings" disabled>
@@ -196,7 +190,7 @@
         <button type="button" id="import-course-pack">Choose file</button>
         <p id="course-pack-status" role="status" aria-live="polite" hidden></p>
       </details>
-      <footer>
+      <section class="ikr-popup-appearance" aria-label="Appearance"><div class="ikr-popup-appearance-copy"><h2>App theme</h2><p>Pages &amp; popup</p></div><span data-ikr-theme-picker></span></section><footer>
         <div class="save-state">
           <p id="save-status" class="save-status" role="status" aria-live="polite">Loading …</p>
           <button id="retry-save" type="button" hidden>Try again</button>

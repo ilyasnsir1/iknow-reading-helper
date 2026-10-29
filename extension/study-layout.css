@@ -1,0 +1,67 @@
+/* Let the saved list use the practice card's height without sizing the card
+   from an arbitrarily long list. The list remains the only scrolling region. */
+body[data-ikr-page="study"] .library {
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+body[data-ikr-page="study"] .library > :not(.library-items) {
+  flex-shrink:0;
+}
+body[data-ikr-page="study"] .library-items {
+  height:0;
+  min-height:0;
+  max-height:none;
+  flex:1 1 auto;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+/* A quiet text action, with room around its label rather than a tight pill. */
+html[data-ikr-theme] body[data-ikr-page="study"] #study-card .text-button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:30px;
+  padding:6px 8px;
+  border:0;
+  border-radius:5px;
+  background:transparent;
+  box-shadow:none;
+  font-size:12px;
+  line-height:1.5;
+}
+html[data-ikr-theme] body[data-ikr-page="study"] #study-card .text-button:not(:disabled):hover {
+  background:transparent;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+html[data-ikr-theme] body[data-ikr-page="study"] #study-card .text-button:focus-visible {
+  outline:none;
+  box-shadow:inset 0 0 0 1px var(--ikr-focus);
+}
+html[data-ikr-theme] body[data-ikr-page="study"] #reveal-all {margin-right:-8px}
+/* Long course titles wrap, but the menu does not dominate the study card. */
+body[data-ikr-page="study"] .ikr-course-options {
+  padding:5px;
+  border-radius:9px;
+}
+body[data-ikr-page="study"] .ikr-course-options button {
+  padding:8px 10px;
+  font-size:11px;
+  line-height:1.5;
+}
+/* Study uses a cool library column beside a softer practice surface. */
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .library {
+  background:var(--ikr-study-library,var(--ikr-surface-soft));
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) body[data-ikr-page="study"] .practice {
+  background:var(--ikr-study-practice,var(--ikr-surface));
+}
+@media(max-width:650px) {
+  body[data-ikr-page="study"] .library {display:block}
+  body[data-ikr-page="study"] .library-items {
+    height:auto;
+    max-height:min(45dvh,300px);
+    flex:none;
+  }
+}

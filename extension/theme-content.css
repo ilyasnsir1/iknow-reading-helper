@@ -1,0 +1,287 @@
+/* Theme only Reading Helper surfaces. Native iKnow course text and artwork
+   keep their own colors; the existing pixel fox/temple assets are not filtered. */
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) {
+  color: var(--ikr-text);
+  border-color: var(--ikr-line);
+  background: var(--ikr-surface);
+  box-shadow: var(--ikr-panel-shadow);
+  color-scheme: var(--ikr-scheme);
+}
+/* The saved/preparation scene and controls are distinct, related surfaces. */
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation,.ikr-series-card) {
+  background:var(--ikr-status-background);border-color:var(--ikr-status-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar {
+  background:var(--ikr-controls-background);border-color:var(--ikr-controls-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar>strong {color:var(--ikr-controls-title)}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation {
+  --ikr-auto-ink: var(--ikr-text);
+  --ikr-auto-muted: var(--ikr-muted);
+  --ikr-auto-orange: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation::after { background: var(--ikr-status-stripe); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation[data-status="error"]::after { background: var(--ikr-warning); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation[data-status="complete"]::after { background: var(--ikr-positive); }
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar :is(strong, label),
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation :is(.ikr-preparation-title, .ikr-saved-module, .ikr-scene-prop-count),
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(h2, .ikr-series-status-title, .ikr-picker-summary) {
+  color: var(--ikr-text);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar .ikr-status,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation :is(.ikr-preparation-eyebrow, .ikr-preparation-phase, .ikr-preparation-detail,
+  .ikr-saved-module-name, .ikr-preparation-eta, .ikr-scene-prop-label, .ikr-saved-status),
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-series-eyebrow, .ikr-series-detail, .ikr-selection-count,
+  .ikr-saved-note, .ikr-series-status-detail, .ikr-series-eta, .ikr-series-progress-label, .ikr-saved-check-count) {
+  color: var(--ikr-muted);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation :is(.ikr-preparation-steps,
+  .ikr-saved-module[data-status="missing"] .ikr-saved-module-value,
+  .ikr-saved-module[data-status="checking"] .ikr-saved-module-value) { color: var(--ikr-subtle); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation :is(.ikr-preparation-steps li[data-state="active"], .ikr-scene-prop) {
+  color: var(--ikr-text);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-preparation-steps li[data-state="done"],
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-picker-course[data-saved="ready"] .ikr-picker-course-badge,
+  .ikr-picker-modules .ikr-module-status[data-state="ready"]) { color: var(--ikr-positive); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-saved-module[data-status="partial"] .ikr-saved-module-value,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-picker-course[data-saved="partial"] .ikr-picker-course-badge,
+  .ikr-picker-modules .ikr-module-status[data-state="partial"]) { color: var(--ikr-warning); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar .ikr-status[data-error="true"],
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-series-error { color: var(--ikr-danger); }
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) :is(button, select, a.ikr-preparation-setup):not(:where(.ikr-theme-picker button)) {
+  color: var(--ikr-text);
+  background-color: var(--ikr-elevated);
+  border-color: var(--ikr-line-strong);
+  color-scheme: var(--ikr-scheme);
+  outline: none;
+  box-shadow: none;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) :is(button, select):not(:where(.ikr-theme-picker button)):not(:disabled):hover,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation a.ikr-preparation-setup:hover {
+  color: var(--ikr-text);
+  background-color: var(--ikr-surface-hover);
+  border-color: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) select {
+  padding-right: 31px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23938e9d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) input { accent-color: var(--ikr-accent); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card button.ikr-series-primary {
+  color: var(--ikr-on-accent);
+  background: var(--ikr-accent);
+  border-color: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card button.ikr-series-primary:not(:disabled):hover {
+  background: var(--ikr-accent-hover);
+  border-color: var(--ikr-accent-hover);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) button:disabled {
+  cursor: default;
+  transition: none;
+  animation: none;
+  transform: none;
+  box-shadow: none;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar, .ikr-preparation, .ikr-series-card) :is(button, select, a):not(:where(.ikr-theme-picker button)):focus-visible {
+  outline: none !important;
+  border-color: var(--ikr-focus);
+  box-shadow: inset 0 0 0 1px var(--ikr-focus) !important;
+}
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) .ikr-feature-option {
+  color: var(--ikr-muted);
+  border-color: var(--ikr-line-strong);
+  background: var(--ikr-elevated);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) .ikr-feature-option:has(input:checked) {
+  color: var(--ikr-text);
+  border-color: var(--ikr-accent);
+  background: var(--ikr-accent-soft);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) .ikr-feature-option:has(input:focus-visible:not(:disabled)),
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course:has(input:focus-visible:not(:disabled)) {
+  outline: none;
+  border-color: var(--ikr-focus);
+  box-shadow: inset 0 0 0 1px var(--ikr-focus);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) .ikr-feature-option:has(input:disabled) {
+  color: var(--ikr-subtle);
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) :is(.ikr-feature-option, .ikr-picker-course) input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation :is(.ikr-saved-module + .ikr-saved-module, .ikr-scene-prop-1, .ikr-scene-prop-2),
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-course-picker, .ikr-series-status) { border-color: var(--ikr-line); }
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-saved-check, .ikr-picker-course) {
+  color: var(--ikr-text);
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course:has(input:checked) {
+  background: var(--ikr-accent-soft);
+  border-color: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course[data-saved="ready"] {
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card a.ikr-picker-course-name { color: var(--ikr-text); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card a.ikr-picker-course-name:hover { color: var(--ikr-accent); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course[data-saved="ready"] a.ikr-picker-course-name { color: var(--ikr-muted); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course[data-saved="ready"] a.ikr-picker-course-name:is(:hover, :focus-visible) { color: var(--ikr-text); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card :is(.ikr-picker-course-badge, .ikr-picker-modules .ikr-module-status,
+  .ikr-picker-course[data-saved="checking"] .ikr-picker-course-badge) { color: var(--ikr-muted); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-summary > span:first-child::before { color: var(--ikr-subtle); }
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) :is(.ikr-preparation-progress, .ikr-series-progress, .ikr-check-progress) {
+  color: var(--ikr-accent);
+  background: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) :is(.ikr-preparation-progress, .ikr-series-progress, .ikr-check-progress)::-webkit-progress-bar {
+  background: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) :is(.ikr-preparation-progress, .ikr-series-progress, .ikr-check-progress)::-webkit-progress-value {
+  background: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-preparation, .ikr-series-card) :is(.ikr-preparation-progress, .ikr-series-progress, .ikr-check-progress)::-moz-progress-bar {
+  background: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-preparation-progress:not([value]) {
+  background: linear-gradient(90deg, var(--ikr-line) 15%, var(--ikr-accent) 50%, var(--ikr-line) 85%);
+  background-size: 200% 100%;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-check-spinner,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-series-card .ikr-picker-course[data-saved="checking"] .ikr-picker-course-badge::before {
+  border-color: var(--ikr-line-strong);
+  border-top-color: var(--ikr-accent);
+}
+
+/* Keep the actual fox art untouched; only the surrounding scene UI is themed. */
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation.ikr-owned :is(.ikr-preparation-minimize, .ikr-scene-replay) {
+  color: var(--ikr-muted);
+  background: transparent;
+  border-color: transparent;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation.ikr-owned :is(.ikr-preparation-minimize, .ikr-scene-replay):not(:disabled):hover {
+  color: var(--ikr-text);
+  background: var(--ikr-surface-hover);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-saved-status svg { stroke: var(--ikr-muted); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-saved-status .ikr-bookmark { fill: var(--ikr-accent); stroke: none; }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-scene-option,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-scene-prop-button {
+  color: var(--ikr-subtle);
+  background: var(--ikr-elevated);
+  border-color: var(--ikr-line-strong);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-scene-option-box { background: var(--ikr-surface); border-color: var(--ikr-line-strong); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-preparation .ikr-scene-ground {
+  background: linear-gradient(90deg, transparent, var(--ikr-line) 18%, var(--ikr-line-strong) 60%, transparent);
+}
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack[data-pinned="true"] {
+  background: var(--ikr-surface);
+  border-color: var(--ikr-line);
+  box-shadow: var(--ikr-panel-shadow);
+  scrollbar-color: var(--ikr-line-strong) var(--ikr-surface);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack[data-pinned="true"] > :is(.ikr-toolbar, .ikr-preparation) ~ :is(.ikr-toolbar, .ikr-preparation) {
+  border-top-color: var(--ikr-line);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack .ikr-panel-handle {
+  color: var(--ikr-subtle);
+  border-color: transparent;
+  background: transparent;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack .ikr-panel-handle:not(:disabled):hover {
+  color: var(--ikr-text);
+  background: var(--ikr-surface-hover);
+  border-color: transparent;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack .ikr-panel-draggable .ikr-panel-handle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--ikr-focus);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-panel-stack[data-drop]::after { background: var(--ikr-accent); }
+
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-group-info,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-word-notice.ikr-owned {
+  color: var(--ikr-text);
+  background: var(--ikr-elevated);
+  border-color: var(--ikr-line-strong);
+  color-scheme: var(--ikr-scheme);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-group-info { border-left-color: var(--ikr-accent); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-word-notice.ikr-owned { box-shadow: var(--ikr-shadow); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-word-notice-spinner { border-color: var(--ikr-line-strong); border-top-color: var(--ikr-accent); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-word-notice[data-state="ready"] .ikr-word-notice-spinner { border-color: var(--ikr-positive); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-word-notice.ikr-owned[data-state="error"] { color: var(--ikr-danger); border-color: var(--ikr-danger); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-group-info-pin, .ikr-language-button, .ikr-study-action) {
+  color: var(--ikr-muted);
+  background: var(--ikr-elevated);
+  border-color: var(--ikr-line-strong);
+  color-scheme: var(--ikr-scheme);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-group-info-pin, .ikr-language-button, .ikr-study-action):not(:disabled):hover {
+  color: var(--ikr-text);
+  background: var(--ikr-surface-hover);
+  border-color: var(--ikr-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-group-info[data-pinned="true"] .ikr-group-info-pin,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-action.ikr-study-saved {
+  color: var(--ikr-accent);
+  background: var(--ikr-accent-soft);
+  border-color: var(--ikr-line-strong);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-action.ikr-study-saved svg { fill: var(--ikr-accent-soft); }
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-group-info-pin, .ikr-language-button, .ikr-study-action):focus-visible {
+  outline: none;
+  border-color: var(--ikr-focus);
+  box-shadow: inset 0 0 0 1px var(--ikr-focus);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-action:disabled { cursor: default; }
+
+/* These controls sit on iKnow's white course rows, outside the dark panels. */
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-language-button,.ikr-study-tools .ikr-study-action) {
+  color-scheme:light;color:var(--ikr-local-tool-ink);background:var(--ikr-local-tool-bg);border-color:var(--ikr-local-tool-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-language-button,.ikr-study-tools .ikr-study-action):not(:disabled):hover {
+  color:var(--ikr-local-tool-ink);background:var(--ikr-local-tool-hover);border-color:var(--ikr-local-tool-hover-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-tools .ikr-study-action.ikr-study-saved {
+  color:var(--ikr-local-tool-ink);background:var(--ikr-local-tool-saved);border-color:var(--ikr-local-tool-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-tools .ikr-study-action.ikr-study-saved svg {fill:transparent}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-language-button,.ikr-study-tools .ikr-study-action):focus-visible {
+  border-color:var(--ikr-local-tool-ink);box-shadow:inset 0 0 0 1px var(--ikr-local-tool-ink);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar :is(button,select):not(:where(.ikr-theme-picker button)) {
+  background-color:var(--ikr-controls-field);border-color:var(--ikr-controls-field-border);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar :is(button,select):not(:where(.ikr-theme-picker button)):not(:disabled):hover {
+  background-color:color-mix(in srgb,var(--ikr-controls-field) 80%,var(--ikr-controls-title));border-color:var(--ikr-controls-accent);
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar input {accent-color:var(--ikr-controls-accent)}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-toolbar>strong {color:var(--ikr-controls-title)}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ikr-theme]:not([data-ikr-theme="paper"]) .ikr-study-action { transition: none; }
+}
+
+/* The original palette stays entirely in the existing stylesheets. Only the
+   requested focus correction applies regardless of the selected theme. */
+html[data-ikr-theme="paper"] :is(.ikr-toolbar,.ikr-preparation,.ikr-series-card) :is(button,select,a):focus-visible {
+ outline:none!important;outline-offset:0!important;box-shadow:inset 0 0 0 1px #9793ad!important;
+}
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar,.ikr-preparation).ikr-panel-draggable .ikr-panel-handle,
+html[data-ikr-theme]:not([data-ikr-theme="paper"]) :is(.ikr-toolbar,.ikr-preparation).ikr-panel-draggable .ikr-panel-handle:not(:disabled):hover {
+ background:transparent;border-color:transparent;box-shadow:none;color:var(--ikr-subtle);
+}
