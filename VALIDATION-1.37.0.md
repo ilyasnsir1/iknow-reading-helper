@@ -1,7 +1,8 @@
 # Version 1.37.0 validation
 
-Local review build. Not published. Extension 1.37.0, helper 1.20.0; browser
-permissions unchanged. Existing registered and Desktop copies remain frozen.
+Reviewed locally and published after the user's explicit instruction.
+Extension 1.37.0, helper 1.20.0; browser permissions unchanged. Registered and
+Desktop copies were not overwritten during development/publication.
 
 ## Components
 
@@ -64,3 +65,13 @@ sentinels pass. This is not a live GitHub update test or publication.
 No automatic pronunciation grade is inferred from speech recognition. The
 record-and-compare workflow has no upload or stored microphone recordings.
 Models are installed only by a separate explicit action after the app update.
+
+## Published release
+
+Published v1.37.0 from source commit 124bdc5 with the expected four signed assets.
+The real anonymous GitHub/native-host test upgraded an isolated exact 1.36.0
+archive to the public release, verified all 146 managed files, retained existing
+model/course/voice-cache sentinels and personal notes, and reported current on a
+second live check. No models were downloaded and no registered user installation
+was used. This transport/transaction test is separate from the Brave lifecycle
+and component native-broker tests described above.
