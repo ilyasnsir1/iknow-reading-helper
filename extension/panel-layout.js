@@ -154,7 +154,9 @@
       for (const y of [4, 9, 14]) for (const x of [3, 9]) {
         const dot = document.createElementNS(icon.namespaceURI, "circle"); dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", "1.1"); icon.append(dot);
       }
-      handle.append(icon); (panel.querySelector(":scope > .ikr-preparation-header") || panel).prepend(handle); handles.set(panel, handle);
+      // Anchor the grip to the panel itself in every preparation/scene state.
+      // A folded card's right-hand header must not become its layout parent.
+      handle.append(icon); panel.prepend(handle); handles.set(panel, handle);
       handle.addEventListener("pointerdown", event => {
         if (event.button !== 0 || !event.isPrimary || !course || course.hidden) return;
         event.preventDefault();

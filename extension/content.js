@@ -390,8 +390,8 @@
     }
     languageSelect.addEventListener("change", () => { void saveSetting("translationLanguage", languageSelect.value); });
     translationLabel.append(languageSelect); menus.append(translationLabel);
-    const themePicker = create("span", ""); menus.append(themePicker);
-    toolbar.append(menus);
+    const themePicker = create("span", "ikr-toolbar-theme");
+    toolbar.append(menus, themePicker);
     const retry = create("button", "", "Reload");
     retry.type = "button"; retry.dataset.retry = "true"; retry.hidden = true;
     retry.addEventListener("click", () => {

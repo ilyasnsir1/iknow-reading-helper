@@ -7,7 +7,8 @@
 }
 .ikr-toolbar strong { font-size: 14px; color: #6d3b12; }
 .ikr-toolbar label { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: #34363e; font-weight: 500; }
-.ikr-toolbar-selects { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.ikr-toolbar-selects { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; flex:1 1 500px; min-width:min(100%,500px); }
+.ikr-toolbar-theme { display:inline-flex; flex:0 0 auto; margin-left:auto; max-width:100%; }
 .ikr-toolbar input { width: 15px; height: 15px; margin: 0; accent-color: #b55012; }
 .ikr-toolbar select, .ikr-toolbar button {
   box-sizing: border-box; font: inherit; min-height: 30px; padding: 3px 8px; color: #34363e;

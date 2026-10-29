@@ -1,4 +1,4 @@
-# iKnow! Reading Helper · 1.40.2
+# iKnow! Reading Helper · 1.40.3
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
 
