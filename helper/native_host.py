@@ -27,7 +27,7 @@ from process_resources import worker_threads
 for _thread_variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_thread_variable] = str(worker_threads())
 
-HOST_VERSION = "1.21.0"
+HOST_VERSION = "1.21.1"
 MAX_INPUT = 16 * 1024 * 1024
 MAX_RESULT = 8 * 1024 * 1024
 CACHE_ROOT = Path(os.environ.get("IKNOW_READER_CACHE", str(Path(os.environ.get("LOCALAPPDATA", Path.home())) / "iKnowLesehilfe"))).resolve()

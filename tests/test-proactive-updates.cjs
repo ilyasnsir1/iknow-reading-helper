@@ -5,11 +5,11 @@ const ext=path.resolve(__dirname,"../extension"),KEY="iknowReaderUpdateState";
 const signal=()=>{const callbacks=[];return{addListener:fn=>callbacks.push(fn),emit(...args){for(const fn of callbacks)fn(...args);}};};
 async function fixture({initial={},version="1.36.0",mode="available",latestVersion="1.37.0",enabled=true,tabs=[],active=false,now=1800000000000,holdReplies=false}={}){
  const data=structuredClone(initial),calls=[],reloads=[],badges=[],handlers=[],replies=[],events={startup:signal(),installed:signal(),activated:signal(),updated:signal()};
- let next={mode,latestVersion,ok:true},busy=active,clock=now,runtimeReloads=0;
+ let next={mode,latestVersion,ok:true},busy=active,clock=now,runtimeReloads=0,metadata={};
  const manifest={version,action:{default_title:"Reading Helper settings"}};
  const chrome={runtime:{id:"fixture",getManifest:()=>manifest,getURL:name=>"chrome-extension://fixture/"+name,onStartup:events.startup,onInstalled:events.installed,
   onMessage:{addListener:fn=>handlers.push(fn)},reload(){runtimeReloads++;},connectNative(){let opened=true;const messages=[],disconnects=[];return{
-   onMessage:{addListener:fn=>messages.push(fn)},onDisconnect:{addListener:fn=>disconnects.push(fn)},disconnect(){if(!opened)return;opened=false;disconnects.forEach(fn=>fn());},postMessage(message){calls.push(message.type);const reply=()=>{if(opened)messages.forEach(fn=>fn({type:"update:result",requestId:message.requestId,ok:next.ok,state:{status:next.mode,latestVersion:next.latestVersion,message:"Fixture signed result"}}));};if(holdReplies)replies.push(reply);else setTimeout(reply,1);}};}},
+   onMessage:{addListener:fn=>messages.push(fn)},onDisconnect:{addListener:fn=>disconnects.push(fn)},disconnect(){if(!opened)return;opened=false;disconnects.forEach(fn=>fn());},postMessage(message){calls.push(message.type);const reply=()=>{if(opened)messages.forEach(fn=>fn({type:"update:result",requestId:message.requestId,ok:next.ok,state:{status:next.mode,latestVersion:next.latestVersion,message:"Fixture signed result",...metadata}}));};if(holdReplies)replies.push(reply);else setTimeout(reply,1);}};}},
   storage:{local:{get:async key=>({[key]:structuredClone(data[key])}),set:async patch=>Object.assign(data,structuredClone(patch))}},
   action:{setBadgeText:async detail=>badges.push(detail.text),setBadgeTextColor:async()=>{},setBadgeBackgroundColor:async()=>{},setTitle:async()=>{}},
   tabs:{onActivated:events.activated,onUpdated:events.updated,query:async()=>structuredClone(tabs),get:async id=>{const tab=tabs.find(tab=>tab.id===id);if(!tab)throw Error("Closed");return structuredClone(tab);},reload:async id=>reloads.push(id)}};
@@ -18,7 +18,7 @@ async function fixture({initial={},version="1.36.0",mode="available",latestVersi
  for(const name of["update-refresh.js","update-discovery.js","updates.js"])vm.runInContext(fs.readFileSync(path.join(ext,name),"utf8"),context,{filename:name});
  const settle=()=>new Promise(resolve=>setTimeout(resolve,12));await settle();
  const send=(action,sender={id:"fixture",url:"chrome-extension://fixture/popup.html"})=>new Promise(resolve=>handlers[0]({type:"ikr:update:"+action},sender,resolve));
- return{data,calls,reloads,badges,events,context,send,settle,tabs,release:()=>replies.shift()?.(),get runtimeReloads(){return runtimeReloads;},advance:ms=>{clock+=ms;},mode:(mode,ok=true,latestVersion="1.37.0")=>{next={mode,ok,latestVersion};},busy:value=>{busy=value;}};
+ return{data,calls,reloads,badges,events,context,send,settle,tabs,release:()=>replies.shift()?.(),get runtimeReloads(){return runtimeReloads;},advance:ms=>{clock+=ms;},metadata:value=>{metadata=value;},mode:(mode,ok=true,latestVersion="1.37.0")=>{next={mode,ok,latestVersion};},busy:value=>{busy=value;}};
 }
 (async()=>{
  let f=await fixture();assert.deepEqual(f.calls,["update:check"]);assert.equal(f.badges.at(-1),"NEW");assert.equal(f.data[KEY].status,"available");
@@ -47,6 +47,11 @@ async function fixture({initial={},version="1.36.0",mode="available",latestVersi
  assert.equal(aligned.calls.length,2);assert.equal(due.nextCheckAt,1800000000000+65000);
  aligned.advance(20000);await aligned.send("presence",course);assert.equal(aligned.calls.length,3);assert.equal(aligned.badges.at(-1),"NEW");
  console.log("PASS Activity shifting the shared cooldown returns its exact due time, so a visible page can discover the release 45 seconds later instead of waiting two heartbeat intervals");
+ const stale=await fixture();stale.advance(45000);stale.mode("current",true,"1.36.0");stale.metadata({metadataStale:true,metadataVersion:"1.35.0"});
+ await stale.send("presence",course);assert.equal(stale.data[KEY].status,"available");assert.equal(stale.badges.at(-1),"NEW");
+ assert.equal(stale.data[KEY].latestVersion,"1.37.0");assert.equal(stale.data[KEY].metadataVersion,"1.35.0");
+ await stale.send("check");assert.equal(stale.badges.at(-1),"NEW");assert.equal(stale.data[KEY].discovery.lastCheckOutcome,"available");
+ console.log("PASS An older signed CDN response never removes a previously verified newer notice, for automatic or explicit checking; observed metadata version remains in diagnostics");
  later.advance(-3600000);await later.send("presence",course);assert.equal(later.calls.length,3);
  console.log("PASS Correcting the PC clock backwards does not suppress automatic discovery for an hour");
  const retry=await fixture({mode:"current",latestVersion:"1.36.0"});assert.equal(retry.calls.length,1);assert.equal(retry.data[KEY].discovery.failureCount,0);

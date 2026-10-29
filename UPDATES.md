@@ -1,5 +1,13 @@
 # Updates
 
+Version 1.37.2 adds a shared public 45-second time bucket to the latest metadata
+request, avoiding repeated reuse of an older moving redirect. GitHub can briefly
+serve a previously signed version after publication. Discovery validates those
+bytes without treating the observation as an installation request: the installed
+version remains current, and any newer verified notice remains available. The
+observed metadata version and stale flag are retained in diagnostic exports.
+Explicit installation still rejects older releases. Helper 1.21.1 is included.
+
 Version 1.37.0 ships a signed in-app component catalogue and Models & voices
 manager. After initial helper setup, supported optional models/runtimes can be
 downloaded, paused, resumed or verified without rerunning a terminal. Programme

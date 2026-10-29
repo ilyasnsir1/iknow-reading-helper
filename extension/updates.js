@@ -47,6 +47,7 @@
   function normalize(value) {
     if (!value || typeof value !== "object" || !statuses.has(value.status)) throw Error("The helper returned an invalid update status.");
     return { status: value.status, currentVersion: version, latestVersion: validVersion(value.latestVersion),
+      metadataVersion: validVersion(value.metadataVersion), metadataStale: value.metadataStale === true,
       message: String(value.message || "").slice(0, 320), code: typeof value.code === "string" && /^[a-z][a-z0-9_]{0,79}$/.test(value.code) ? value.code : null,
       progress: Number.isFinite(value.progress) ? Math.min(1, Math.max(0, value.progress)) : null,
       checkedAt: Number.isFinite(value.checkedAt) ? value.checkedAt : state.checkedAt || null,
@@ -189,6 +190,10 @@
       if (action === "check") globalThis.IKnowReaderDiagnosticHistory?.record("updates", "check-started", { status: automatic ? "automatic" : "manual" });
       const reply = await native(action, action === "install" ? 10 * 60 * 1000 : 45000);
       if (action === "check") {
+        if (reply.ok && reply.state.metadataStale && previous.status === "available" && validVersion(previous.latestVersion)) {
+          reply.state.status = "available"; reply.state.latestVersion = previous.latestVersion;
+          reply.state.message = previous.message;
+        }
         // Some older helpers return ok:true with an unconfigured status. Only
         // a verified release/current result is a successful metadata check.
         reply.ok = reply.ok && ["current", "available"].includes(reply.state.status);

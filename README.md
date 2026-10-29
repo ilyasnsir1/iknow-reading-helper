@@ -1,6 +1,8 @@
-# iKnow! Reading Helper · 1.37.1
+# iKnow! Reading Helper · 1.37.2
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.37.2 makes the 45-second discovery route resilient to GitHub's temporarily stale latest-release redirect. A public time bucket refreshes the request URL; a previous signed release observed just after installation does not produce a downgrade error or erase a newer notice. Actual installation still refuses downgrades. Helper 1.21.1 is included.
 
 Version 1.37.1 checks for updates every 45 seconds during browser activity. Visible iKnow courses and series align their timer with the shared check time, so a later release normally appears as NEW within about a minute without opening the popup or clicking Check for updates. Small signed public metadata files avoid continuous GitHub REST polling; unchanged metadata reuses signature bytes and verifies them again. Lightweight checks continue during preparation, while installation remains explicit. Offline retries back off, existing notices remain visible, and diagnostics retain results and retry timing. Helper 1.21.0 is included automatically; no new browser permission or model download is required.
 

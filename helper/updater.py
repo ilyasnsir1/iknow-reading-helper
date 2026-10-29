@@ -318,7 +318,7 @@ def safe_url(url, settings, api=False, *, latest_metadata=False):
         raise UpdateError("The release download address is invalid.")
     prefix = "/repos/" + settings["owner"] + "/" + settings["repository"] + "/releases/"
     if latest_metadata:
-        valid = not api and parts.hostname == "github.com" and not parts.query and parts.path == (
+        valid = not api and parts.hostname == "github.com" and (not parts.query or re.fullmatch(r"ikr_check=(?:0|[1-9][0-9]{0,11})", parts.query)) and parts.path == (
             "/" + settings["owner"] + "/" + settings["repository"] + "/releases/latest/download/update-manifest.json")
     elif api:
         valid = parts.hostname == "api.github.com" and parts.path.startswith(prefix)
@@ -560,7 +560,10 @@ def get_latest_release(settings, installed, helper_version, *, cache=None, app_r
     key. Installation separately rechecks release membership with get_release.
     """
     prefix = "https://github.com/" + settings["owner"] + "/" + settings["repository"]
-    metadata = download(safe_url(prefix + "/releases/latest/download/update-manifest.json", settings,
+    # A public time bucket prevents an intermediary from reusing the moving
+    # latest redirect for many checks. It contains no user/install identifier.
+    bucket = max(0, int(time.time()) // 45)
+    metadata = download(safe_url(prefix + "/releases/latest/download/update-manifest.json?ikr_check=" + str(bucket), settings,
                                  latest_metadata=True), min(MAX_METADATA, 512 * 1024))
     candidate = strict_json(metadata)
     if not isinstance(candidate, dict):
@@ -584,7 +587,11 @@ def get_latest_release(settings, installed, helper_version, *, cache=None, app_r
         on_metadata(metadata, signature)
     if not verified:
         verify_signature(metadata, signature, settings["publicKeyXml"])
-    manifest = validate_manifest(metadata, settings, installed, helper_version)
+    # Discovery can briefly receive the previous signed release from a CDN just
+    # after installation. It is candidate metadata, never an install request:
+    # validate every signed field without treating this observation as a
+    # downgrade. The explicit installer still uses the actual installed floor.
+    manifest = validate_manifest(metadata, settings, declared if version(declared) < version(installed) else installed, helper_version)
     expected_archive = version_prefix + urllib.parse.quote(manifest["asset"]["name"], safe="")
     if manifest["asset"]["url"] != expected_archive:
         raise UpdateError("The signed archive does not belong to this release version.")
@@ -750,9 +757,20 @@ def _check(cache, helper_version, app_root=APP_ROOT):
         return save_state(cache, {"status": "unconfigured", "currentVersion": installed, "latestVersion": installed, "message": str(error)}, app_root)
     manifest, raw, signature = get_latest_release(settings, installed, helper_version, cache=cache, app_root=app_root,
         on_metadata=lambda raw, sig: remember_diagnostic_metadata(cache, app_root, settings, raw, sig))
-    available = version(manifest["version"]) > version(installed)
+    observed = manifest["version"]
+    previous = read_json(state_path(cache, app_root)) or {}
+    try:
+        keep_notice = previous.get("status") == "available" and version(previous.get("latestVersion")) > max(version(installed), version(observed))
+    except UpdateError:
+        keep_notice = False
+    if keep_notice:
+        return save_state(cache, {"status": "available", "currentVersion": installed, "latestVersion": previous["latestVersion"],
+            "metadataVersion": observed, "metadataStale": True, "message": "A new version is ready to install."}, app_root)
+    available = version(observed) > version(installed)
     return save_state(cache, {"status": "available" if available else "current", "currentVersion": installed,
-                             "latestVersion": manifest["version"], "message": "A new version is ready to install." if available else "You are up to date."}, app_root)
+                             "latestVersion": observed if available else installed, "metadataVersion": observed,
+                             "metadataStale": version(observed) < version(installed),
+                             "message": "A new version is ready to install." if available else "You are up to date."}, app_root)
 
 
 def _stage_is_safe(stage, expected_root):

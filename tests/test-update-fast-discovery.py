@@ -45,7 +45,11 @@ class FastDiscoveryTests(unittest.TestCase):
         self.settings = copy.deepcopy(legacy.UpdaterTests.settings)
         (self.app / "helper/update-config.json").write_text(json.dumps(self.settings), encoding="utf-8")
         self.prefix = "https://github.com/" + self.settings["owner"] + "/" + self.settings["repository"]
-        self.latest = self.prefix + "/releases/latest/download/update-manifest.json"
+        self.clock = patch.object(updater.time, "time", return_value=1800000000)
+        self.clock_mock = self.clock.start()
+        self.addCleanup(self.clock.stop)
+        self.latest_base = self.prefix + "/releases/latest/download/update-manifest.json"
+        self.latest = self.latest_base + "?ikr_check=40000000"
         self.signature_url = self.prefix + "/releases/download/v1.38.0/update-manifest.sig"
         self.manifest = {"schema": 1, "version": "1.38.0", "helperVersion": "1.21.0", "minimumHelperVersion": "1.16.0",
                          "asset": {"name": "Reading-Helper-1.38.0.zip", "size": 12345, "sha256": "a" * 64,
@@ -84,9 +88,12 @@ class FastDiscoveryTests(unittest.TestCase):
 
     def test_01_exact_latest_endpoint_only(self):
         self.assertEqual(updater.safe_url(self.latest, self.settings, latest_metadata=True), self.latest)
+        self.assertEqual(updater.safe_url(self.latest_base, self.settings, latest_metadata=True), self.latest_base)
         with self.assertRaises(updater.UpdateError):
             updater.safe_url(self.latest, self.settings)
-        for candidate in [self.latest + "?elsewhere=1", self.latest + "/extra", self.latest.replace("update-manifest.json", "update.zip"),
+        for candidate in [self.latest + "&elsewhere=1", self.latest + "&ikr_check=2", self.latest_base + "?ikr_check=-1",
+                          self.latest_base + "?ikr_check=01", self.latest_base + "?ikr_check=1.2", self.latest_base + "?ikr_check=" + "1" * 13,
+                          self.latest_base + "/extra", self.latest.replace("update-manifest.json", "update.zip"),
                           self.latest.replace("github.com/", "github.com.evil.test/"), self.latest.replace("https:", "http:"),
                           self.latest.replace("/" + self.settings["owner"] + "/", "/another-owner/")]:
             with self.assertRaises(updater.UpdateError, msg=candidate):
@@ -153,8 +160,11 @@ class FastDiscoveryTests(unittest.TestCase):
                 self.check()
         self.raw = json.dumps(self.manifest).encode()
         self.signature = self.sign(self.raw)
-        with patch.object(updater, "download", side_effect=self.transport), self.assertRaises(updater.UpdateError):
-            updater.get_latest_release(self.settings, "1.39.0", "1.21.0", cache=self.cache, app_root=self.app)
+        with patch.object(updater, "download", side_effect=self.transport):
+            stale, _, _ = updater.get_latest_release(self.settings, "1.39.0", "1.21.0", cache=self.cache, app_root=self.app)
+        self.assertEqual(stale["version"], "1.38.0")
+        with self.assertRaises(updater.UpdateError):
+            updater.validate_manifest(self.raw, self.settings, "1.39.0", "1.21.0")
         self.raw = b'{"version":"1.38.0","version":"1.39.0"}'
         with patch.object(updater, "download", side_effect=self.transport), self.assertRaises(updater.UpdateError):
             self.check()
@@ -199,6 +209,32 @@ class FastDiscoveryTests(unittest.TestCase):
             with self.assertRaises(updater.UpdateError):
                 updater.get_release(self.settings, "1.37.0", "1.21.0")
         self.assertEqual(requests[:3], [api, metadata_url, self.signature_url])
+
+    def test_10_stale_signed_metadata_is_not_a_downgrade_or_lost_notice(self):
+        (self.app / "extension/manifest.json").write_text(json.dumps({"version": "1.39.0"}), encoding="utf-8")
+        with patch.object(updater, "download", side_effect=self.transport):
+            state = updater._check(self.cache, "1.21.1", self.app)
+        self.assertEqual(state["status"], "current")
+        self.assertEqual(state["latestVersion"], "1.39.0")
+        self.assertEqual(state["metadataVersion"], "1.38.0")
+        self.assertTrue(state["metadataStale"])
+        updater.save_state(self.cache, {"status": "available", "latestVersion": "1.40.0"}, self.app)
+        with patch.object(updater, "download", side_effect=self.transport):
+            state = updater._check(self.cache, "1.21.1", self.app)
+        self.assertEqual(state["status"], "available")
+        self.assertEqual(state["latestVersion"], "1.40.0")
+        self.assertTrue(state["metadataStale"])
+
+    def test_11_time_bucket_changes_without_user_identifiers(self):
+        with patch.object(updater, "download", side_effect=self.transport):
+            self.check()
+        self.clock_mock.return_value = 1800000045
+        def next_transport(url, limit, target=None, progress=None):
+            if url == self.latest_base + "?ikr_check=40000001":
+                return self.raw
+            return self.transport(url, limit, target, progress)
+        with patch.object(updater, "download", side_effect=next_transport):
+            self.check()
 
 
 if __name__ == "__main__":
