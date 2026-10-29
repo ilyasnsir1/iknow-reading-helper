@@ -29,9 +29,30 @@ const wav=()=>{const b=Buffer.alloc(44+8820);b.write("RIFF");b.writeUInt32LE(b.l
  });
  let worker=context.serviceWorkers()[0]||await context.waitForEvent("serviceworker");const id=new URL(worker.url()).host;
  try{
+  const Core=require("../extension/core.js"),expected=Core.expectedSource(goal);
+  const germanPack={format:"iknow-reader-course",schemaVersion:1,course:{id:19053,title:goal.title,wordCount:1,sentenceCount:1},alignments:{10001:{signature:expected.sentences["10001"].signature,groups:[]}},germanItems:{100:{signature:expected.items["100"],text:"das"}},audio:{}};
+  await worker.evaluate(pack=>chrome.storage.local.set({iknowReaderSettings:{translationLanguage:"both"},iknowReaderCoursePacks:{19053:pack}}),germanPack);
   const course=await context.newPage();await course.goto("https://iknow.jp/courses/19053");
   try { await course.locator(".sentence .ikr-study-tools button").first().waitFor({timeout:10000}); }
   catch(error){ console.log("Course fixture debug",JSON.stringify({errors,external,body:await course.locator("body").innerText(),html:await course.locator("html").getAttribute("class"),worker:await worker.evaluate(()=>Object.keys(globalThis).filter(name=>name.startsWith('IKnowReader')))}));throw error; }
+  const checkWordActions=async(mode,label)=>{
+   await course.locator('[data-setting="translationLanguage"]').selectOption(mode);
+   await until(async()=>await course.locator("html").evaluate((node,mode)=>node.classList.contains("ikr-language-"+mode),mode),label+" language");
+   const layout=await course.locator(".item-details .cue-response").evaluate(node=>{
+    const tools=node.querySelector(".ikr-study-tools"),visibleGlosses=[...node.querySelectorAll(".response,.ikr-item-german")].filter(gloss=>getComputedStyle(gloss).display!=="none");
+    return {buttons:tools?.querySelectorAll("button").length,groups:node.querySelectorAll(".ikr-study-tools").length,glosses:visibleGlosses.map(gloss=>gloss.textContent),after:visibleGlosses.every(gloss=>Boolean(gloss.compareDocumentPosition(tools)&Node.DOCUMENT_POSITION_FOLLOWING)),below:visibleGlosses.every(gloss=>tools.getBoundingClientRect().top>=gloss.getBoundingClientRect().bottom)};
+   });
+   assert.equal(layout.buttons,2,label+" has save and practice");assert.equal(layout.groups,1,label+" has no duplicate controls");assert.equal(layout.after,true,label+" controls follow every visible gloss in DOM");assert.equal(layout.below,true,label+" controls are visually below every visible gloss");
+   assert.deepEqual(layout.glosses,mode==="both"?["that","das"]:mode==="de"?["das"]:["that"]);
+  };
+  for(const mode of ["both","en","de","both"])await checkWordActions(mode,"Initially prepared "+mode);
+  await course.screenshot({path:path.join(out,"00-both-word-actions.png"),fullPage:true});
+  await worker.evaluate(pack=>chrome.storage.local.set({iknowReaderCoursePacks:{19053:{...pack,germanItems:{}}}}),germanPack);
+  await until(async()=>await course.locator(".item-details .ikr-item-german").count()===0,"German gloss removed without recreating word controls");
+  await worker.evaluate(pack=>chrome.storage.local.set({iknowReaderCoursePacks:{19053:pack}}),germanPack);
+  await until(async()=>await course.locator(".item-details .ikr-item-german").count()===1,"German gloss arrives after existing word controls");
+  for(const mode of ["both","de","en","both"])await checkWordActions(mode,"Late prepared "+mode);
+  console.log("PASS Word controls stay below all visible English/German glosses across language switches and late cache arrival, without duplicates");
   await course.locator(".sentence .ikr-study-tools button").first().click();
   await until(()=>worker.evaluate(async()=>Object.keys((await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary?.records||{}).length===1),"course bookmark");
   const next=context.waitForEvent("page");await course.locator(".sentence .ikr-study-tools button").nth(1).click();const study=await next;await study.waitForLoadState();
@@ -46,6 +67,10 @@ const wav=()=>{const b=Buffer.alloc(44+8820);b.write("RIFF");b.writeUInt32LE(b.l
   console.log("PASS The real course saves a sentence, opens its study tab through the background, and reveals Romaji per word or together");
   await course.locator(".item-details .ikr-study-tools button").first().click();
   await until(()=>worker.evaluate(async()=>Object.keys((await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary.records).length===2),"word bookmark");
+  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary.records["word:19053:100"].german),"das");
+  const wordTab=context.waitForEvent("page");await course.locator(".item-details .ikr-study-tools button").nth(1).click();const wordStudy=await wordTab;await wordStudy.waitForLoadState();
+  await wordStudy.locator("#japanese").waitFor();assert.equal(await wordStudy.locator("#japanese").innerText(),"それ");assert.match(wordStudy.url(),/study\.html\?course=19053&item=word/);await wordStudy.close();
+  assert.equal(await course.locator(".item-details .ikr-study-tools button").count(),2);
   await study.locator("#kind-filter").selectOption("word");await until(async()=>await study.locator("#japanese").innerText()==="それ","word filter");
   await study.locator("#kind-filter").selectOption("");await study.locator('[data-key="sentence:19053:10001"]').click();
   console.log("PASS Vocabulary bookmarks are saved independently and the study library switches correctly between words and sentences");

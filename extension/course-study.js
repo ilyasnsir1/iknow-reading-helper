@@ -60,7 +60,7 @@
   function word(state, entry, courseId, courseTitle) {
     if (!courseId || state.studyTools?.isConnected) return;
     const source = entry.item, record = { ...base("word", { ...source.cue, id: source.cue.id || source.id }, courseId, courseTitle), english: clean(source.response?.text), german: state.germanLine?.textContent || "", audioUrl: sound(entry.sound) };
-    const node = tools(() => ({...record, german: state.germanLine?.textContent || ""})); if (!node) return; state.response.after(node); state.studyTools = node;
+    const node = tools(() => ({...record, german: state.germanLine?.textContent || ""})); if (!node) return; (state.germanLine || state.response).after(node); state.studyTools = node;
   }
   globalThis.IKnowReaderCourseStudy = Object.freeze({ sentence, word });
 })();
