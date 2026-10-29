@@ -47,7 +47,7 @@
     root.append(save, practice); return root;
   }
   function base(kind, cue, courseId, title) {
-    return { kind, courseId: String(courseId), courseTitle: clean(title), sourceId: String(cue.id), japanese: clean(cue.text), kana: clean(cue.transliterations?.Hrkt), romaji: clean(cue.transliterations?.Latn) };
+    return { kind, courseId: String(courseId), courseTitle: clean(title), sourceId: String(cue.id), japanese: clean(cue.text), jpan: clean(cue.transliterations?.Jpan), kana: clean(cue.transliterations?.Hrkt), romaji: clean(cue.transliterations?.Latn) };
   }
   function sound(value) { try { return globalThis.IKnowReaderStudyStore.audioUrl(new URL(value, location.href).href); } catch { return ""; } }
   function sentence(state, courseId, courseTitle) {

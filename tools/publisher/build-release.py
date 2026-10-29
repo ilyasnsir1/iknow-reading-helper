@@ -78,6 +78,21 @@ def build(args):
     version = manifest['version']
     if not VERSION.fullmatch(version) or not VERSION.fullmatch(args.minimum_helper_version):
         raise ValueError('Invalid version.')
+    if 'extension/changelog.json' in data:
+        notes = json.loads(data['extension/changelog.json'])
+        entries = notes.get('entries') if isinstance(notes, dict) else None
+        if not isinstance(notes, dict) or notes.get('schemaVersion') != 1 or not isinstance(entries, list) or not entries:
+            raise ValueError('The release changelog is invalid.')
+        if any(not isinstance(entry, dict) or entry.get('status') != 'released' for entry in entries):
+            raise ValueError('Finalize the private changelog draft before building a release; previews cannot be published.')
+        if entries[0].get('version') != version:
+            raise ValueError('The newest changelog entry must match the release version.')
+        for entry in entries:
+            for change in entry.get('changes', []):
+                for image in change.get('images', []):
+                    source = image.get('src', '')
+                    if not re.fullmatch(r'changelog-media/[A-Za-z0-9][A-Za-z0-9._-]*\.(png|webp|jpg|jpeg)', source) or '..' in source or 'extension/' + source not in data:
+                        raise ValueError('A changelog image is missing or unsafe.')
     host = re.search(rb'^HOST_VERSION = "([0-9.]+)"', data['helper/native_host.py'], re.MULTILINE)
     if not host or not VERSION.fullmatch(host.group(1).decode()):
         raise ValueError('Helper version is missing.')

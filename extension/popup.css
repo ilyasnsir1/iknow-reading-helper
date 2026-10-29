@@ -120,8 +120,8 @@ footer { display: flex; align-items: center; gap: 8px; justify-content: space-be
 .update-fox-startle::before {top:0;height:8px;}
 .update-fox-startle::after {top:12px;height:3px;}
 .update-fox-peek[data-phase="caught"] .update-fox-startle {opacity:1;}
-.app-updates:focus { outline:none; }
-.app-updates:focus-visible { outline:2px solid #9895a4; outline-offset:5px; border-radius:5px; }
+/* The section is a scroll/focus destination, not an interactive control. */
+.app-updates:focus, .app-updates:focus-visible { outline:none; outline-offset:0; }
 .update-heading { display:flex; gap:10px; align-items:baseline; justify-content:space-between; }
 .update-heading h2 { margin:0; color:var(--muted); font-size:10px; font-weight:750; letter-spacing:.09em; text-transform:uppercase; }
 #update-version { color:#81818b; font-size:10px; }

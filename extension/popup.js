@@ -12,6 +12,7 @@
     colorMode: "hover",
     alignmentMode: "phrases",
     pronunciation: false,
+    romajiStyle: "source",
     fontSize: 16,
     sentenceBold: false,
     groupInfo: false,
@@ -72,6 +73,7 @@
     }
     if (COLOR_MODES.includes(safe.colorMode)) normalized.colorMode = safe.colorMode;
     if (ALIGNMENT_MODES.includes(safe.alignmentMode)) normalized.alignmentMode = safe.alignmentMode;
+    if (["source", "spoken"].includes(safe.romajiStyle)) normalized.romajiStyle = safe.romajiStyle;
     if (TRANSLATION_LANGUAGES.includes(safe.translationLanguage)) normalized.translationLanguage = safe.translationLanguage;
     if (FONT_SIZES.includes(Number(safe.fontSize))) normalized.fontSize = Number(safe.fontSize);
     if (["female", "male"].includes(safe.wordNeuralVoice)) normalized.wordNeuralVoice = safe.wordNeuralVoice;
@@ -95,6 +97,7 @@
     for (const key of BOOLEAN_KEYS) document.getElementById(key).checked = settings[key];
     document.getElementById("colorMode").value = settings.colorMode;
     document.getElementById("alignmentMode").value = settings.alignmentMode;
+    document.getElementById("romajiStyle").value = settings.romajiStyle;
     document.getElementById("translationLanguage").value = settings.translationLanguage;
     document.getElementById("fontSize").value = String(settings.fontSize);
     document.getElementById("wordNeuralVoice").value = settings.wordNeuralVoice;
@@ -163,6 +166,7 @@
     if (BOOLEAN_KEYS.includes(key)) saveSetting(key, event.target.checked);
     else if (key === "colorMode") saveSetting(key, event.target.value);
     else if (key === "alignmentMode") saveSetting(key, event.target.value);
+    else if (key === "romajiStyle") saveSetting(key, event.target.value);
     else if (key === "translationLanguage") saveSetting(key, event.target.value);
     else if (key === "fontSize") saveSetting(key, Number(event.target.value));
     else if (key === "wordAudioSpeed") saveSetting(key, Number(event.target.value));

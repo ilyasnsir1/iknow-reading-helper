@@ -78,8 +78,32 @@ const until = async (predicate, message, timeout = 20000) => { const at = Date.n
     }), "real extension banner navigates to visible focused updates");
     assert.match(popup.url(), /#app-updates$/);
     assert.equal(await worker.evaluate(() => __updateTest.calls.length), beforeNavigation);
+    const assertNoPanelRing = async label => {
+      const style = await popup.locator("#app-updates").evaluate(node => {
+        const css = getComputedStyle(node);
+        return { focused: document.activeElement === node, outline: css.outlineStyle, offset: css.outlineOffset, shadow: css.boxShadow };
+      });
+      assert.equal(style.focused, true, label + " retains the navigation focus target");
+      assert.equal(style.outline, "none", label + " does not outline the whole Updates section");
+      assert.equal(style.offset, "0px", label + " does not offset an outer ring");
+      assert.equal(style.shadow, "none", label + " has no section focus shadow");
+    };
+    for (const theme of ["paper", "midnight", "tokyo", "forest"]) {
+      await popup.evaluate(theme => IKnowReaderTheme.choose(theme), theme);
+      await popup.locator("#update-notice").click();
+      await assertNoPanelRing(theme + " pointer banner");
+      await popup.locator("#update-notice").focus(); await popup.keyboard.press("Enter");
+      await assertNoPanelRing(theme + " keyboard banner");
+      await popup.keyboard.press("Tab");
+      const button = await popup.locator("#check-updates").evaluate(node => ({ focused: document.activeElement === node, visible: node.matches(":focus-visible"), shadow: getComputedStyle(node).boxShadow }));
+      assert.equal(button.focused, true, theme + " Tab moves into the first update action");
+      assert.equal(button.visible, true, theme + " preserves keyboard focus indication on the action");
+      assert.match(button.shadow, /inset/, theme + " action keeps its inset keyboard focus ring");
+    }
+    assert.equal(await worker.evaluate(() => __updateTest.calls.length), beforeNavigation);
     await popup.setViewportSize({ width: 700, height: 1000 });
     pass("The fox notice scrolls and focuses the Updates section in a real extension popup without starting native work");
+    pass("Pointer and keyboard navigation never outline the whole Updates section in any theme; individual update buttons retain inset keyboard focus");
     await worker.evaluate(() => { __updateTest.busy = true; });
     const before = await worker.evaluate(() => __updateTest.calls.length);
     await popup.locator("#install-update").click();

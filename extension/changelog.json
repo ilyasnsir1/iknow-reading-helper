@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "romaji-style",
+      "version": "1.40.5",
+      "status": "released",
+      "date": "2026-10-29",
+      "title": "Your choice of Romaji",
+      "summary": "A new reading option and a home for release notes.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Romaji style",
+          "description": "Choose Source spelling or Pronunciation.",
+          "details": [
+            "Pronunciation shows particles as wa, e and o.",
+            "Available in the course toolbar, popup and Study space."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/romaji-style.png",
+              "alt": "Source spelling and particle pronunciation side by side",
+              "caption": "Choose the reading style that helps you most."
+            }
+          ]
+        },
+        {
+          "type": "added",
+          "title": "Changelog",
+          "description": "See what's changed, with pictures when helpful.",
+          "details": [],
+          "images": []
+        },
+        {
+          "type": "fixed",
+          "title": "Update popup",
+          "description": "Removed the extra outline around the Updates section.",
+          "details": [],
+          "images": []
+        }
+      ]
+    },
+    {
+      "id": "bilingual-word-controls",
+      "version": "1.40.4",
+      "status": "released",
+      "date": "2026-10-29",
+      "title": "Keep translations together",
+      "summary": "A small fix for Both languages.",
+      "changes": [
+        {
+          "type": "fixed",
+          "title": "Vocabulary buttons",
+          "description": "Save and practice buttons now sit below English and German.",
+          "details": [],
+          "images": [
+            {
+              "src": "changelog-media/bilingual-word-controls.png",
+              "alt": "Vocabulary buttons before and after the Both languages fix",
+              "caption": "Both translations stay together."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

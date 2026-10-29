@@ -19,7 +19,7 @@
   }
   function details(input) {
     if (!object(input)) throw Error("The study item is not valid.");
-    return { japanese: text(input.japanese, 5000, true), kana: text(input.kana, 5000), romaji: text(input.romaji, 5000),
+    return { japanese: text(input.japanese, 5000, true), jpan: text(input.jpan, 5000), kana: text(input.kana, 5000), romaji: text(input.romaji, 5000),
       english: text(input.english, 5000), german: text(input.german, 5000), audioUrl: audioUrl(input.audioUrl) };
   }
   function validate(input) {

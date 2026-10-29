@@ -27,7 +27,7 @@ from process_resources import worker_threads
 for _thread_variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_thread_variable] = str(worker_threads())
 
-HOST_VERSION = "1.21.1"
+HOST_VERSION = "1.22.0"
 MAX_INPUT = 16 * 1024 * 1024
 MAX_RESULT = 8 * 1024 * 1024
 CACHE_ROOT = Path(os.environ.get("IKNOW_READER_CACHE", str(Path(os.environ.get("LOCALAPPDATA", Path.home())) / "iKnowLesehilfe"))).resolve()
@@ -393,6 +393,10 @@ def handle(message):
     if kind == "ping":
         send({"type": "pong", "version": HOST_VERSION, "requestId": request_id})
         return
+    if kind == "changelog:author":
+        import changelog_authoring
+        changelog_authoring.handle(message, Path(__file__).resolve().parent.parent, send)
+        return
     if kind == "diagnostics":
         import diagnostics
         send({"type": "diagnostics-result", "requestId": request_id, "ok": True,
@@ -579,7 +583,7 @@ def main():
                 # Update metadata/status and version pings do not need numerical
                 # DLLs or voice imports. Load dependencies on the stdin thread
                 # before other work to preserve the existing Windows CRT rule.
-                if isinstance(message, dict) and message.get("type") not in {"update:check", "update:status", "update:install", "components:status", "components:start", "components:pause", "components:resume", "ping", "diagnostics"}:
+                if isinstance(message, dict) and message.get("type") not in {"update:check", "update:status", "update:install", "components:status", "components:start", "components:pause", "components:resume", "ping", "diagnostics", "changelog:author"}:
                     warm_dependencies()
                 handle(message)
             except (ValueError, TypeError, UnicodeError) as error:

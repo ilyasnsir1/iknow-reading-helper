@@ -1,11 +1,12 @@
 /* Local saved-item practice. Recognition is deliberately not an accuracy score. */
 (() => {
   "use strict";
-  const Store = globalThis.IKnowReaderStudyStore, $ = id => document.getElementById(id);
+  const Core = globalThis.IKnowReaderCore, Store = globalThis.IKnowReaderStudyStore, $ = id => document.getElementById(id);
   const query = new URL(location.href).searchParams;
   let records = [], filtered = [], selected = null, visibleCount = 40, reloadGeneration = 0, searchTimer = null;
   let cardIdentity = "", useContext = false, playGeneration = 0, pendingAudio = null, pendingWait = null, looping = false;
   let captureGeneration = 0, captureState = "idle", recorder = null, stream = null, captureTimer = null, takeUrl = "";
+  let romajiStyle = "source", settingsRevision = 0;
   const original = new Audio(), take = new Audio(); original.preload = "none"; take.preload = "none";
   const announce = value => { $("page-status").textContent = value; };
   const currentRecord = () => records.find(record => record.key === selected);
@@ -143,14 +144,41 @@
     $("reveal-all").textContent = all ? "Hide all Romaji" : "Reveal all Romaji"; $("reveal-all").disabled = !nodes.length;
   }
   function setToken(node, reveal) { node.textContent = reveal ? node.dataset.reading : "•••"; node.setAttribute("aria-pressed", String(reveal)); node.setAttribute("aria-label", reveal ? `Hide reading ${node.dataset.reading}` : `Reveal reading, word ${node.dataset.index}`); }
+  function readingTokens(value) {
+    const item = currentRecord(), kind = useContext && item?.context ? "sentence" : item?.kind;
+    const reading = Core.displayRomaji({ ...value, kind }, romajiStyle);
+    return reading.trim().split(/\s+/).filter(Boolean).slice(0, 250);
+  }
   function renderReading(value) {
     $("romaji").replaceChildren();
-    const tokens = (value || "").trim().split(/\s+/).filter(Boolean).slice(0, 250);
+    const tokens = readingTokens(value);
     for (const [index, word] of tokens.entries()) {
       const node = el("button", "reading-token"); node.type = "button"; node.dataset.reading = word; node.dataset.index = String(index + 1); setToken(node, false);
       node.addEventListener("click", () => { setToken(node, node.getAttribute("aria-pressed") !== "true"); readingLabel(); }); $("romaji").append(node);
     }
     if (!tokens.length) $("romaji").append(el("span", "status", "No published Romaji was saved for this item.")); readingLabel();
+  }
+  function updateReadingStyle(value) {
+    const next = Core.normalizeSettings(value).romajiStyle;
+    if (next === romajiStyle) return;
+    romajiStyle = next;
+    const details = currentDetails(); if (!details) return;
+    const tokens = readingTokens(details), nodes = [...$("romaji").querySelectorAll("button")];
+    // A reading preference must not restart practice, discard a microphone
+    // take or hide already revealed tokens. The source token boundaries stay.
+    for (const [index, node] of nodes.entries()) {
+      if (tokens[index] === undefined) continue;
+      const revealed = node.getAttribute("aria-pressed") === "true";
+      node.dataset.reading = tokens[index]; setToken(node, revealed);
+    }
+    readingLabel();
+  }
+  async function loadReadingStyle() {
+    const revision = settingsRevision;
+    try {
+      const stored = await chrome.storage.local.get(Core.STORAGE_KEY);
+      if (revision === settingsRevision) updateReadingStyle(stored[Core.STORAGE_KEY]);
+    } catch { /* The source spelling remains available when settings cannot load. */ }
   }
   function renderCard(force = false) {
     const item = currentRecord();
@@ -164,7 +192,7 @@
       $("japanese").textContent = value.japanese; $("kana").textContent = value.kana; $("kana").hidden = !value.kana;
       $("english").textContent = value.english; $("english").hidden = !value.english; $("german").textContent = value.german; $("german").hidden = !value.german;
       $("context-row").hidden = !item.context; $("use-context").checked = useContext;
-      renderReading(value.romaji);
+      renderReading(value);
       if (!value.audioUrl) $("audio-status").textContent = "No original recording was saved for this item.";
       $("course-link").href = `https://iknow.jp/courses/${item.courseId}`; $("course-link").textContent = "Open course ↗";
     }
@@ -217,6 +245,10 @@
   $("remove-item").addEventListener("click", async () => { if (!selected) return; const key = selected; $("remove-item").disabled = true; try { await Store.remove(key); await load(); announce("Removed from your saved library."); } catch (error) { announce(String(error.message || error)); } finally { $("remove-item").disabled = false; } });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { stopPlayback("Practice stopped while this page is hidden."); cancelCapture(false); } });
   window.addEventListener("pagehide", () => { stopPlayback(); cancelCapture(true); });
-  chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes[Store.KEY]) void load(); });
-  void load();
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (changes[Core.STORAGE_KEY]) { settingsRevision++; updateReadingStyle(changes[Core.STORAGE_KEY].newValue); }
+    if (changes[Store.KEY]) void load();
+  });
+  void loadReadingStyle(); void load();
 })();

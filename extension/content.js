@@ -270,6 +270,7 @@
     const root = document.documentElement;
     const enabledChanged = previous.enabled !== settings.enabled;
     const languageChanged = previous.translationLanguage !== settings.translationLanguage;
+    const romajiChanged = previous.romajiStyle !== settings.romajiStyle;
     const alignmentChanged = previous.alignmentMode !== settings.alignmentMode;
     const interactive = settings.enabled && settings.groupInfo && settings.colorMode !== "off";
     const interactionChanged = Boolean(previous.enabled && previous.groupInfo && previous.colorMode !== "off") !== interactive;
@@ -288,6 +289,7 @@
       for (const state of sentenceStates.values()) clearSentence(state);
       sentenceStates.clear(); displayRecordCache = new WeakMap(); schedule();
     }
+    if (romajiChanged) for (const state of sentenceStates.values()) updateRomanText(state);
     // Bold and the three reading visibility switches are CSS-only. Sentence
     // content, meaning controls and audio targets do not change for those.
     if (interactionChanged || languageChanged) for (const state of sentenceStates.values()) {
@@ -303,7 +305,7 @@
         audioError = message;
         updateStatus();
       }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice });
-    if (interactionChanged) AudioFollow?.refresh({ wordsOnly: true });
+    if (interactionChanged || romajiChanged) AudioFollow?.refresh({ wordsOnly: true });
     if (settings.enabled && !previous.enabled) schedule();
     if (enabledChanged) updateAutomation();
   }
@@ -390,6 +392,13 @@
     }
     languageSelect.addEventListener("change", () => { void saveSetting("translationLanguage", languageSelect.value); });
     translationLabel.append(languageSelect); menus.append(translationLabel);
+    const romajiLabel = create("label", "", "Romaji ");
+    const romajiSelect = create("select"); romajiSelect.dataset.setting = "romajiStyle";
+    for (const [value, label] of [["source", "Source spelling"], ["spoken", "Pronunciation"]]) {
+      const option = create("option", "", label); option.value = value; romajiSelect.append(option);
+    }
+    romajiSelect.addEventListener("change", () => { void saveSetting("romajiStyle", romajiSelect.value); });
+    romajiLabel.append(romajiSelect); menus.append(romajiLabel);
     const themePicker = create("span", "ikr-toolbar-theme");
     toolbar.append(menus, themePicker);
     const retry = create("button", "", "Reload");
@@ -527,9 +536,13 @@
     highlightRanges(node, groups, "ja", state);
   }
   function romanValues(state) {
-    // Display the source's Latn, including its particle and number spellings.
-    // Spoken readings belong to playback; stored preparation cannot replace it.
-    return state.romanTokens.map(token => token.text);
+    if (!state.romanDisplay) {
+      const cue = state.sentence.cue, source = state.romanTokens.map(token => token.text);
+      const spoken = Core.tokenize(Core.displayRomaji({ kind: "sentence", romaji: plain(cue.transliterations?.Latn),
+        kana: plain(cue.transliterations?.Hrkt), japanese: plain(cue.text), jpan: plain(cue.transliterations?.Jpan) }, "spoken")).map(token => token.text);
+      state.romanDisplay = { source, spoken: spoken.length === source.length ? spoken : source };
+    }
+    return state.romanDisplay[settings.romajiStyle] || state.romanDisplay.source;
   }
   function groupLabels(record, sentence, values, language = "en") {
     const en = plain(sentence.response?.text);

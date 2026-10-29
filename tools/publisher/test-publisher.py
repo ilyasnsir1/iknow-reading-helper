@@ -81,6 +81,24 @@ class PublisherChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'configurations differ'):
             self.build()
 
+    def test_changelog_requires_a_finalized_matching_release(self):
+        path = self.package / 'extension/changelog.json'
+        value = {'schemaVersion': 1, 'entries': [{'status': 'unreleased', 'version': None, 'changes': []}]}
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(ValueError, 'previews cannot be published'):
+            self.build()
+        value['entries'][0].update(status='released', version='1.33.0')
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(ValueError, 'must match'):
+            self.build()
+        value['entries'][0].update(version='1.34.0', changes=[{'images': [{'src': 'changelog-media/missing.png'}]}])
+        path.write_text(json.dumps(value))
+        with self.assertRaisesRegex(ValueError, 'image is missing'):
+            self.build()
+        value['entries'][0]['changes'] = []
+        path.write_text(json.dumps(value))
+        self.assertEqual(self.build()['version'], '1.34.0')
+
     def test_publish_dry_run_verifies_signature_and_archive_without_github(self):
         manifest = self.build()
         notes = self.case / 'notes.txt'

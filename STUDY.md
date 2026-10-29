@@ -5,14 +5,21 @@ saves and opens that item directly. The popup also links to Study library &
 speaking practice. Search and filter by course or item type. Removing an item
 affects this library only, not its prepared translations, colors or timings.
 
-Romaji starts concealed. Reveal individual tokens or all readings. Both course
-and Study views display iKnow's original Latn spelling, including ha/he/wo where
-provided. The extension does not replace the displayed text with pronunciation
-variants, even if an older setting or prepared record contains those variants.
-Original Japanese, Kana and available saved translations remain visible.
-Japanese は is the kana ha; as a grammatical particle it is pronounced wa.
-Showing ha here preserves the source spelling; it is not an instruction to
-pronounce that particle ha. Word playback still uses spoken Japanese readings.
+Romaji starts concealed. Reveal individual tokens or all readings. **Romaji
+style** in the popup's Reading section or the course toolbar controls both
+course and Study displays. **Source spelling** is the default and preserves
+iKnow's original Latn, including ha/he/wo where provided. **Pronunciation**
+shows confirmed sentence particles as wa/e/o instead. It does not change
+ordinary words, vowel lengths or the Japanese/Kana text. Word playback uses
+spoken Japanese readings in either mode.
+
+Saved Romaji stays in its original form; changing the display does not
+regenerate course data or recordings. New bookmarks retain iKnow's Japanese
+segmentation to distinguish particles from words such as 歯 (ha, tooth).
+Ambiguous or older entries without enough source information retain their
+original spelling. Saving such an item again from its course supplies the
+current source metadata. An old, retired pronunciation preference does not
+automatically enable the new mode.
 
 **Listen. Pause. Say it.** repeats the complete original recording with a chosen
 pause for you to speak. Repeats, pause length and playback speed are selectable.

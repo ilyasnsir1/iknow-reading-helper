@@ -3,7 +3,7 @@
   "use strict";
   const DEFAULTS = Object.freeze({
     enabled: true, wordRomaji: true, sentenceRomaji: true, followPanels: false,
-    kanaVisible: true, colorMode: "hover", alignmentMode: "phrases", pronunciation: false, fontSize: 16,
+    kanaVisible: true, colorMode: "hover", alignmentMode: "phrases", pronunciation: false, romajiStyle: "source", fontSize: 16,
     sentenceBold: false, groupInfo: false, audioFollow: false, wordAudio: false, wordAudioPolicy: 5, translationLanguage: "en", autoPrepare: false,
     prepareGerman: false, prepareColors: false, prepareAudio: false,
     wordAudioMode: "neural", wordAudioSpeed: 1, wordNeuralVoice: "female"
@@ -19,6 +19,7 @@
     }
     if (["off", "hover", "all"].includes(input.colorMode)) output.colorMode = input.colorMode;
     if (["phrases", "words"].includes(input.alignmentMode)) output.alignmentMode = input.alignmentMode;
+    if (["source", "spoken"].includes(input.romajiStyle)) output.romajiStyle = input.romajiStyle;
     if (["en", "de", "both"].includes(input.translationLanguage)) output.translationLanguage = input.translationLanguage;
     if (["female", "male"].includes(input.wordNeuralVoice)) output.wordNeuralVoice = input.wordNeuralVoice;
     if ([.7, .85, 1].includes(Number(input.wordAudioSpeed))) output.wordAudioSpeed = Number(input.wordAudioSpeed);
@@ -42,6 +43,61 @@
     return Array.from(text.matchAll(/\S+/gu), match => ({
       text: match[0], start: match.index, end: match.index + match[0].length
     }));
+  }
+  function displayRomaji(input, style = "source") {
+    const source = typeof input?.romaji === "string" ? input.romaji : "";
+    if (style !== "spoken" || input?.kind !== "sentence") return source;
+    // Only the three confirmed particle tokens change. Source text, token
+    // boundaries, punctuation, caches and timing/alignment signatures stay intact.
+    const edges = /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu;
+    const bare = text => text.replace(edges, "");
+    const meaningful = text => tokenize(text).filter(token => bare(token.text));
+    const kanaText = plainText(input.kana), roman = meaningful(source), kana = meaningful(kanaText);
+    // Jpan supplies iKnow's segmented Japanese spelling (歯 must not become wa).
+    // A caller may also provide explicitly segmented Japanese as a fallback;
+    // an unsegmented sentence is insufficient to guess grammar safely.
+    const jpan = plainText(input.jpan), japanese = plainText(input.japanese);
+    const surfaceText = jpan || (/\s/u.test(japanese) ? japanese : "");
+    if (!surfaceText) return source;
+    const surface = meaningful(surfaceText);
+    if (roman.length !== kana.length) return source;
+    const readings = { ha: ["は", "wa"], he: ["へ", "e"], wo: ["を", "o"] };
+    const quotedKana = (text, token) => Array.from(text.matchAll(/[「『“"']\s*[はへを]\s*[」』”"']/gu))
+      .some(match => token.start < match.index + match[0].length && token.end > match.index);
+    const aligned = roman.length === surface.length, confirmed = new Set();
+    {
+      // Jpan sometimes splits a date or joins a verb that Latn/Kana do not.
+      // Rescue a particle independently only when its occurrence/order mapping
+      // is unique. An embedded glyph (e.g. には) or lexical 歯 reading makes
+      // that form ambiguous and is deliberately left in source spelling.
+      const kanaParticles = [], surfaceParticles = [];
+      for (const [written, [glyph, spoken]] of Object.entries(readings)) {
+        const indices = kana.flatMap((token, index) => index && bare(token.text) === glyph && !quotedKana(kanaText, token) ? [index] : []);
+        const matches = surface.flatMap((token, index) => bare(token.text) === glyph && !quotedKana(surfaceText, token) ? [index] : []);
+        if (!indices.length || indices.length !== matches.length || indices.length !== kanaText.split(glyph).length - 1 ||
+            indices.some(index => ![written, spoken].includes(bare(roman[index].text).toLowerCase()))) continue;
+        indices.forEach(index => kanaParticles.push({ index, glyph }));
+        matches.forEach(index => surfaceParticles.push({ index, glyph }));
+      }
+      kanaParticles.sort((a, b) => a.index - b.index); surfaceParticles.sort((a, b) => a.index - b.index);
+      if (kanaParticles.map(token => token.glyph).join("") === surfaceParticles.map(token => token.glyph).join("")) {
+        kanaParticles.forEach(token => confirmed.add(token.index));
+      }
+    }
+    const changes = [];
+    for (let index = 0; index < roman.length; index++) {
+      const token = roman[index], word = bare(token.text), match = readings[word.toLowerCase()];
+      const direct = aligned && bare(surface[index].text) === match?.[0] && !quotedKana(surfaceText, surface[index]);
+      if (!index || !match || bare(kana[index].text) !== match[0] || !direct && !confirmed.has(index)) continue;
+      // A quoted kana name, such as 「は」, is a letter rather than a particle.
+      if (quotedKana(kanaText, kana[index])) continue;
+      const position = token.start + token.text.indexOf(word);
+      const replacement = word === word.toUpperCase() ? match[1].toUpperCase() : /^[A-Z]/u.test(word) ? match[1][0].toUpperCase() + match[1].slice(1) : match[1];
+      changes.push({ position, end: position + word.length, replacement });
+    }
+    let result = source;
+    for (const change of changes.reverse()) result = result.slice(0, change.position) + change.replacement + result.slice(change.end);
+    return result;
   }
   function courseIdFromUrl(url) {
     try {
@@ -269,7 +325,7 @@
     const waiting = unknown.filter(stage => stage !== queue?.stage).map(stage => `${names[stage]} estimate after it starts`).join(" · ");
     return `Measuring ${names[queue?.stage] || "preparation"} speed…${waiting ? ` · ${waiting}` : ""}`;
   }
-  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
+  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IKnowReaderCore = api;
 })();

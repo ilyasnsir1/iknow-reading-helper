@@ -1,6 +1,6 @@
 /* Local preparation bridge. Executable code and models never come from a course pack. */
 "use strict";
-importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostic-history.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js", "components-source.js", "study-store.js");
+importScripts("core.js", "course-packs.js", "data.js", "audio-data.js", "audio-source.js", "word-speech-source.js", "diagnostic-history.js", "diagnostics-background.js", "neural-speech-source.js", "word-voice-source.js", "components-source.js", "study-store.js", "changelog-background.js");
 globalThis.IKnowReaderStudyStore?.listenBackground();
 
 const AutoCore = globalThis.IKnowReaderCore;

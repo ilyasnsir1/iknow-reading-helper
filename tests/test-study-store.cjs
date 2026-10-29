@@ -5,13 +5,18 @@ const assert=require("node:assert/strict"),Store=require("../extension/study-sto
  const backend=Store.createBackend(storage,()=>123);
  const record={kind:"sentence",courseId:"19053",sourceId:"100",japanese:"それはとてもいい話だ。",romaji:"sore wa tottemo ii hanashi da.",english:"That's a really nice story.",audioUrl:"https://assets0.iknow.jp/assets/test.mp3"};
  assert.equal(Store.makeKey(record),"sentence:19053:100");
- for(const bad of [{audioUrl:"javascript:alert(1)"},{audioUrl:"https://assets0.iknow.jp.evil/x.mp3"},{audioUrl:"https://evil.test/x.mp3"},{courseId:"../1"},{kind:"other"},{sourceId:"__proto__"},{sourceId:"x/y"}]){
+ for(const bad of [{audioUrl:"javascript:alert(1)"},{audioUrl:"https://assets0.iknow.jp.evil/x.mp3"},{audioUrl:"https://evil.test/x.mp3"},{courseId:"../1"},{kind:"other"},{sourceId:"__proto__"},{sourceId:"x/y"},{jpan:[]},{jpan:"x".repeat(5001)}]){
   assert.throws(()=>Store.validate({...record,...bad}));
  }
  await Promise.all(Array.from({length:30},(_,i)=>backend.save({...record,sourceId:String(i)})));
  assert.equal(Object.keys((await backend.read()).records).length,30);
  await backend.remove("sentence:19053:5");assert.equal(Object.keys((await backend.read()).records).length,29);
  const inert=await backend.save({...record,japanese:'<img src=x onerror="alert(1)">'});assert.match(inert.japanese,/<img/);
+ const written={...record,romaji:"sore ha totemo ii hanashi da.",jpan:"それ は とても いい 話 だ 。"};
+ const retained=await backend.save({...written,context:{...written}});
+ assert.equal(retained.romaji,written.romaji);assert.equal(retained.jpan,written.jpan);assert.equal(retained.context.jpan,written.jpan);
+ assert.equal((await backend.read()).records[Store.makeKey(written)].romaji,written.romaji);
+ assert.equal(Store.validate(record).jpan,"");assert.equal(Store.makeKey(written),Store.makeKey(record));
  data[Store.KEY]={schemaVersion:2,records:{personal:"retained"}};const saved=structuredClone(data);await assert.rejects(backend.save(record));assert.deepEqual(data,saved);
  console.log("PASS Study records have stable identities and bounded text/audio validation; serialized writes preserve simultaneous saves, removal and unrecognized existing library formats");
 })().catch(error=>{console.error(error);process.exitCode=1;});

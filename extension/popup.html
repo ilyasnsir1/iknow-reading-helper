@@ -62,6 +62,16 @@
               <input id="sentenceRomaji" name="sentenceRomaji" type="checkbox" role="switch">
               <span class="switch" aria-hidden="true"></span>
             </label>
+            <label class="select-row" for="romajiStyle">
+              <span class="setting-copy">
+                <span class="setting-title">Romaji style</span>
+                <span class="setting-description">Particle pronunciation: ha → wa · he → e · wo → o</span>
+              </span>
+              <select id="romajiStyle" name="romajiStyle">
+                <option value="source">Source spelling</option>
+                <option value="spoken">Pronunciation</option>
+              </select>
+            </label>
             <label class="setting-row" for="audioFollow">
               <span class="setting-copy">
                 <span class="setting-title">Follow sentence audio</span>
@@ -180,6 +190,7 @@
           <button id="install-update" type="button" class="update-primary" hidden>Install update</button>
           <button id="refresh-updated-tabs" type="button" hidden>Refresh iKnow pages</button>
         </div>
+        <a class="setup-link" id="open-changelog" href="changelog.html" target="_blank" rel="noopener noreferrer">Changelog <span aria-hidden="true">↗</span></a>
       </section>
 
       <a class="setup-link" id="open-diagnostics" href="diagnostics.html" target="_blank" rel="noopener noreferrer">Diagnostics <span aria-hidden="true">↗</span></a>
