@@ -1,0 +1,33 @@
+/* The same backup structure and spacing in every palette. */
+.focus-backup-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb,var(--ikr-bg) 76%,transparent);backdrop-filter:blur(5px)}
+.focus-backup-dialog{width:min(560px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;border:1px solid var(--ikr-line);border-radius:12px;background:var(--study-sheet);box-shadow:var(--ikr-shadow);overflow:hidden}
+.focus-backup-dialog:focus{outline:none}
+.focus-backup-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:23px 25px 20px;border-bottom:1px solid var(--ikr-line);flex:none}
+.focus-backup-dialog h2{font-size:23px;margin-top:5px}
+.focus-backup-close{width:32px;height:32px;min-height:32px;display:grid;place-items:center;padding:7px;background:transparent;border-color:transparent;border-radius:4px}
+.focus-backup-close svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.5;fill:none}
+.focus-backup-body{padding:23px 25px;overflow:auto;min-height:0;scrollbar-width:thin}
+.focus-backup-dialog h3{font-size:14px;font-weight:550}
+.focus-backup-dialog p{font-size:12px;color:var(--ikr-muted);line-height:1.6;margin-top:7px}
+.focus-backup-export{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-bottom:23px;border-bottom:1px solid var(--ikr-line)}
+.focus-backup-dialog button{font-size:12px;white-space:nowrap}
+.focus-backup-dialog button:not(.focus-backup-close){padding:9px 12px;border-radius:4px}
+.focus-backup-import{padding-top:23px}
+.focus-backup-file-label{display:flex;align-items:center;gap:12px;position:relative;padding:12px 13px;margin-top:14px;border:1px dashed var(--ikr-line-strong);border-radius:4px;cursor:pointer;background:var(--study-library);min-height:44px}
+.focus-backup-file-label>span{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.focus-backup-file-label input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.focus-backup-file-label:focus-within{border-style:solid}
+.focus-backup-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;padding:19px 0 12px}
+.focus-backup-counts>div{display:flex;flex-direction:column;gap:5px}
+.focus-backup-counts strong{font-size:22px;font-weight:500}
+.focus-backup-counts span{font-size:10px;color:var(--ikr-muted)}
+.focus-backup-dialog .focus-backup-merge-note{font-size:11px;margin-top:0}
+.focus-backup-settings{display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px}
+.focus-backup-settings input{margin:0;flex:none}
+.focus-backup-import-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:20px;min-height:39px}
+.focus-backup-dialog #focus-backup-status{margin:0;font-size:11px;overflow-wrap:anywhere}
+#focus-backup-status[data-error=true]{color:var(--ikr-danger)}
+.focus-backup-import-actions button{margin-left:auto}
+
+.focus-backup-overlay [hidden]{display:none!important}
+@media(max-width:600px){.focus-backup-overlay{padding:14px}.focus-backup-dialog{max-height:calc(100dvh - 28px)}.focus-backup-dialog>header{padding:20px}.focus-backup-body{padding:20px}.focus-backup-export{align-items:flex-start;flex-direction:column;gap:13px}.focus-backup-import-actions{align-items:flex-start;flex-direction:column;gap:12px}.focus-backup-import-actions button{width:100%;margin-left:0}}

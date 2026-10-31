@@ -9,6 +9,44 @@
     wordAudioMode: "neural", wordAudioSpeed: 1, wordNeuralVoice: "female"
   });
   const STORAGE_KEY = "iknowReaderSettings";
+  let volumeService;
+  function audioVolume() {
+    if (volumeService) return volumeService;
+    const keys = Object.freeze({original:"iknowReaderVolumeOriginal",word:"iknowReaderVolumeWord",recording:"iknowReaderVolumeRecording"});
+    const values = {original:100,word:100,recording:100}, confirmed={...values}, listeners = new Set(), revisions = {}, pending = {}, tails={};
+    const storage = globalThis.chrome?.storage, browser = Boolean(storage?.local?.get && storage.local.set);
+    const local = !browser && globalThis.location?.protocol === "http:" && location.hostname === "127.0.0.1";
+    const valid = value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value) : 100;
+    const notify = () => { for (const fn of listeners) fn({...values}); };
+    const ready = Promise.resolve().then(async () => {
+      const stored = browser ? await storage.local.get(Object.values(keys)) : local ? Object.fromEntries(Object.values(keys).map(key => {const value=localStorage.getItem('ikr-preview:'+key);return[key,value===null?100:Number(value)];})) : {};
+      for (const kind of Object.keys(keys)) {confirmed[kind]=valid(stored[keys[kind]]);if (!revisions[kind]) values[kind]=confirmed[kind];}
+      notify();
+    }).catch(() => {});
+    if (browser) storage.onChanged?.addListener((changes, area) => {
+      if (area !== 'local') return; let changed=false;
+      for (const kind of Object.keys(keys)) if (changes[keys[kind]] && !pending[kind]) {values[kind]=confirmed[kind]=valid(changes[keys[kind]].newValue);changed=true;}
+      if (changed) notify();
+    });
+    if (local) globalThis.addEventListener?.('storage', event => {
+      const kind=Object.keys(keys).find(kind=>'ikr-preview:'+keys[kind]===event.key);
+      if(kind&&!pending[kind]){values[kind]=confirmed[kind]=valid(event.newValue===null?100:Number(event.newValue));notify();}
+    });
+    function get(kind) {return Object.hasOwn(keys,kind)?values[kind]:100;}
+    async function set(kind, value) {
+      if (!Object.hasOwn(keys,kind) || typeof value !== 'number' || !Number.isFinite(value) || value<0 || value>100) throw Error('Choose a volume from 0 to 100.');
+      const revision=(revisions[kind]||0)+1;revisions[kind]=revision;pending[kind]=(pending[kind]||0)+1;
+      values[kind]=Math.round(value);notify();const next=values[kind];
+      const write=(tails[kind]||ready).catch(()=>{}).then(async()=>{if(browser)await storage.local.set({[keys[kind]]:next});else if(local)localStorage.setItem('ikr-preview:'+keys[kind],String(next));confirmed[kind]=next;});
+      tails[kind]=write.catch(()=>{});
+      try {await write;}
+      catch(error){if(revisions[kind]===revision){values[kind]=confirmed[kind];notify();}throw error;}
+      finally{pending[kind]--;}
+    }
+    function subscribe(fn) {listeners.add(fn);return()=>listeners.delete(fn);}
+    function bind(player, kind) {const update=()=>{player.volume=get(kind)/100;};update();const dispose=subscribe(update);void ready.then(update);return dispose;}
+    volumeService=Object.freeze({keys,ready,get,set,subscribe,bind});return volumeService;
+  }
   function normalizeSettings(value) {
     const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const output = { ...DEFAULTS };
@@ -325,7 +363,7 @@
     const waiting = unknown.filter(stage => stage !== queue?.stage).map(stage => `${names[stage]} estimate after it starts`).join(" · ");
     return `Measuring ${names[queue?.stage] || "preparation"} speed…${waiting ? ` · ${waiting}` : ""}`;
   }
-  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
+  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, audioVolume, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IKnowReaderCore = api;
 })();

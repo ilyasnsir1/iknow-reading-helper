@@ -1,0 +1,10 @@
+/* Notes and delete confirmations share the approved Study dialog geometry. */
+.focus-workspace-action-dialog{width:min(520px,100%)}
+.focus-workspace-action-dialog>header h2{margin:0;font-size:21px}
+.focus-workspace-action-dialog .focus-workspace-action-source{font-size:20px;color:var(--ikr-text);margin:0 0 18px;overflow-wrap:anywhere}
+.focus-workspace-action-dialog textarea{width:100%;min-height:170px;resize:vertical;border-radius:4px;padding:12px;line-height:1.65;background:var(--ikr-elevated);color:var(--ikr-text);border:1px solid var(--ikr-line)}
+.focus-workspace-note-meta{display:flex;justify-content:flex-end;margin-top:6px;font-size:10px;color:var(--ikr-muted)}
+.focus-workspace-action-dialog .focus-workspace-action-status{min-height:19px;margin:14px 0 0;font-size:11px;overflow-wrap:anywhere}
+.focus-workspace-action-status[data-error=true]{color:var(--ikr-danger)}
+.focus-workspace-action-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:13px}
+.focus-workspace-action-footer button{min-width:83px;text-align:center;justify-content:center}

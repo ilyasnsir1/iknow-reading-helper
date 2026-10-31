@@ -1,0 +1,41 @@
+/* Actual media volume and recording UI in a disposable extension/profile. */
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const{chromium}=require(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));
+const out=path.join(__dirname,'study-volume-evidence');fs.mkdirSync(out,{recursive:true});
+function wav(){const rate=16000,count=rate*3,data=Buffer.alloc(44+count*2);data.write('RIFF');data.writeUInt32LE(data.length-8,4);data.write('WAVEfmt ',8);data.writeUInt32LE(16,16);data.writeUInt16LE(1,20);data.writeUInt16LE(1,22);data.writeUInt32LE(rate,24);data.writeUInt32LE(rate*2,28);data.writeUInt16LE(2,32);data.writeUInt16LE(16,34);data.write('data',36);data.writeUInt32LE(count*2,40);return data;}
+(async()=>{
+ const extension=require('./fixtures/isolate-extension.cjs')(process.env.IKR_WORKSPACE_TEST_EXTENSION||path.resolve(__dirname,'../extension'),out);
+ const context=await chromium.launchPersistentContext(path.join(out,'profile-'+Date.now()),{executablePath:'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe',headless:true,ignoreDefaultArgs:['--disable-extensions'],args:[`--load-extension=${extension}`,`--disable-extensions-except=${extension}`,'--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream','--mute-audio'],viewport:{width:1440,height:900},reducedMotion:'reduce'});
+ const errors=[];
+ try{
+  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),id=new URL(worker.url()).host;
+  await worker.evaluate(async()=>{const key='sentence:19053:seed';await chrome.storage.local.set({iknowReaderStudyLibrary:{schemaVersion:1,records:{[key]:{key,kind:'sentence',courseId:'19053',sourceId:'seed',courseTitle:'Course 1',japanese:'それはとてもいい話だ。',kana:'それ は とても いい はなし だ。',romaji:'sore wa tottemo ii hanashi da.',english:"That is a really nice story.",german:'Das ist eine schöne Geschichte.',audioUrl:'https://assets0.iknow.jp/assets/volume-fixture.mp3',createdAt:1,updatedAt:1}}}});});
+  await context.route('https://assets0.iknow.jp/assets/volume-fixture.mp3',route=>route.fulfill({contentType:'audio/wav',body:wav()}));
+  const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
+  await page.addInitScript(()=>{const Native=window.Audio;window.volumePlayers=[];window.Audio=function(...args){const player=new Native(...args);volumePlayers.push(player);return player;};});
+  await page.goto(`chrome-extension://${id}/study.html`);await page.locator('.focus-card').waitFor();
+  const open=()=>page.locator('[data-audio-volume-menu]').first().click();
+  async function set(kind,value){const input=page.locator(`[data-audio-volume="${kind}"]`);await input.fill(String(value));await input.dispatchEvent('input');await page.waitForFunction(({kind,value})=>IKnowReaderCore.audioVolume().get(kind)===value,{kind,value});}
+  await open();assert.deepEqual(await page.locator('.ikr-volume-menu [data-audio-volume]').evaluateAll(nodes=>nodes.map(node=>node.dataset.audioVolume)),['original','recording'],'Study only shows channels it plays');await set('original',35);await set('recording',60);await page.keyboard.press('Escape');
+  await page.locator('[data-action="play"]').click();await page.waitForFunction(()=>volumePlayers.some(player=>player.src.includes('volume-fixture')&&!player.paused));
+  assert.equal(await page.evaluate(()=>volumePlayers.find(player=>player.src.includes('volume-fixture')).volume),.35,'Main original uses its saved level');
+  await open();await set('original',20);assert.equal(await page.evaluate(()=>volumePlayers.find(player=>player.src.includes('volume-fixture')).volume),.2,'An active player changes immediately');await page.keyboard.press('Escape');
+  await page.locator('[data-action="compare"]').click();await page.locator('[data-compare-action="record"]').click();await page.locator('[data-compare-action="stop"]').waitFor();
+  await page.waitForTimeout(280);await page.locator('[data-compare-action="stop"]').click();await page.locator('[data-compare-action="take"]:not([disabled])').waitFor();await page.locator('[data-compare-action="take"]').click();
+  assert.equal(await page.evaluate(()=>volumePlayers.find(player=>player.src.startsWith('blob:')).volume),.6,'My take has an independent playback level');
+  const popup=await context.newPage();await popup.goto(`chrome-extension://${id}/popup.html`);await popup.locator('[data-audio-volume="original"]').waitFor();assert.equal(await popup.locator('[data-audio-volume]').count(),3,'The global popup retains all three channels');await popup.locator('[data-audio-volume="word"]').fill('75');await popup.locator('[data-audio-volume="word"]').dispatchEvent('input');await popup.locator('[data-audio-volume="original"]').fill('45');await popup.locator('[data-audio-volume="original"]').dispatchEvent('input');
+  await page.waitForFunction(()=>IKnowReaderCore.audioVolume().get('original')===45);
+  await page.bringToFront();await page.reload();await page.locator('.focus-card').waitFor();await open();assert.equal(await page.locator('[data-audio-volume="original"]').inputValue(),'45');assert.equal(await page.locator('[data-audio-volume="recording"]').inputValue(),'60');await page.keyboard.press('Escape');
+  for(const theme of ['paper','midnight','tokyo','forest']){
+   await worker.evaluate(theme=>chrome.storage.local.set({iknowReaderTheme:theme}),theme);await page.waitForFunction(theme=>document.querySelector('[data-focus-menu=theme]')?.dataset.value===theme,theme);await open();
+   const geometry=await page.locator('.ikr-volume-menu').evaluate(menu=>({x:menu.getBoundingClientRect().x,right:menu.getBoundingClientRect().right,bottom:menu.getBoundingClientRect().bottom,inputs:[...menu.querySelectorAll('input')].map(input=>({width:input.getBoundingClientRect().width,height:input.getBoundingClientRect().height}))}));assert.ok(geometry.x>=0&&geometry.right<=1440&&geometry.bottom<=900);assert.ok(geometry.inputs.every(input=>input.width>180&&input.height===16));await page.screenshot({path:path.join(out,'volume-'+theme+'.png')});await page.keyboard.press('Escape');
+   await popup.waitForFunction(theme=>document.documentElement.dataset.ikrTheme===theme,theme);
+   const popupGeometry=await popup.locator('.ikr-volume-inline').evaluate(node=>({right:node.getBoundingClientRect().right,width:innerWidth,heights:[...node.querySelectorAll('input')].map(input=>input.getBoundingClientRect().height)}));assert.ok(popupGeometry.right<=popupGeometry.width&&popupGeometry.heights.every(height=>height===16),'Popup sliders share the same themed geometry');
+  }
+  await page.setViewportSize({width:390,height:844});await open();const narrow=await page.locator('.ikr-volume-menu').boundingBox();assert.ok(narrow.x>=0&&narrow.x+narrow.width<=390&&narrow.y+narrow.height<=844,'Playback levels fit a narrow screen');await page.keyboard.press('Escape');await page.setViewportSize({width:1440,height:900});
+  await page.locator('[data-action="practise-item"]').click();await page.locator('[data-mode="listening"]').click();await page.locator('[data-action="start"]').click();await page.locator('[data-action="play-session"]').click();await page.waitForFunction(()=>volumePlayers.some(player=>player.src.includes('volume-fixture')&&!player.paused));
+  assert.equal(await page.evaluate(()=>volumePlayers.filter(player=>player.src.includes('volume-fixture')).at(-1).volume),.45,'Listening exercises share the original level');await open();assert.deepEqual(await page.locator('.ikr-volume-menu [data-audio-volume]').evaluateAll(nodes=>nodes.map(node=>node.dataset.audioVolume)),['original'],'Listening only shows the original channel');await set('original',0);assert.equal(await page.evaluate(()=>volumePlayers.filter(player=>player.src.includes('volume-fixture')).at(-1).volume),0,'Mute is supported during listening');
+  assert.deepEqual(errors,[]);console.log('PASS Actual Study originals, own recording and Listening have independent live/persistent volumes; popup sync, mute and four-theme sliders; no microphone-gain or audio-file changes');
+ }finally{await context.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

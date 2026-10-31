@@ -1,32 +1,44 @@
 <!doctype html>
-<html lang="en" class="ikr-theme-page" data-ikr-theme="paper"><head><link rel="stylesheet" href="theme.css"><script src="theme.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study · iKnow! Reading Helper</title><link rel="stylesheet" href="study.css"><script src="core.js" defer></script><script src="study-store.js" defer></script><script src="study-course-filter.js" defer></script><script src="study.js" defer></script><link rel="stylesheet" href="theme-pages.css"><link rel="stylesheet" href="study-layout.css"></head>
-<body data-ikr-page="study"><main>
-  <header class="page-header"><div class="brand"><img src="icons/icon128.png" alt="" width="46" height="46"><div><p class="eyebrow">iKnow! Reading Helper</p><h1>Your study space</h1></div></div><a id="course-link" href="https://iknow.jp/content/japanese" target="_blank" rel="noopener noreferrer">Open iKnow <span aria-hidden="true">↗</span></a></header>
-  <div class="workspace">
-    <aside class="library" aria-label="Saved study items"><div class="library-heading"><h2>Saved for later</h2><span id="library-count">0</span></div>
-      <label class="sr-only" for="search">Search your saved items</label><input id="search" type="search" placeholder="Find a word or sentence" maxlength="200" autocomplete="off">
-      <div class="filters"><label><span class="sr-only">Course</span><select id="course-filter"><option value="">All courses</option></select></label><label><span class="sr-only">Item type</span><select id="kind-filter"><option value="">All items</option><option value="word">Words</option><option value="sentence">Sentences</option></select></label></div>
-      <div id="library-items" class="library-items"></div><button id="show-more" class="quiet" type="button" hidden>Show more</button>
-    </aside>
-    <section class="practice" aria-label="Study and pronunciation practice">
-      <div id="empty" class="empty"><span aria-hidden="true" class="empty-mark">あ</span><h2>A little practice, at your pace.</h2><p>Save a word or sentence from an iKnow course to bring it here.</p><p id="empty-filter" hidden>No saved items match these filters.</p></div>
-      <article id="study-card" hidden>
-        <div class="item-top"><p id="item-source" class="eyebrow"></p><button id="remove-item" class="icon-button" type="button" aria-label="Remove this item from your saved library" title="Remove saved item"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"/></svg></button></div>
-        <p id="japanese" class="japanese" lang="ja"></p><p id="kana" class="kana" lang="ja"></p>
-        <div class="reading-header"><span>Reading</span><button id="reveal-all" class="text-button" type="button">Reveal all Romaji</button></div><div id="romaji" class="romaji" aria-label="Reveal individual Romaji words"></div>
-        <details class="translation" open><summary>Meaning</summary><p id="english" lang="en"></p><p id="german" lang="de"></p></details>
-        <div id="context-row" class="context-row" hidden><label><input id="use-context" type="checkbox"> Practice the original example sentence</label></div>
-        <section class="audio-section" aria-labelledby="shadow-title"><div class="section-heading"><div><h2 id="shadow-title">Listen. Pause. Say it.</h2><p>Practice with the complete original recording.</p></div><button id="play-original" type="button" class="secondary">Listen to original</button></div>
-          <div class="loop-controls"><label>Repeats<select id="repeat-count"><option value="2">2 times</option><option value="3" selected>3 times</option><option value="5">5 times</option><option value="10">10 times</option></select></label><label>Pause to speak<select id="pause-duration"><option value="1">1 second</option><option value="3" selected>3 seconds</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option></select></label><label>Original speed<select id="original-speed"><option value="0.75">0.75×</option><option value="0.85">0.85×</option><option value="1" selected>1×</option></select></label><button id="start-loop" type="button" class="primary">Start practice</button><button id="stop-loop" type="button" class="secondary" hidden>Stop</button></div>
-          <p id="audio-status" class="status" role="status"></p>
-        </section>
-        <section class="record-section" aria-labelledby="compare-title"><div class="section-heading"><div><h2 id="compare-title">Listen and compare</h2><p>Record yourself, then compare with the original.</p></div><span id="record-indicator" class="record-indicator" hidden>Recording</span></div>
-          <div class="record-controls"><button id="record" type="button" class="secondary">Record my voice</button><button id="play-take" type="button" class="secondary" disabled>Listen to my take</button><button id="discard-take" type="button" class="text-button" hidden>Discard</button></div>
-          <p id="record-status" class="status" role="status">Up to 20 seconds. Your recording stays on this page and is never uploaded.</p><p class="assessment-note">This is a listening comparison, not an automatic pronunciation score.</p>
-        </section>
-        <footer class="review-footer"><span id="review-position"></span><button id="next-item" type="button" class="secondary">Next saved item <span aria-hidden="true">→</span></button></footer>
-      </article>
-      <p id="page-status" class="page-status" role="status"></p>
-    </section>
-  </div>
-</main></body></html>
+<html lang="en" class="ikr-theme-page" data-ikr-theme="paper" data-study-runtime="extension">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Study · iKnow! Reading Helper</title>
+  <script src="study-workspace-boot.js"></script>
+  <link rel="stylesheet" href="study-workspace-boot.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="study-focus.css">
+  <link rel="stylesheet" href="study-focus-menus.css">
+  <link rel="stylesheet" href="study-focus-results.css">
+  <link rel="stylesheet" href="study-focus-kana.css">
+  <link rel="stylesheet" href="study-focus-backup.css">
+  <link rel="stylesheet" href="study-focus-danger.css">
+  <link rel="stylesheet" href="study-workspace-actions.css">
+  <link rel="stylesheet" href="audio-volume-controls.css">
+  <script src="core.js" defer></script>
+  <script src="audio-volume-controls.js" defer></script>
+  <script src="study-practice.js" defer></script>
+  <script src="study-store.js" defer></script>
+  <script src="study-learning.js" defer></script>
+  <script src="study-learning-store.js" defer></script>
+  <script src="course-packs.js" defer></script>
+  <script src="data.js" defer></script>
+  <script src="translation-corrections.js" defer></script>
+  <script src="study-catalog.js" defer></script>
+  <script src="study-workspace-data.js" defer></script>
+  <script src="study-workspace-actions.js" defer></script>
+  <script src="study-workspace-rounds.js" defer></script>
+  <script src="study-focus-course.js" defer></script>
+  <script src="study-focus-audio.js" defer></script>
+  <script src="study-focus-menus.js" defer></script>
+  <script src="study-focus-results.js" defer></script>
+  <script src="study-focus-kana.js" defer></script>
+  <script src="study-focus-backup.js" defer></script>
+  <script src="study-focus.js" defer></script>
+</head>
+<body>
+  <main id="demo" data-layout="c" data-focus-variant="docked" aria-label="Study space"></main>
+  <div id="announcement" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+/* Kana bulk actions change the same groups and characters shown by the chart. */
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const{chromium}=require(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));
+const source=path.resolve(__dirname,'../tools/preview'),extension=path.resolve(__dirname,'../extension');
+const KEY='iknowReaderStudyKanaPreferences:v1';
+const fixture=`<!doctype html><html lang="en" data-ikr-theme="paper"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="study-focus.css"><link rel="stylesheet" href="study-focus-kana.css"><link rel="stylesheet" href="study-focus-results.css"><script src="study-focus-results.js" defer></script><script src="study-focus-kana.js" defer></script><style>.app-frame{display:block!important}.focus-desk{height:100%}#demo{min-height:0}.app-header{min-height:45px}</style></head><body><main id="demo" data-layout="c"><header class="app-header"><h1>Kana</h1></header><div class="app-frame"><div class="focus-desk" id="fixture"></div></div></main><script>document.addEventListener('DOMContentLoaded',()=>{const host=document.getElementById('fixture');host.innerHTML=IKnowFocusKana.render();IKnowFocusKana.mount(host.firstElementChild);});</script></body></html>`;
+async function serve(page,theme){await page.route('http://kana-actions.invalid/**',route=>{const name=new URL(route.request().url()).pathname.slice(1);if(!name)return route.fulfill({contentType:'text/html',body:fixture.replace('data-ikr-theme="paper"',`data-ikr-theme="${theme}"`)});return route.fulfill({contentType:name.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(path.join(name==='theme.css'?extension:source,name),'utf8')});});}
+const action=(page,name)=>page.locator(`[data-kana-action="${name}"]`);
+async function state(page){return page.evaluate(key=>({enabled:[...document.querySelectorAll('[data-kana-include]:checked')].map(node=>node.dataset.kanaInclude),selected:[...document.querySelectorAll('.kana-cell[aria-pressed=true]')].map(node=>node.dataset.kanaSelect),stored:JSON.parse(localStorage.getItem(key))}),KEY);}
+async function assertActions(page,{groups,selection,disabled=false}){assert.equal(await action(page,'all-groups').textContent(),groups);assert.equal(await action(page,'select-all').textContent(),selection);assert.equal(await action(page,'select-all').isDisabled(),disabled);}
+async function reload(page){const before=await state(page);await page.reload();await page.locator('[data-kana-root]').waitFor();assert.deepEqual(await state(page),before,'Exact group and character choices survive refresh');}
+(async()=>{
+ const browser=await chromium.launch({executablePath:'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe',headless:true});const errors=[];
+ try{
+  for(const theme of ['paper','midnight','tokyo','forest']){
+   const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'}),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await serve(page,theme);await page.goto('http://kana-actions.invalid/');await page.locator('[data-kana-root]').waitFor();
+   assert.equal((await state(page)).selected.length,46);await assertActions(page,{groups:'All groups',selection:'Deselect all'});
+   await action(page,'select-all').click();assert.equal((await state(page)).selected.length,0);assert.deepEqual((await state(page)).enabled,['basic']);await assertActions(page,{groups:'All groups',selection:'Select all'});assert.equal(await action(page,'clear').isDisabled(),true);assert.equal(await action(page,'start').isDisabled(),true);
+   await action(page,'select-all').click();assert.equal((await state(page)).selected.length,46);await page.locator('[data-kana-select="basic:あ"]').click();assert.equal((await state(page)).selected.length,45);await assertActions(page,{groups:'All groups',selection:'Select all'});
+   // Including groups must retain a deliberately deselected character.
+   await action(page,'all-groups').click();let current=await state(page);assert.deepEqual(current.enabled,['basic','voiced','combinations']);assert.equal(current.selected.length,103);assert.equal(current.selected.includes('basic:あ'),false);await assertActions(page,{groups:'Deselect groups',selection:'Select all'});await reload(page);
+   await action(page,'select-all').click();assert.equal((await state(page)).selected.length,104);await assertActions(page,{groups:'Deselect groups',selection:'Deselect all'});
+   // Deselect all affects included groups only, leaving excluded edits available.
+   await page.locator('[data-kana-select="voiced:が"]').click();await page.locator('[data-kana-include="voiced"]').uncheck();await action(page,'select-all').click();current=await state(page);assert.equal(current.selected.length,0);assert.equal(current.stored.selected.voiced.length,24);assert.equal(current.stored.selected.voiced.includes('voiced:が'),false);await assertActions(page,{groups:'All groups',selection:'Select all'});await reload(page);
+   await action(page,'all-groups').click();assert.equal((await state(page)).selected.length,24);await assertActions(page,{groups:'Deselect groups',selection:'Select all'});await action(page,'all-groups').click();assert.deepEqual((await state(page)).enabled,[]);assert.equal((await state(page)).selected.length,0);await assertActions(page,{groups:'All groups',selection:'Select all',disabled:true});assert.equal(await action(page,'clear').isDisabled(),true);await reload(page);
+   // A disabled action cannot change either chart choices or persisted settings.
+   const before=await state(page);await action(page,'select-all').evaluate(button=>button.click());await action(page,'clear').evaluate(button=>button.click());assert.deepEqual(await state(page),before);
+   const appearance=()=>action(page,'select-all').evaluate(button=>{const css=getComputedStyle(button);return{background:css.backgroundColor,border:css.borderColor,shadow:css.boxShadow,transform:css.transform};});await page.mouse.move(0,0);const normal=await appearance();await action(page,'select-all').hover();await page.waitForTimeout(180);assert.deepEqual(await appearance(),normal,`${theme}: disabled selection action has no hover animation`);
+   // Individual cells still enable their group and Clear remains an explicit reset.
+   await page.locator('[data-kana-select="basic:い"]').click();assert.deepEqual((await state(page)).enabled,['basic']);assert.deepEqual((await state(page)).selected,['basic:い']);await assertActions(page,{groups:'All groups',selection:'Select all'});assert.equal(await action(page,'clear').isDisabled(),false);await action(page,'clear').click();current=await state(page);assert.equal(current.selected.length,0);assert.equal(Object.values(current.stored.selected).flat().length,0);await reload(page);
+   await context.close();
+  }
+  assert.deepEqual(errors,[]);console.log('PASS Kana bulk actions: true group/character toggles, retained subsets, disabled no-op/hover states, Clear and refresh persistence in all four themes');
+ }finally{await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

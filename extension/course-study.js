@@ -50,6 +50,19 @@
     return { kind, courseId: String(courseId), courseTitle: clean(title), sourceId: String(cue.id), japanese: clean(cue.text), jpan: clean(cue.transliterations?.Jpan), kana: clean(cue.transliterations?.Hrkt), romaji: clean(cue.transliterations?.Latn) };
   }
   function sound(value) { try { return globalThis.IKnowReaderStudyStore.audioUrl(new URL(value, location.href).href); } catch { return ""; } }
+  function example(source) {
+    const Core = globalThis.IKnowReaderCore, fields = [source.cue?.text, source.response?.text, source.cue?.transliterations?.Hrkt, source.cue?.transliterations?.Latn].map(clean);
+    const matched = Core.alignmentFor(globalThis.IKnowReaderData, String(source.cue?.id), Core.signature(fields));
+    return { japanese: fields[0], jpan: clean(source.cue?.transliterations?.Jpan), kana: fields[2], romaji: fields[3],
+      english: globalThis.IKnowReaderTranslationCorrections?.get(source)?.text || fields[1], german: matched?.german?.text || "", audioUrl: sound(source.sound) };
+  }
+  function linkedExample(entry, japanese) {
+    const candidates = (entry.sentences || []).slice(0, 100).filter(source => source?.cue?.text).map(example);
+    // Prefer a complete source token. An inflected or unrelated example remains
+    // useful for listening, but the cloze engine will not quiz another word.
+    return candidates.find(value => value.jpan && value.jpan.replace(/\s/gu, "") === value.japanese.replace(/\s/gu, "") &&
+      value.jpan.trim().split(/\s+/u).some(token => token.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "") === japanese)) || candidates[0];
+  }
   function sentence(state, courseId, courseTitle) {
     if (!courseId || state.studyTools?.isConnected) return;
     const source = state.sentence, record = { ...base("sentence", source.cue, courseId, courseTitle), english: state.correction?.text || clean(source.response?.text), german: state.record?.german?.text || "", audioUrl: sound(source.sound) };
@@ -60,6 +73,7 @@
   function word(state, entry, courseId, courseTitle) {
     if (!courseId || state.studyTools?.isConnected) return;
     const source = entry.item, record = { ...base("word", { ...source.cue, id: source.cue.id || source.id }, courseId, courseTitle), english: clean(source.response?.text), german: state.germanLine?.textContent || "", audioUrl: sound(entry.sound) };
+    const context = linkedExample(entry, record.japanese); if (context) record.context = context;
     const node = tools(() => ({...record, german: state.germanLine?.textContent || ""})); if (!node) return; (state.germanLine || state.response).after(node); state.studyTools = node;
   }
   globalThis.IKnowReaderCourseStudy = Object.freeze({ sentence, word });

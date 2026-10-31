@@ -15,6 +15,8 @@
   let frame = null;
   let lastSend = 0;
   let clipPlayer = null;
+  let volumeEnabled=false,originalVolume=1,wordVolume=1,lastNative=null;
+  const nativeVolumes=new WeakMap();
   let clip = null;
   let nativeStartedAt = 0;
   let preparedRequestId = null;
@@ -72,6 +74,7 @@
     clipPlayer.addEventListener("ended", () => { if (clip === current) finishClip("ended"); }, options);
     clipPlayer.addEventListener("error", () => { if (clip === current) finishClip("error", "voice"); }, options);
     current.timer = setTimeout(() => { if (clip === current) finishClip("error", "load"); }, 10000);
+    clipPlayer.volume=wordVolume;
     clipPlayer.preload = "auto";
     // The local voice produces the selected tempo itself; no time stretching.
     clipPlayer.defaultPlaybackRate = 1; clipPlayer.playbackRate = 1; clipPlayer.preservesPitch = true;
@@ -136,6 +139,7 @@
     clipPlayer.addEventListener("ended", () => { if (clipPlayer.ended) finishClip("ended"); }, options);
     clipPlayer.addEventListener("error", () => { if (clipPlayer.error) finishClip("error", "load"); }, options);
     current.timer = setTimeout(() => { if (clip === current) finishClip("error", "load"); }, 15000);
+    clipPlayer.volume=wordVolume;
     clipPlayer.preload = "auto"; clipPlayer.defaultPlaybackRate = speed; clipPlayer.playbackRate = speed;
     clipPlayer.preservesPitch = true;
     clipPlayer.src = blobUrl || url.href; clipPlayer.load();
@@ -193,6 +197,10 @@
       // No promise, network request, model or timing preparation precedes play.
       try {
         if (this instanceof HTMLAudioElement) {
+          if(this!==clipPlayer&&allowedPath(this)){
+            if(volumeEnabled){if(!nativeVolumes.has(this))nativeVolumes.set(this,this.volume);this.volume=originalVolume;lastNative=this;}
+            else if(nativeVolumes.has(this)){this.volume=nativeVolumes.get(this);nativeVolumes.delete(this);}
+          }
           if (this !== clipPlayer) { nativeStartedAt = performance.now(); preparedRequestId = null; finishClip(); }
           if (enabled || wordEnabled) watch(this);
         }
@@ -215,6 +223,12 @@
     if (event.data?.type !== "IKR_NATIVE_AUDIO_CONFIG_V1") return;
     enabled = event.data.enabled === true;
     wordEnabled = event.data.wordEnabled === true;
+    volumeEnabled=event.data.volumeEnabled===true;
+    const level=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1?value:1;
+    originalVolume=level(event.data.originalVolume);wordVolume=level(event.data.wordVolume);
+    if(volumeEnabled&&lastNative)lastNative.volume=originalVolume;
+    else if(lastNative&&nativeVolumes.has(lastNative)){lastNative.volume=nativeVolumes.get(lastNative);nativeVolumes.delete(lastNative);}
+    if(clipPlayer)clipPlayer.volume=wordVolume;
     if (!wordEnabled) { preparedRequestId = null; finishClip(); }
     if (!enabled && !wordEnabled) cancelTick();
     else if (active && !active.paused && !active.ended) { emit(active, "playing"); startTick(); }

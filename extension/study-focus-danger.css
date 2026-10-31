@@ -1,0 +1,4 @@
+/* Clear and Delete stay recognizable without changing the shared controls. */
+button:is([data-kana-action=clear],[data-action=clear-selection],[data-action=delete],[data-action=delete-all],.danger){color:var(--ikr-danger);border-color:color-mix(in srgb,var(--ikr-danger) 35%,var(--ikr-line));background:transparent;border-radius:4px;text-decoration:none}
+button:is([data-kana-action=clear],[data-action=clear-selection],[data-action=delete],[data-action=delete-all],.danger):not(:disabled):hover{color:var(--ikr-danger);border-color:color-mix(in srgb,var(--ikr-danger) 65%,var(--ikr-line));background:color-mix(in srgb,var(--ikr-danger) 8%,transparent);text-decoration:none}
+button:is([data-kana-action=clear],[data-action=clear-selection],[data-action=delete],[data-action=delete-all],.danger):disabled{color:var(--ikr-danger);border-color:color-mix(in srgb,var(--ikr-danger) 35%,var(--ikr-line));background:transparent;transition:none;animation:none}

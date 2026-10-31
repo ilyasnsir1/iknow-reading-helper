@@ -1,6 +1,8 @@
-# iKnow! Reading Helper · 1.40.5
+# iKnow! Reading Helper · 1.41.0
 
 Unpacked Windows11 / Brave release. One Setup.cmd menu installs all components or just the Mao Plain / Nise voices, and handles repairs. Successful setup ends with the ilyasnsir1 creator banner.
+
+Version 1.41.0 brings the new [Study workspace](STUDY.md): saved entries and notes, Review, Fill the gap, Listening, full-course tests, Hiragana and Katakana practice, backups and playback volume controls. Theme menus share the same style across Reading Helper. Existing settings, models and prepared courses are retained. Helper 1.22.0 is unchanged; no model download or new browser permission is required.
 
 Version 1.40.5 adds a Romaji style choice: keep iKnow's source spelling or show confirmed particles as wa/e/o. The preference applies to courses and Study. The popup's Updates section now links to the [Changelog](CHANGELOG.md), starting at 1.40.4, with short notes and screenshots. Only the locally authorized maintainer can edit private drafts; changes reach readers through signed updates. The extra focus outline around Updates has been removed. Helper 1.22.0 is included; no model download or new browser permission is required.
 

@@ -18,6 +18,22 @@ checks; stale saves must reload the draft. Uploaded images are limited to PNG,
 JPEG and WebP, 600 KB each. Removing a published image affects its draft
 reference only; installed package images are never deleted by the editor.
 
+Write public notes against the latest published version. Do not describe
+internal fixes to unreleased features as separate public improvements. Keep
+the notes short and add only screenshots that help explain the new behavior.
+
+For the user review, show the intended publication layout rather than draft
+labels. From this checkout run, for example:
+
+```powershell
+python tools/changelog/configure-authoring.py preview --output ../study-preview/extension --display-version 1.41.0 --display-date 2026-10-31
+```
+
+This read-only local view uses the actual Changelog renderer and intended
+screenshots. It does not finalize the private draft, change the installed
+version, export to source, sign or publish anything. Use the release's intended
+version and date when refreshing that view; the example is not a publication.
+
 When explicitly approved for publication, finalize the private draft's release
 version, date and status, then run
 `python tools/changelog/configure-authoring.py export` from the canonical source

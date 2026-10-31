@@ -8,7 +8,7 @@ const out=path.join(__dirname,"native-audio-evidence");fs.mkdirSync(out,{recursi
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const until=async(fn,label)=>{const at=Date.now();while(!await fn()){if(Date.now()-at>15000)throw Error("Timed out: "+label);await delay(30);}};
 const instrument=`(()=>{const play=HTMLMediaElement.prototype.play,pause=HTMLMediaElement.prototype.pause;window.fixtureCalls=[];window.fixtureStates=[];window.fixtureHandling=false;
- HTMLMediaElement.prototype.play=function(...args){fixtureCalls.push({op:'play',native:!!this.fixtureNative,time:performance.now(),inside:fixtureHandling});return Reflect.apply(play,this,args)};
+ HTMLMediaElement.prototype.play=function(...args){fixtureCalls.push({op:'play',native:!!this.fixtureNative,volume:this.volume,time:performance.now(),inside:fixtureHandling});return Reflect.apply(play,this,args)};
  HTMLMediaElement.prototype.pause=function(...args){fixtureCalls.push({op:'pause',native:!!this.fixtureNative,time:performance.now(),inside:fixtureHandling});return Reflect.apply(pause,this,args)};
  window.addEventListener('message',event=>{if(event.source===window&&event.data?.type==='IKR_NATIVE_AUDIO_STATE_V1')fixtureStates.push(event.data)});})();`;
 const nativeScript=`window.fixturePlayer=new Audio();fixturePlayer.fixtureNative=true;window.fixtureClicks=[];window.fixtureFailures=[];
@@ -41,13 +41,13 @@ const goal={id:19053,title:'Native audio fixture',cue_language:'ja',items_count:
  const page=await context.newPage();
  const timings=[];
  try{
-  await worker.evaluate(()=>chrome.storage.local.set({iknowReaderSettings:{enabled:true,wordAudio:true,wordAudioPolicy:5,audioFollow:true,pronunciation:true,colorMode:'off'}}));
+  await worker.evaluate(()=>chrome.storage.local.set({iknowReaderVolumeOriginal:40,iknowReaderVolumeWord:65,iknowReaderSettings:{enabled:true,wordAudio:true,wordAudioPolicy:5,audioFollow:true,pronunciation:true,colorMode:'off'}}));
   await page.goto('https://iknow.jp/courses/19053');await until(async()=>await page.locator('.ikr-sentence-line').count()===200,'all rows enhanced');
   const configure=async(follow,words)=>{await worker.evaluate(async({follow,words})=>{const key='iknowReaderSettings',stored=await chrome.storage.local.get(key);await chrome.storage.local.set({[key]:{...stored[key],audioFollow:follow,wordAudio:words}})},{follow,words});await until(()=>page.locator('[data-setting="audioFollow"]').isChecked().then(value=>value===follow),'follow setting');await delay(100);};
   for(const [follow,words] of [[false,false],[false,true],[true,true]]){
    await configure(follow,words);
    const result=await page.evaluate(async()=>{fixtureCalls=[];fixtureClicks=[];fixtureStates=[];const button=document.querySelector('.sentence-audio-container');for(let i=0;i<24;i++){button.click();await new Promise(resolve=>setTimeout(resolve,10));}await new Promise(resolve=>setTimeout(resolve,140));return{clicks:fixtureClicks,calls:fixtureCalls,paused:fixturePlayer.paused,states:fixtureStates,failures:fixtureFailures,speaking:document.querySelectorAll('.ikr-speaking').length}});
-   const calls=result.calls.filter(value=>value.native&&value.op==='play');assert.equal(calls.length,24);assert.equal(result.paused,false);assert.deepEqual(result.failures,[]);
+   const calls=result.calls.filter(value=>value.native&&value.op==='play');assert.equal(calls.length,24);assert.ok(calls.every(call=>call.volume===.4),'Native speaker uses original volume even with Follow off');assert.equal(result.paused,false);assert.deepEqual(result.failures,[]);
    assert.equal(result.calls.filter(value=>value.native&&value.op==='pause'&&!value.inside).length,0,'extension must not pause native playback');
    const max=Math.max(...calls.map((value,i)=>value.time-result.clicks[i]));assert.ok(max<25,'native play must remain synchronous, not wait for model/timings');
    if(!follow)assert.equal(result.states.filter(value=>value.kind==='time'&&!value.clip).length,0,'no continuous native clock traffic with Follow off');
@@ -76,6 +76,12 @@ const goal={id:19053,title:'Native audio fixture',cue_language:'ja',items_count:
   await page.evaluate(()=>{const button=document.querySelector('.sentence-audio-container');button.addEventListener('keydown',event=>{if(event.key==='Enter')button.click()});button.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))});await delay(100);
   assert.equal(await page.evaluate(()=>fixtureClicks.length),before+2,'keyboard native handler is not swallowed either');
   assert.equal(await page.locator('.ikr-sentence-line').first().innerText(),'sore ha totemo ii hanashi da.','course uses source spelling despite legacy pronunciation=true');
+  await worker.evaluate(()=>chrome.storage.local.set({iknowReaderVolumeOriginal:25}));
+  await until(()=>page.evaluate(()=>fixturePlayer.volume===.25),'live native original volume');
+  assert.equal(await page.evaluate(()=>fixturePlayer.paused),false,'Changing volume never pauses or reloads the original');
+  await page.evaluate(()=>{const intentTime=performance.now();window.postMessage({type:'IKR_WORD_AUDIO_PREPARE_V1',requestId:'volume-word',intentTime},location.origin);window.postMessage({type:'IKR_WORD_AUDIO_PLAY_V1',requestId:'volume-word',intentTime,src:'https://assets0.iknow.jp/assets/native-fixture.mp3',start:0,end:null,duration:0,speed:1},location.origin);});
+  await until(()=>page.evaluate(()=>fixtureCalls.some(call=>!call.native&&call.op==='play'&&call.volume===.65)),'independent word voice playback volume');
+  console.log('PASS Native original volume updates live without interruption; word playback keeps an independent level');
   assert.deepEqual(errors,[]);assert.deepEqual(extra,[]);
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,scope:'Real platform Audio and production extension in isolated Brave; public-site handler shape, data/audio fixtures',timings,pageErrors:errors},null,2));
   console.log('PASS Native controls keep priority even inside decorated word layouts; course Romaji preserves source ha spelling');

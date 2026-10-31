@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-ikr-theme="paper">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Study · iKnow! Reading Helper</title>
+  <script data-theme-boot>
+    (()=>{try{const theme=localStorage.getItem("ikr-layout-review:theme");if(["paper","midnight","tokyo","forest"].includes(theme))document.documentElement.dataset.ikrTheme=theme;}catch{}})();
+  </script>
+  <style data-theme-boot-colors>
+    :root{--ikr-bg:#faf8f4;--ikr-text:#2b2634;--ikr-scheme:light}
+    :root[data-ikr-theme=midnight]{--ikr-bg:#12151c;--ikr-text:#edf0f6;--ikr-scheme:dark}
+    :root[data-ikr-theme=tokyo]{--ikr-bg:#15111f;--ikr-text:#f4eeff;--ikr-scheme:dark}
+    :root[data-ikr-theme=forest]{--ikr-bg:#111b18;--ikr-text:#edf5ec;--ikr-scheme:dark}
+    html{background:var(--ikr-bg);color:var(--ikr-text);color-scheme:var(--ikr-scheme)}
+    body{background:var(--ikr-bg)}
+  </style>
+  <link rel="stylesheet" href="/extension/theme.css">
+  <link rel="stylesheet" href="study-focus.css">
+  <link rel="stylesheet" href="study-focus-menus.css">
+  <link rel="stylesheet" href="study-focus-results.css">
+  <link rel="stylesheet" href="study-focus-kana.css">
+  <link rel="stylesheet" href="study-focus-backup.css">
+  <link rel="stylesheet" href="study-focus-danger.css">
+  <link rel="stylesheet" href="/extension/audio-volume-controls.css">
+  <script src="/extension/core.js" defer></script>
+  <script src="/extension/audio-volume-controls.js" defer></script>
+  <script src="/extension/study-practice.js" defer></script>
+  <script src="/extension/study-store.js" defer></script>
+  <script src="/extension/study-learning.js" defer></script>
+  <script src="/extension/study-learning-store.js" defer></script>
+  <script src="/extension/course-packs.js" defer></script>
+  <script src="/extension/data.js" defer></script>
+  <script src="/extension/translation-corrections.js" defer></script>
+  <script src="/extension/study-catalog.js" defer></script>
+  <script src="study-focus-course.js" defer></script>
+  <script src="study-focus-audio.js" defer></script>
+  <script src="study-focus-menus.js" defer></script>
+  <script src="study-focus-results.js" defer></script>
+  <script src="study-focus-kana.js" defer></script>
+  <script src="study-focus-backup.js" defer></script>
+  <script src="study-focus.js" defer></script>
+</head>
+<body>
+  <main id="demo" data-layout="c" data-focus-variant="docked" aria-label="Study space"></main>
+  <div id="announcement" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

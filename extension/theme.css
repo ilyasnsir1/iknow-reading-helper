@@ -46,17 +46,28 @@ html.ikr-theme-page:not([data-ikr-theme=paper]){background:var(--ikr-bg);color:v
 html.ikr-theme-page.ikr-theme-pending{visibility:hidden}
 html[data-ikr-theme] .ikr-theme-picker{position:relative;display:inline-flex;align-items:center;font:12px/1.4 "Segoe UI",system-ui,sans-serif;color:var(--ikr-text);color-scheme:var(--ikr-scheme);flex:0 0 auto}
 html[data-ikr-theme] .ikr-theme-picker button{box-sizing:border-box;appearance:none;font:inherit;cursor:pointer;transition:background-color .14s,border-color .14s;color:var(--ikr-text)}
-html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger{display:inline-flex;gap:8px;align-items:center;justify-content:center;border:1px solid var(--ikr-line);background:var(--ikr-surface);border-radius:8px;min-height:32px;padding:6px 10px;white-space:nowrap}
-html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger:not(:disabled):hover{background:var(--ikr-surface-hover);border-color:var(--ikr-line-strong)}
-html[data-ikr-theme] .ikr-theme-picker button:focus,html[data-ikr-theme] .ikr-theme-picker button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--ikr-focus);border-color:var(--ikr-focus)}
-html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.6;fill:none;flex:none}
-html[data-ikr-theme] .ikr-theme-picker .ikr-theme-options{position:absolute;right:0;top:calc(100% + 7px);box-sizing:border-box;z-index:2147483000;padding:6px;display:grid;gap:3px;width:184px;border:1px solid var(--ikr-line);border-radius:11px;background:var(--ikr-elevated);box-shadow:var(--ikr-shadow)}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger{display:flex;gap:6px;align-items:center;justify-content:flex-start;width:136px;height:34px;min-height:34px;border:1px solid var(--ikr-line);background:transparent;border-radius:4px;padding:7px 9px;font-size:12px;line-height:18px;font-weight:400;white-space:nowrap;box-shadow:none}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger:not(:disabled):hover{background:transparent;border-color:var(--ikr-line-strong)}
+html[data-ikr-theme] .ikr-theme-picker button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--ikr-focus);border-color:var(--ikr-focus)}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:none;color:var(--ikr-muted)}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-trigger .ikr-theme-chevron{width:12px;height:12px;stroke-width:1.6}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-options{position:absolute;right:0;top:calc(100% + 6px);box-sizing:border-box;z-index:2147483000;padding:4px;display:grid;gap:0;width:184px;max-width:calc(100vw - 24px);border:1px solid var(--ikr-line-strong);border-radius:5px;background:var(--ikr-elevated);box-shadow:var(--ikr-shadow)}
 html[data-ikr-theme] .ikr-theme-picker .ikr-theme-options[hidden]{display:none!important}
 html[data-ikr-theme] .ikr-theme-picker .ikr-theme-options[popover]{position:fixed;inset:auto;margin:0}
-html[data-ikr-theme] .ikr-theme-picker .ikr-theme-option{border:1px solid transparent;border-radius:6px;padding:9px 10px;display:flex;gap:10px;align-items:center;text-align:left;background:transparent}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-option{width:100%;min-height:34px;border:1px solid transparent;border-radius:3px;padding:7px 9px;display:flex;gap:8px;align-items:center;text-align:left;background:transparent;font-size:12px;font-weight:400;line-height:18px;white-space:nowrap;box-shadow:none}
 html[data-ikr-theme] .ikr-theme-picker .ikr-theme-option:hover{background:var(--ikr-surface-hover)}
 html[data-ikr-theme] .ikr-theme-picker .ikr-theme-option[aria-pressed=true]{background:var(--ikr-accent-soft);color:var(--ikr-text)}
-.ikr-theme-option[aria-pressed=true]::after{content:"";margin-left:auto;width:5px;height:5px;border-radius:50%;background:var(--ikr-accent)}
+/* A theme choice keeps its menu role on every app page. Generic dark control
+   paints must not turn each option into a separate outlined button. */
+html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button.ikr-theme-option{background:transparent;border-color:transparent;box-shadow:none;color:var(--ikr-text)}
+html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button.ikr-theme-trigger,html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button.ikr-theme-trigger:not(:disabled):hover{background:transparent}
+html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button.ikr-theme-option[aria-pressed=true]{background:var(--ikr-accent-soft);border-color:transparent}
+html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button.ikr-theme-option:not(:disabled):hover{background:var(--ikr-surface-hover);border-color:transparent}
+html.ikr-theme-page[data-ikr-theme] body[data-ikr-page] .ikr-theme-picker button:focus-visible{outline:none;box-shadow:inset 0 0 0 1px var(--ikr-focus);border-color:var(--ikr-focus)}
+html[data-ikr-theme] .ikr-theme-picker button:focus:not(:focus-visible){outline:none;box-shadow:none}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-check{display:block;width:13px;height:13px;flex:0 0 13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+html[data-ikr-theme] .ikr-theme-picker .ikr-theme-option[aria-pressed=true] .ikr-theme-check{opacity:1}
 .ikr-theme-swatch{display:inline-block;width:16px;height:16px;border-radius:50%;border:1px solid #ffffff38;box-shadow:inset 0 0 0 1px #00000012;flex:none}
 .ikr-theme-swatch[data-swatch=paper]{background:linear-gradient(135deg,#fffaf4 50%,#cf8b59 50%)}
 .ikr-theme-swatch[data-swatch=midnight]{background:linear-gradient(135deg,#1b1f29 50%,#8c9ed5 50%)}
@@ -69,5 +80,5 @@ html[data-ikr-theme] .ikr-theme-option svg.ikr-theme-swatch{display:block;flex:0
 .ikr-page-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:18px;flex-wrap:wrap}
 body[data-ikr-page]:not([data-ikr-page=popup]) main>header{flex-wrap:wrap;row-gap:15px}
 body[data-ikr-page]:not([data-ikr-page=popup]) .ikr-page-actions>a{margin:0;white-space:nowrap}
-@media(max-width:650px){.ikr-page-actions{gap:12px}.ikr-theme-trigger{font-size:11px!important}}
+@media(max-width:650px){.ikr-page-actions{gap:12px}}
 @media(prefers-reduced-motion:reduce){html[data-ikr-theme] .ikr-theme-picker button{transition:none}}

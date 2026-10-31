@@ -304,7 +304,7 @@
         if (audioError === message) return;
         audioError = message;
         updateStatus();
-      }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice });
+      }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice, volumeEnabled: settings.enabled });
     if (interactionChanged || romajiChanged) AudioFollow?.refresh({ wordsOnly: true });
     if (settings.enabled && !previous.enabled) schedule();
     if (enabledChanged) updateAutomation();

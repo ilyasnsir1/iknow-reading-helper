@@ -10,11 +10,13 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
 (async () => {
   const bundled = JSON.parse(fs.readFileSync(path.join(source, "changelog.json"), "utf8"));
   assert.equal(bundled.schemaVersion, 1);
-  assert.equal(bundled.entries.length, 2, "history starts with the requested button fix and Romaji choice");
+  assert.equal(bundled.entries.length, 3, "history retains the button fix, Romaji choice and new Study release");
   assert.equal(bundled.entries[0].status, "released");
   assert.equal(bundled.entries[0].version, JSON.parse(fs.readFileSync(path.join(source, "manifest.json"), "utf8")).version, "the finalized newest notes match the release");
-  assert.equal(bundled.entries[1].version, "1.40.4");
+  assert.equal(bundled.entries[1].version, "1.40.5");
   assert.equal(bundled.entries[1].status, "released");
+  assert.equal(bundled.entries[2].version, "1.40.4");
+  assert.equal(bundled.entries[0].changes[0].title, "Study workspace");
   const extension = require("./fixtures/isolate-extension.cjs")(source, out);
   fs.mkdirSync(path.join(extension, "changelog-media"), { recursive: true });
   fs.copyFileSync(path.join(extension, "icons/icon128.png"), path.join(extension, "changelog-media/test-fixture.png"));
@@ -71,9 +73,15 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
         const paint = await page.locator("#changelog-entries").evaluate(node => ({ color: getComputedStyle(node).color, background: getComputedStyle(document.body).backgroundColor }));
         assert.notEqual(paint.color, paint.background, `${width}/${theme} text remains distinguishable`);
         const contrast = await page.locator(".ikr-theme-trigger").evaluate(node => {
-          const channels = value => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+          const rgba = value => { const values = (value.match(/[\d.]+/g) || []).map(Number); return [values[0], values[1], values[2], values[3] ?? 1]; };
+          const over = (foreground, background) => foreground.slice(0, 3).map((value, index) => value * foreground[3] + background[index] * (1 - foreground[3]));
           const luminance = values => values.map(value => { const s = value / 255; return s <= .04045 ? s / 12.92 : ((s + .055) / 1.055) ** 2.4; }).reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
-          const css = getComputedStyle(node), a = luminance(channels(css.color)), b = luminance(channels(css.backgroundColor));
+          // Transparent button surfaces show their ancestors, not RGB black.
+          // Composite the actual flat paint behind this header control first.
+          const ancestors = [];for (let element = node; element; element = element.parentElement) ancestors.unshift(element);
+          let background = [255, 255, 255];
+          for (const element of ancestors) { const css = getComputedStyle(element); if (css.backgroundImage !== 'none') throw Error('Resolve the header background image before measuring contrast.'); background = over(rgba(css.backgroundColor), background); }
+          const a = luminance(over(rgba(getComputedStyle(node).color), background)), b = luminance(background);
           return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
         });
         assert.ok(contrast >= 4.5, `${width}/${theme} theme control text contrast is ${contrast.toFixed(2)}`);

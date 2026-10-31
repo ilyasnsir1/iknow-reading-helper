@@ -1,0 +1,36 @@
+"use strict";
+const assert=require("node:assert/strict"),Catalog=require("../extension/study-catalog.js"),Core=require("../extension/core.js"),Practice=require("../extension/study-practice.js");
+const cue=(id,text,Jpan,Hrkt,Latn)=>({id,text,transliterations:{Jpan,Hrkt,Latn}});
+const sentence=(id,text,jpan,kana,romaji,en)=>({cue:cue(id,text,jpan,kana,romaji),response:{text:en},sound:"https://assets0.iknow.jp/assets/recording.mp3"});
+const source={id:19053,title:"Course &amp; Study",cue_language:"ja",goal_items:[{item:{id:1,cue:cue(101,"読む","読む","よむ","yomu"),response:{text:"read"}},sound:"https://assets0.iknow.jp/assets/word.mp3",sentences:[sentence(10,"本を読みます。","本 を 読みます 。","ほん を よみます。","hon wo yomimasu.","I read a book."),sentence(11,"本を読む。","本 を 読む 。","ほん を よむ。","hon wo yomu.","Read a book.")]}]};
+const clone=structuredClone;
+(async()=>{
+ const initial=Catalog.normalizeSource(source,{now:100});assert.equal(initial.title,"Course & Study");assert.equal(initial.records.length,3);assert.equal(initial.records[0].key,"word:19053:101");assert.equal(initial.records[0].context.japanese,"本を読む。");assert.equal(Practice.buildCloze(initial.records[0]).answerJapanese,"読む");
+ const noExact=clone(source);noExact.goal_items[0].sentences.pop();assert.equal(Practice.buildCloze(Catalog.normalizeSource(noExact).records[0]),null,"Inflected context is listening-only");
+ const expected=Core.expectedSource(source),pack={format:"iknow-reader-course",schemaVersion:1,course:{id:19053,title:"Test",wordCount:1,sentenceCount:2},alignments:{11:{signature:expected.sentences[11].signature,groups:[],german:{text:"Lies ein Buch.",groups:[]}}},audio:{},germanItems:{1:{signature:expected.items[1],text:"lesen"}}};
+ const translated=Catalog.normalizeSource(source,{packs:{19053:pack}});assert.equal(translated.records[0].german,"lesen");assert.equal(translated.records[0].context.german,"Lies ein Buch.");
+ const changed=clone(pack);changed.alignments[11].signature="00000000";changed.germanItems[1].signature="00000000";const guarded=Catalog.normalizeSource(source,{packs:{19053:changed}});assert.equal(guarded.records[0].german,"");assert.equal(guarded.records[0].context.german,"");
+ for(const input of ["https://evil.test/courses/19053","https://iknow.jp.evil/courses/19053","javascript:alert(1)","../19053",0])assert.throws(()=>Catalog.courseId(input));
+ assert.equal(Catalog.courseId("https://iknow.jp/courses/19053?view=study"),"19053");
+ let data={iknowReaderCoursePacks:{19053:pack},iknowReaderAvailabilitySources:{entries:{19055:{source:{title:"Another course"}}}}},clock=100,calls=0,offline=false;
+ const storage={get:async names=>Object.fromEntries((Array.isArray(names)?names:[names]).map(name=>[name,clone(data[name])])),set:async patch=>{data={...data,...clone(patch)};}};
+ const backend=Catalog.createBackend(storage,{now:()=>clock,fetchImpl:async url=>{calls++;if(offline)throw Error("offline");const id=Number(url.match(/\d+$/)[0]);return new Response(JSON.stringify({...source,id}),{headers:{"content-type":"application/json"}});}});
+ assert.equal((await backend.list()).find(course=>course.courseId==="19055").title,"Another course");
+ const [a,b]=await Promise.all([backend.load(19053),backend.load("19053")]);assert.deepEqual(a,b);assert.equal(calls,1);assert.equal(a.stale,false);
+ await backend.load(19053);assert.equal(calls,1,"Fresh metadata loads without refetching or native preparation");
+ clock+=Catalog.TTL+1;offline=true;const stale=await backend.load(19053);assert.equal(stale.stale,true);assert.equal(stale.fetchedAt,100);assert.equal(calls,2);
+ await assert.rejects(backend.load(19099),/offline/);
+ offline=false;for(let index=0;index<32;index++){clock++;await backend.load(19100+index);}assert.equal(Object.keys(data[Catalog.KEY].entries).length,Catalog.MAX_COURSES);assert.ok(Buffer.byteLength(JSON.stringify(data[Catalog.KEY]))<Catalog.MAX_BYTES);
+ const wrong=Catalog.createBackend(storage,{fetchImpl:async()=>new Response(JSON.stringify({...source,id:1}))});await assert.rejects(wrong.load(19999),/supported Japanese/);
+ const oversized=Catalog.createBackend(storage,{fetchImpl:async()=>new Response("{}",{headers:{"content-length":String(20*1024*1024)}})});await assert.rejects(oversized.load(19999),/too large/);
+ const vm=require("node:vm"),fs=require("node:fs"),path=require("node:path"),Study=require("../extension/study-store.js");let saved;
+ class Element{constructor(){this.children=[];this.listeners={};this.classList={toggle(){}};this.isConnected=true;}setAttribute(){}append(...children){this.children.push(...children);}after(node){this.afterNode=node;}addEventListener(type,fn){this.listeners[type]=fn;}}
+ const response=new Element(),sandbox={IKnowReaderCore:Core,IKnowReaderData:{},IKnowReaderStudyStore:{makeKey:record=>Study.makeKey(JSON.parse(JSON.stringify(record))),audioUrl:Study.audioUrl,list:async()=>[],save:async record=>{saved=record;}},document:{createElement:()=>new Element()},chrome:{storage:{onChanged:{addListener(){}}}},URL,location:{href:"https://iknow.jp/courses/19053"}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../extension/course-study.js"),"utf8"),sandbox);sandbox.IKnowReaderCourseStudy.word({response},source.goal_items[0],19053,"Test");
+ await response.afterNode.children[0].listeners.click({stopPropagation(){}});assert.equal(saved.context.japanese,"本を読む。","New course bookmarks include a complete matching example");assert.equal(Practice.buildCloze(saved).answerJapanese,"読む");
+ let listener;global.chrome={runtime:{id:"catalog-fixture",getURL:path=>`chrome-extension://catalog-fixture/${path}`,onMessage:{addListener:fn=>listener=fn}},storage:{local:storage}};Catalog.listenBackground();
+ const message=(sender,type="ikr:catalog:list")=>new Promise(resolve=>{const ongoing=listener({type,courseId:19053},sender,resolve);if(ongoing!==true)queueMicrotask(()=>resolve({ok:false}));});
+ for(const sender of [{id:"catalog-fixture",url:"https://iknow.jp/courses/19053",frameId:0},{id:"catalog-fixture",url:"chrome-extension://catalog-fixture/study.html",frameId:1},{id:"other",url:"chrome-extension://catalog-fixture/study.html",frameId:0}])assert.equal((await message(sender,"ikr:catalog:load")).ok,false);
+ assert.equal((await message({id:"catalog-fixture",url:"chrome-extension://catalog-fixture/study.html",frameId:0})).ok,true);
+ console.log("PASS Study catalog: full words/sentences, stable IDs, exact context, safe translations, request coalescing, bounded cache, offline fallback and response guards");
+})().catch(error=>{console.error(error);process.exitCode=1;});

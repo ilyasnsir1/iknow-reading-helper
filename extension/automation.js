@@ -83,6 +83,7 @@
     let viewId = "", viewReady = !ViewState, viewGeneration = 0;
     let preparedDuringVisit = false, completion = null;
     let sceneReady = false, sceneWarming = false;
+    let sceneFrame = 0, deferredRender = false, knownSceneAnimations = [];
     const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const pausedSceneAnimations = new Set();
     const card = node("section", "ikr-owned ikr-preparation");
@@ -347,6 +348,7 @@
       } else if (!animation) sceneEffects.delete(element);
     }
     function positionScene() {
+      if (destroyed || document.hidden) return;
       if (scene.clientWidth < 1 || scene.clientHeight < 1) return;
       const floor = Math.max(28, scene.clientHeight - 176);
       const floorPx = `${floor}px`;
@@ -372,11 +374,14 @@
         bindSceneEffect(wind, "ikr-breeze-wind", key, () => motion.windKeyframes(layout));
       }
     }
-    const sceneResize = new ResizeObserver(() => { if (card.dataset.saved === "true") positionScene(); });
+    const sceneResize = new ResizeObserver(() => { if (card.dataset.saved === "true" && !document.hidden) scheduleSceneFrame(); });
     sceneResize.observe(scene);
     function syncSceneMotion(fullySaved) {
       if (!fullySaved || motionPreference.matches) { pausedSceneAnimations.clear(); return; }
-      const animations = scene.getAnimations({ subtree: true });
+      // Leave a disappearing tab without synchronously querying its animation
+      // tree or layout. The visible render already collected these clocks.
+      const animations = document.hidden ? knownSceneAnimations : scene.getAnimations({ subtree: true });
+      if (!document.hidden) knownSceneAnimations = animations;
       if (!sceneReady || detailsOpen || minimized || !options.enabled || document.hidden || completion?.phase === "reveal") {
         for (const animation of animations) {
           if (animation.playState === "running" || animation.pending) animation.pause();
@@ -390,6 +395,9 @@
     }
     function render() {
       if (destroyed) return;
+      if (document.hidden) { deferredRender = true; syncSceneMotion(card.dataset.saved === "true"); return; }
+      deferredRender = false;
+      if (sceneFrame) { cancelAnimationFrame(sceneFrame); sceneFrame = 0; }
       mount();
       const initialized = !options.initializing && Boolean(options.course && options.availability) && viewReady;
       card.hidden = !options.enabled || !initialized;
@@ -589,7 +597,25 @@
     });
     minimize.addEventListener("click", () => { setCollapsed(!minimized); render(); });
     motionPreference.addEventListener("change", render);
-    const onVisibility = () => { if (document.hidden) { clearFoxReaction(); if (completion) { cancelCompletion(); render(); } } if (card.dataset.saved === "true") positionScene(); syncSceneMotion(card.dataset.saved === "true"); };
+    function scheduleSceneFrame() {
+      if (destroyed || document.hidden || sceneFrame) return;
+      sceneFrame = requestAnimationFrame(() => {
+        sceneFrame = 0;
+        if (destroyed || document.hidden) return;
+        if (deferredRender) render();
+        else { if (card.dataset.saved === "true") positionScene(); syncSceneMotion(card.dataset.saved === "true"); }
+      });
+    }
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (sceneFrame) { cancelAnimationFrame(sceneFrame); sceneFrame = 0; }
+        clearFoxReaction();
+        if (completion) { cancelCompletion(); deferredRender = true; }
+        syncSceneMotion(card.dataset.saved === "true");
+        return;
+      }
+      scheduleSceneFrame();
+    };
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("ikr:panels-reordered", onVisibility);
     return Object.freeze({
@@ -637,7 +663,7 @@
         } else render();
       },
       destroy() {
-        destroyed = true; viewGeneration++; cancelCompletion(); clearFoxReaction(); sceneResize.disconnect(); sceneEffects.clear(); pausedSceneAnimations.clear(); motionPreference.removeEventListener("change", render); document.removeEventListener("visibilitychange", onVisibility); document.removeEventListener("ikr:panels-reordered", onVisibility); port?.disconnect(); port = null; card.remove();
+        destroyed = true; viewGeneration++; if (sceneFrame) cancelAnimationFrame(sceneFrame); sceneFrame = 0; cancelCompletion(); clearFoxReaction(); sceneResize.disconnect(); sceneEffects.clear(); pausedSceneAnimations.clear(); knownSceneAnimations = []; motionPreference.removeEventListener("change", render); document.removeEventListener("visibilitychange", onVisibility); document.removeEventListener("ikr:panels-reordered", onVisibility); port?.disconnect(); port = null; card.remove();
       }
     });
   }

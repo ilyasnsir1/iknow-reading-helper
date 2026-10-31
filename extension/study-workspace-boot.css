@@ -1,0 +1,7 @@
+/* Initial page colors, generated from the reviewed Study page. */
+:root{--ikr-bg:#faf8f4;--ikr-text:#2b2634;--ikr-scheme:light}
+    :root[data-ikr-theme=midnight]{--ikr-bg:#12151c;--ikr-text:#edf0f6;--ikr-scheme:dark}
+    :root[data-ikr-theme=tokyo]{--ikr-bg:#15111f;--ikr-text:#f4eeff;--ikr-scheme:dark}
+    :root[data-ikr-theme=forest]{--ikr-bg:#111b18;--ikr-text:#edf5ec;--ikr-scheme:dark}
+    html{background:var(--ikr-bg);color:var(--ikr-text);color-scheme:var(--ikr-scheme)}
+    body{background:var(--ikr-bg)}

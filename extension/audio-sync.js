@@ -16,6 +16,13 @@
   const WORD_NOTICE_DELAY = 280, WORD_NOTICE_MINIMUM = 420;
   let wordNotice = null;
   const Core = globalThis.IKnowReaderCore;
+  const volume = Core?.audioVolume();
+  let volumeEnabled = false;
+  function sendConfiguration() {
+    window.postMessage({type:'IKR_NATIVE_AUDIO_CONFIG_V1',enabled,wordEnabled,volumeEnabled,originalVolume:volume?.get('original')/100,wordVolume:volume?.get('word')/100},location.origin);
+  }
+  volume?.subscribe(sendConfiguration);
+  void volume?.ready.then(sendConfiguration);
 
   // Word feedback is outside document flow and follows the clicked target.
   // It never inserts a toolbar row, changes course geometry or delays playback.
@@ -444,14 +451,16 @@
     const wordsChanged = wordEnabled !== wordValue || modeChanged;
     if (modeChanged || speed !== wordSpeed || voice !== wordNeuralVoice) { stopWord(); status(""); }
     wordMode = mode; wordSpeed = speed; wordNeuralVoice = voice;
-    const changed = enabled !== value || wordEnabled !== wordValue;
+    const nextVolumeEnabled=options.volumeEnabled===true;
+    const changed = enabled !== value || wordEnabled !== wordValue || volumeEnabled!==nextVolumeEnabled;
+    volumeEnabled=nextVolumeEnabled;
     enabled = value;
     wordEnabled = wordValue;
     if (!wordEnabled) stopWord();
     if (wordsChanged) for (const state of wordStates) syncWords(state);
     if (!changed) return;
     if (!enabled) { clear(); lastMessage = null; }
-    window.postMessage({ type: "IKR_NATIVE_AUDIO_CONFIG_V1", enabled, wordEnabled }, location.origin);
+    sendConfiguration();
   }
   function refresh({ wordsOnly = false } = {}) {
     for (const state of wordStates) syncWords(state);

@@ -1,0 +1,27 @@
+/* Header menus use the page palette instead of the operating system popup. */
+.focus-menu{position:relative;flex:none;min-width:0}
+.focus-menu-language{width:92px}
+.focus-menu-theme{width:136px}
+.focus-menu .focus-menu-trigger{display:flex;align-items:center;justify-content:flex-start;width:100%;height:34px;min-height:34px;padding:7px 9px;gap:6px;border:1px solid var(--ikr-line);border-radius:4px;background:transparent;color:var(--ikr-text);font-size:12px;line-height:18px;font-weight:400;box-shadow:none}
+.focus-menu .focus-menu-trigger:not(:disabled):hover{background:transparent;border-color:var(--ikr-line-strong)}
+.focus-menu .focus-menu-trigger:disabled{background:transparent;border-color:var(--ikr-line);color:var(--ikr-muted);opacity:.45;cursor:default}
+.focus-menu .focus-menu-trigger:focus{outline:0;box-shadow:none}
+.focus-menu .focus-menu-trigger:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--ikr-focus);border-color:var(--ikr-focus)}
+.focus-menu-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left}
+.focus-menu svg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.focus-menu .focus-menu-chevron{width:12px;height:12px;stroke-width:1.6;flex:none;color:var(--ikr-muted)}
+.focus-menu .focus-menu-moon{width:14px;height:14px;stroke-width:1.5;flex:none;color:var(--ikr-muted)}
+.focus-menu .focus-menu-list{position:absolute;top:calc(100% + 6px);right:0;width:max-content;min-width:100%;max-width:min(220px,calc(100vw - 24px));padding:4px;border:1px solid var(--ikr-line-strong);border-radius:5px;background:var(--ikr-elevated);color:var(--ikr-text);box-shadow:var(--ikr-shadow);z-index:60;isolation:isolate}
+.focus-menu-language .focus-menu-list{min-width:112px;left:0;right:auto}
+.focus-menu-theme .focus-menu-list{min-width:184px;width:184px}
+.focus-menu .focus-menu-option{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;min-height:34px;padding:7px 9px;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--ikr-text);font-size:12px;font-weight:400;line-height:18px;text-align:left;white-space:nowrap;box-shadow:none}
+.focus-menu .focus-menu-option:not(:disabled):hover{background:var(--study-hover,var(--ikr-surface-hover));border-color:transparent}
+.focus-menu .focus-menu-option[aria-selected=true]{background:var(--study-tint,var(--ikr-accent-soft));color:var(--ikr-text)}
+.focus-menu .focus-menu-option:focus{outline:0;box-shadow:none}
+.focus-menu .focus-menu-option:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--ikr-focus)}
+.focus-menu .focus-menu-check{width:13px;height:13px;stroke-width:1.6;opacity:0;flex:none}
+.focus-menu .focus-menu-option[aria-selected=true] .focus-menu-check{opacity:1}
+.focus-menu-theme .focus-menu-option{gap:8px}
+.focus-menu .focus-menu-swatch{display:block;flex:0 0 20px;width:20px;height:20px;min-width:20px;border:0;border-radius:50%;background:none;box-shadow:none;overflow:visible;stroke:none}
+@media(max-width:760px){.focus-menu-language{width:90px}.focus-menu-theme{width:136px}}
+@media(prefers-reduced-motion:reduce){.focus-menu *{transition:none!important}}

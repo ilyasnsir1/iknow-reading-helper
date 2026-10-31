@@ -9,7 +9,9 @@
  const valid=value=>choices.some(choice=>choice.id===value)?value:"paper";
  const controls=new Set();
  let current="paper",confirmed="paper",generation=0,revision=0,pendingWrites=0,desired="paper",writes=Promise.resolve();
- const icon='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.8 12.2A6.2 6.2 0 0 1 7.8 4a6.4 6.4 0 1 0 8 8.2Z" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+ const icon='<svg class="ikr-theme-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 12A6.1 6.1 0 0 1 8 4a6.5 6.5 0 1 0 8 8Z"/></svg>';
+ const chevron='<svg class="ikr-theme-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6 3.5 3.5L11.5 6"/></svg>';
+ const check='<svg class="ikr-theme-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8 3 3 6-6"/></svg>';
  function apply(value){
   current=valid(value);root.dataset.ikrTheme=current;root.classList.remove("ikr-theme-pending");
   if(own)try{localStorage.setItem(KEY,current);}catch{}
@@ -36,7 +38,7 @@
   container.dataset.ikrThemeMounted="true";
   const wrapper=document.createElement("div");wrapper.className="ikr-theme-picker ikr-owned";
   const trigger=document.createElement("button");trigger.type="button";trigger.className="ikr-theme-trigger";trigger.innerHTML=icon;
-  const name=document.createElement("span");trigger.append(name);trigger.setAttribute("aria-label",scope==="panels"?"Choose course panel theme":"Choose app theme");trigger.title=scope==="panels"?"Theme for iKnow course and series panels":"Theme for Reading Helper pages and popup";trigger.setAttribute("aria-expanded","false");
+  const name=document.createElement("span");name.className="ikr-theme-label";trigger.append(name);trigger.insertAdjacentHTML("beforeend",chevron);trigger.setAttribute("aria-label",scope==="panels"?"Choose course panel theme":"Choose app theme");trigger.title=scope==="panels"?"Theme for iKnow course and series panels":"Theme for Reading Helper pages and popup";trigger.setAttribute("aria-expanded","false");
   const panel=document.createElement("div");panel.className="ikr-theme-options";panel.hidden=true;panel.setAttribute("role","group");panel.setAttribute("aria-label","Theme");panel.setAttribute("popover","manual");
   const feedback=document.createElement("span");feedback.className="ikr-theme-feedback";feedback.setAttribute("role","status");
   const close=()=>{try{panel.hidePopover?.();}catch{}panel.hidden=true;trigger.setAttribute("aria-expanded","false");};
@@ -50,7 +52,7 @@
    const ns="http://www.w3.org/2000/svg",swatch=document.createElementNS(ns,"svg");swatch.classList.add("ikr-theme-swatch");swatch.dataset.swatch=choice.id;swatch.setAttribute("viewBox","0 0 20 20");swatch.setAttribute("aria-hidden","true");
    const base=document.createElementNS(ns,"circle");base.setAttribute("cx","10");base.setAttribute("cy","10");base.setAttribute("r","9");base.setAttribute("fill",choice.swatch[0]);
    const half=document.createElementNS(ns,"path");half.setAttribute("d","M3.636 16.364A9 9 0 0 0 16.364 3.636Z");half.setAttribute("fill",choice.swatch[1]);
-   const rim=document.createElementNS(ns,"circle");rim.setAttribute("cx","10");rim.setAttribute("cy","10");rim.setAttribute("r","9");rim.setAttribute("fill","none");rim.setAttribute("stroke","#9f94ab66");rim.setAttribute("stroke-width",".6");swatch.append(base,half,rim);button.append(swatch,document.createTextNode(choice.label));
+   const rim=document.createElementNS(ns,"circle");rim.setAttribute("cx","10");rim.setAttribute("cy","10");rim.setAttribute("r","9");rim.setAttribute("fill","none");rim.setAttribute("stroke","#9f94ab66");rim.setAttribute("stroke-width",".6");swatch.append(base,half,rim);const label=document.createElement("span");label.className="ikr-theme-label";label.textContent=choice.label;button.append(swatch,label);button.insertAdjacentHTML("beforeend",check);
    button.addEventListener("click",()=>{void choose(choice.id,feedback);close();trigger.focus({preventScroll:true});});panel.append(button);return button;
   });
   trigger.addEventListener("click",()=>{if(panel.hidden)open();else close();});

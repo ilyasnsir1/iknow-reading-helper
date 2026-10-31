@@ -18,7 +18,7 @@ const wav=()=>{const b=Buffer.alloc(44+8820);b.write("RIFF");b.writeUInt32LE(b.l
   if(get) navigator.mediaDevices.getUserMedia=async args=>{const stream=await get(args);testStreams.push(stream);if(testHoldMicrophone)await new Promise(resolve=>{testGrant=resolve;});return stream;};
   const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{testRevoked.push(url);revoke(url);};
  });
- const sentence={cue:{id:10001,text:"それはとてもいい話だ。",transliterations:{Hrkt:"それ は とても いい はなし だ。",Latn:"sore ha totemo ii hanashi da."}},response:{text:"That's a really nice story."},sound:"https://assets0.iknow.jp/assets/test.mp3"};
+ const sentence={cue:{id:10001,text:"それはとてもいい話だ。",transliterations:{Jpan:"それ は とても いい 話 だ 。",Hrkt:"それ は とても いい はなし だ。",Latn:"sore ha totemo ii hanashi da."}},response:{text:"That's a really nice story."},sound:"https://assets0.iknow.jp/assets/test.mp3"};
  const goal={id:19053,title:"Japanese Core · Fixture",cue_language:"ja",items_count:1,sentences_count:1,goal_items:[{item:{id:100,cue:{id:100,text:"それ",transliterations:{Hrkt:"それ",Latn:"sore"}},response:{text:"that"}},sentences:[sentence],sound:sentence.sound}]};
  await context.route("https://**/*",async route=>{
   const url=new URL(route.request().url());
@@ -56,38 +56,18 @@ const wav=()=>{const b=Buffer.alloc(44+8820);b.write("RIFF");b.writeUInt32LE(b.l
   await course.locator(".sentence .ikr-study-tools button").first().click();
   await until(()=>worker.evaluate(async()=>Object.keys((await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary?.records||{}).length===1),"course bookmark");
   const next=context.waitForEvent("page");await course.locator(".sentence .ikr-study-tools button").nth(1).click();const study=await next;await study.waitForLoadState();
-  await study.locator("#japanese").waitFor();assert.equal(await study.locator("#japanese").innerText(),sentence.cue.text);
+  await study.locator(".focus-card .japanese").waitFor();assert.equal(await study.locator(".focus-card .japanese").innerText(),sentence.cue.text);
   assert.match(study.url(),/study\.html\?course=19053&item=/);
-  assert.equal(await study.locator("#romaji button[aria-pressed=false]").count(),6);await study.locator("#romaji button").first().click();assert.equal(await study.locator("#romaji button").first().innerText(),"sore");
-  await study.locator("#reveal-all").click();assert.equal(await study.locator("#romaji button[aria-pressed=true]").count(),6);
-  assert.deepEqual(await study.locator("#romaji button").allTextContents(),["sore","ha","totemo","ii","hanashi","da."]);
-  assert.equal(await study.locator("#pitch-section").count(),0);assert.equal(await study.locator('script[src="study-pitch.js"],script[src="study-reading.js"]').count(),0);
-  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary.records["sentence:19053:10001"].romaji),sentence.cue.transliterations.Latn);
-  await study.screenshot({path:path.join(out,"01-study.png"),fullPage:true});
-  console.log("PASS The real course saves a sentence, opens its study tab through the background, and reveals Romaji per word or together");
-  await course.locator(".item-details .ikr-study-tools button").first().click();
-  await until(()=>worker.evaluate(async()=>Object.keys((await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary.records).length===2),"word bookmark");
-  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary.records["word:19053:100"].german),"das");
-  const wordTab=context.waitForEvent("page");await course.locator(".item-details .ikr-study-tools button").nth(1).click();const wordStudy=await wordTab;await wordStudy.waitForLoadState();
-  await wordStudy.locator("#japanese").waitFor();assert.equal(await wordStudy.locator("#japanese").innerText(),"それ");assert.match(wordStudy.url(),/study\.html\?course=19053&item=word/);await wordStudy.close();
-  assert.equal(await course.locator(".item-details .ikr-study-tools button").count(),2);
-  await study.locator("#kind-filter").selectOption("word");await until(async()=>await study.locator("#japanese").innerText()==="それ","word filter");
-  await study.locator("#kind-filter").selectOption("");await study.locator('[data-key="sentence:19053:10001"]').click();
-  console.log("PASS Vocabulary bookmarks are saved independently and the study library switches correctly between words and sentences");
-  await study.locator("#repeat-count").selectOption("2");await study.locator("#pause-duration").selectOption("1");await study.locator("#start-loop").click();await until(async()=>/Practice complete/.test(await study.locator("#audio-status").innerText()),"repeat and pause loop");
-  await study.locator("#start-loop").click();await study.locator("#stop-loop").click();assert.match(await study.locator("#audio-status").innerText(),/stopped/);
-  await study.locator("#record").click();await until(async()=>await study.locator("#record").innerText()==="Stop recording","microphone capture");await new Promise(resolve=>setTimeout(resolve,330));await study.locator("#record").click();
-  await until(async()=>await study.locator("#play-take").isEnabled(),"local take");assert.equal(await study.evaluate(()=>testStreams.every(stream=>stream.getTracks().every(track=>track.readyState==="ended"))),true);
-  assert.match(await study.locator(".record-section .assessment-note").innerText(),/not an automatic pronunciation score/);
-  for(const theme of ["paper","midnight","tokyo","forest"]){
-   await study.evaluate(theme=>IKnowReaderTheme.choose(theme),theme);await new Promise(resolve=>setTimeout(resolve,180));
-   for(const selector of ["#discard-take","#reveal-all"]){const action=study.locator(selector);await action.hover();await new Promise(resolve=>setTimeout(resolve,180));const style=await action.evaluate(node=>{const css=getComputedStyle(node);return{background:css.backgroundColor,padding:parseFloat(css.paddingLeft),border:parseFloat(css.borderTopWidth)};});assert.equal(style.background,"rgba(0, 0, 0, 0)",theme+selector+" remains a transparent text action");assert.ok(style.padding>=6);assert.equal(style.border,0);}
-  }
-  await study.evaluate(()=>IKnowReaderTheme.choose("paper"));
-  await study.locator("#discard-take").click();assert.ok(await study.evaluate(()=>testRevoked.length)>0);assert.equal(await study.locator("#play-take").isDisabled(),true);
-  console.log("PASS Original-repeat practice completes/stops; the fake-device microphone records locally, stops tracks, releases its take and never claims a pronunciation grade");
-  await study.evaluate(()=>{testHoldMicrophone=true;});await study.locator("#record").click();await until(()=>study.evaluate(()=>!!testGrant),"delayed microphone fixture");await study.locator("#record").click();await study.evaluate(()=>testGrant());await until(()=>study.evaluate(()=>testStreams.every(stream=>stream.getTracks().every(track=>track.readyState==="ended"))),"late grant tracks stopped");
-  console.log("PASS Cancelling a delayed microphone grant releases the subsequently acquired stream");
+  assert.equal(await study.locator("[data-reading-index][aria-pressed=false]").count(),6);await study.locator("[data-reading-index]").first().click();assert.equal(await study.locator("[data-reading-index][aria-pressed=true]").count(),1);
+  await course.locator(".item-details .ikr-study-tools button").first().click();await until(()=>worker.evaluate(async()=>Object.keys((await chrome.storage.local.get("iknowReaderStudyLibrary")).iknowReaderStudyLibrary?.records||{}).length===2),"word bookmark");
+  await until(async()=>await study.locator('.library-row').count()===2,"live Study bookmarks");await study.locator("#demo-kind").selectOption("word");assert.equal(await study.locator('.library-row').count(),1);await study.locator('.library-row').click();assert.equal(await study.locator('.focus-card .japanese').innerText(),'それ');
+  await study.locator("#demo-kind").selectOption("");await study.locator('[data-item="sentence:19053:10001"]').click();
+  console.log("PASS Course bookmarks open the real C1 Study workspace and switch correctly between words and sentences");
+  await study.locator('[data-action="compare"]').click();await study.locator('[data-compare-action="record"]').click();await study.locator('[data-compare-action="stop"]').waitFor();await new Promise(resolve=>setTimeout(resolve,330));await study.locator('[data-compare-action="stop"]').click();
+  await until(async()=>await study.locator('[data-compare-action="take"]').isEnabled(),"local take");assert.equal(await study.evaluate(()=>testStreams.every(stream=>stream.getTracks().every(track=>track.readyState==="ended"))),true);
+  await study.locator('[data-compare-action="discard"]').click();assert.ok(await study.evaluate(()=>testRevoked.length)>0);assert.equal(await study.locator('[data-compare-action="take"]').isDisabled(),true);
+  await study.evaluate(()=>{testHoldMicrophone=true;});await study.locator('[data-compare-action="record"]').click();await until(()=>study.evaluate(()=>!!testGrant),"delayed microphone fixture");await study.locator('[data-compare-action="record"]').click();await study.evaluate(()=>testGrant());await until(()=>study.evaluate(()=>testStreams.every(stream=>stream.getTracks().every(track=>track.readyState==="ended"))),"late grant tracks stopped");
+  console.log("PASS C1 recording stays local, stops tracks, releases its take and cancels late microphone grants");
   const models=await context.newPage();await models.goto(`chrome-extension://${id}/models.html`);await models.locator(".component").waitFor();assert.equal(await worker.evaluate(()=>fixtureComponentCalls.filter(value=>value.type==='components:start').length),0);
   await models.locator(".component button").click();await until(async()=>await models.locator("#pause").isEnabled(),"download starts");await models.locator("#pause").click();await until(async()=>await models.locator("#pause").innerText()==="Resume","pause reflected");
   await models.locator("#pause").click();await until(async()=>await models.locator("#pause").innerText()==="Pause","resume reflected");await worker.evaluate(()=>finishComponentFixture());await models.locator("#refresh").click();await until(async()=>await models.locator(".status").innerText()==="Installed","component completion");

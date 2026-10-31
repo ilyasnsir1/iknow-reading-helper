@@ -2,6 +2,50 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "new-study-space",
+      "version": "1.41.0",
+      "status": "released",
+      "date": "2026-10-31",
+      "title": "Your study space",
+      "summary": "Your library, practice and course tests in one place.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Study workspace",
+          "description": "A new home for learning Japanese.",
+          "details": [
+            "Keep your saved words, sentences and notes close by.",
+            "Practise with Review, Fill the gap and Listening, using your library or a full course.",
+            "Take course tests, see your answers and revisit mistakes.",
+            "Learn Hiragana and Katakana with the groups and characters you choose.",
+            "Back up your library and learning progress, and restore them on another PC.",
+            "Adjust playback volume for original audio and your recordings."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/author-67944234a01ea13752f19007570e4010.png",
+              "alt": "The new Study workspace with a saved library and reading card.",
+              "caption": "Your library and study tools in one place."
+            },
+            {
+              "src": "changelog-media/author-8e448868704a7bf683ece29a2d9541d3.png",
+              "alt": "Hiragana chart with basic, voiced and combination groups.",
+              "caption": "Pick the characters and groups you want to practise."
+            }
+          ]
+        },
+        {
+          "type": "improved",
+          "title": "Theme menus",
+          "description": "One theme picker style across Reading Helper.",
+          "details": [
+            "Color swatches and a checkmark make your selection clear."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
       "id": "romaji-style",
       "version": "1.40.5",
       "status": "released",
@@ -34,8 +78,8 @@
         },
         {
           "type": "fixed",
-          "title": "Update popup",
-          "description": "Removed the extra outline around the Updates section.",
+          "title": "Updates section",
+          "description": "Removed the extra outline after installing updates.",
           "details": [],
           "images": []
         }
