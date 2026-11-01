@@ -43,8 +43,8 @@ class PublisherChecks(unittest.TestCase):
         (self.package / 'README.md').write_text('Fixture release.\n')
         (self.package / 'RELEASE-FILES.json').write_text('{}')
 
-    def build(self, output='out'):
-        return PUBLISHER.build(argparse.Namespace(package=self.package, owner='test-owner', repository='test-repo', output=self.case / output, minimum_helper_version='1.16.0', private_key=self.keys / 'signing-key.xml', replace=False))
+    def build(self, output='out', *, unchanged_changelog_from=None):
+        return PUBLISHER.build(argparse.Namespace(package=self.package, owner='test-owner', repository='test-repo', output=self.case / output, minimum_helper_version='1.16.0', private_key=self.keys / 'signing-key.xml', replace=False, unchanged_changelog_from=unchanged_changelog_from))
 
     def test_reproducible_signed_package_and_complete_baseline(self):
         manifest = self.build()
@@ -98,6 +98,48 @@ class PublisherChecks(unittest.TestCase):
         value['entries'][0]['changes'] = []
         path.write_text(json.dumps(value))
         self.assertEqual(self.build()['version'], '1.34.0')
+
+    def test_unchanged_changelog_requires_explicit_exact_older_version(self):
+        path = self.package / 'extension/changelog.json'
+        value = {'schemaVersion': 1, 'entries': [{'status': 'released', 'version': '1.33.9', 'changes': []}]}
+        original = json.dumps(value).encode()
+        path.write_bytes(original)
+        with self.assertRaisesRegex(ValueError, 'must match the release version'):
+            self.build()
+        self.assertFalse((self.case / 'out').exists())
+        result = self.build(unchanged_changelog_from='1.33.9')
+        self.assertEqual(result['version'], '1.34.0')
+        self.assertEqual(path.read_bytes(), original)
+        with zipfile.ZipFile(self.case / 'out' / result['asset']['name']) as stream:
+            self.assertEqual(stream.read('extension/changelog.json'), original)
+            self.assertEqual(json.loads(stream.read('extension/manifest.json'))['version'], '1.34.0')
+
+    def test_unchanged_changelog_rejects_invalid_same_future_and_wrong_versions(self):
+        path = self.package / 'extension/changelog.json'
+        value = {'schemaVersion': 1, 'entries': [{'status': 'released', 'version': '1.33.9', 'changes': []}]}
+        path.write_text(json.dumps(value))
+        for prior in ('', 'invalid', '1.033.9', '1.34.0', '1.34.0.0', '1.34.1', '2.0.0'):
+            with self.subTest(prior=prior), self.assertRaisesRegex(ValueError, 'valid and older'):
+                self.build(unchanged_changelog_from=prior)
+        with self.assertRaisesRegex(ValueError, 'must match --unchanged-changelog-from'):
+            self.build(unchanged_changelog_from='1.33.8')
+        self.assertFalse((self.case / 'out').exists())
+
+    def test_unchanged_changelog_keeps_finalization_and_image_checks(self):
+        path = self.package / 'extension/changelog.json'
+        with self.assertRaisesRegex(ValueError, 'requires existing released notes'):
+            self.build(unchanged_changelog_from='1.33.9')
+        for entry in ({'status': 'unreleased', 'version': '1.33.9', 'changes': []},
+                      {'status': 'released', 'version': '1.33.9', 'changes': [{'images': [{'src': 'changelog-media/missing.png'}]}]}):
+            path.write_text(json.dumps({'schemaVersion': 1, 'entries': [entry]}))
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                self.build(unchanged_changelog_from='1.33.9')
+        path.write_text(json.dumps({'schemaVersion': 1, 'entries': [
+            {'status': 'released', 'version': '1.33.9', 'changes': []},
+            {'status': 'unreleased', 'version': None, 'changes': []}]}))
+        with self.assertRaisesRegex(ValueError, 'previews cannot be published'):
+            self.build(unchanged_changelog_from='1.33.9')
+        self.assertFalse((self.case / 'out').exists())
 
     def test_publish_dry_run_verifies_signature_and_archive_without_github(self):
         manifest = self.build()

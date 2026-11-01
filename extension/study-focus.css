@@ -56,6 +56,30 @@ button{border-radius:4px}
 .course-feedback[data-state=error] p::before{content:"!";display:grid;place-items:center;flex:none;width:16px;height:16px;margin-top:2px;border:1px solid currentColor;border-radius:50%;font-size:11px;font-weight:600;line-height:1}
 .course-feedback[data-state=loading] p::before{content:"";flex:none;width:13px;height:13px;margin-top:3px;border:1.5px solid var(--ikr-line);border-top-color:var(--study-accent);border-radius:50%;animation:course-loading-turn .85s linear infinite}
 .course-feedback[data-state=loading]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--ikr-line) 0%,var(--study-accent) 48%,var(--ikr-line) 100%);background-size:220% 100%;animation:course-loading-flow 1.6s ease-in-out infinite}
+/* Keep Course setup inside the desk on shorter desktop windows. */
+@media(min-width:761px) and (max-height:900px){
+ .activity-pane:has(.practice-course){padding:20px 24px}
+ .activity-inner:has(.practice-course)>.activity-heading{margin-bottom:14px}
+ .activity-inner:has(.practice-course)>.practice-sources{padding-bottom:10px;margin-bottom:12px}
+ .activity-inner:has(.practice-course) .mode-card{min-height:100px;padding:14px 17px;gap:7px}
+ .practice-course{margin-top:14px;padding:16px}
+ .practice-course .course-source-fields{margin-top:12px;gap:12px}
+ .practice-course .course-feedback{min-height:32px;margin-top:20px;padding-bottom:4px}
+ .activity-inner:has(.practice-course)>.setup-fields{margin-top:16px}
+ .activity-inner:has(.practice-course)>.setup-start{margin-top:16px}
+}
+@media(min-width:761px) and (max-height:800px){
+ .activity-pane:has(.practice-course){padding-block:16px}
+ .activity-inner:has(.practice-course)>.activity-heading{margin-bottom:10px}
+ .activity-inner:has(.practice-course)>.practice-sources{padding-bottom:8px;margin-bottom:10px}
+ .activity-inner:has(.practice-course) .mode-card{min-height:76px;padding-block:10px}
+ .activity-inner:has(.practice-course) .mode-card small{display:none}
+ .practice-course{padding:12px}
+ .practice-course .course-source-fields{margin-top:8px;gap:10px}
+ .practice-course .course-feedback{min-height:24px}
+ .activity-inner:has(.practice-course)>.setup-fields{margin-top:12px}
+ .activity-inner:has(.practice-course)>.setup-start{margin-top:12px}
+}
 @keyframes course-loading-turn{to{transform:rotate(360deg)}}
 @keyframes course-loading-flow{from{background-position:100% 0}to{background-position:-100% 0}}
 @media(prefers-reduced-motion:reduce){.course-feedback[data-state=loading] p::before,.course-feedback[data-state=loading]::after{animation:none}}

@@ -28,6 +28,11 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def version_order(value):
+    parts = tuple(int(part) for part in value.split('.'))
+    return parts + (0,) * (4 - len(parts))
+
+
 def accepted_path(path):
     name = PurePosixPath(path)
     if name.is_absolute() or '\\' in path or ':' in path or any(part in ('', '.', '..') for part in path.split('/')):
@@ -78,6 +83,12 @@ def build(args):
     version = manifest['version']
     if not VERSION.fullmatch(version) or not VERSION.fullmatch(args.minimum_helper_version):
         raise ValueError('Invalid version.')
+    unchanged_from = getattr(args, 'unchanged_changelog_from', None)
+    if unchanged_from is not None:
+        if not isinstance(unchanged_from, str) or not VERSION.fullmatch(unchanged_from) or version_order(unchanged_from) >= version_order(version):
+            raise ValueError('The unchanged changelog version must be valid and older than the release.')
+        if 'extension/changelog.json' not in data:
+            raise ValueError('An unchanged changelog requires existing released notes.')
     if 'extension/changelog.json' in data:
         notes = json.loads(data['extension/changelog.json'])
         entries = notes.get('entries') if isinstance(notes, dict) else None
@@ -85,7 +96,9 @@ def build(args):
             raise ValueError('The release changelog is invalid.')
         if any(not isinstance(entry, dict) or entry.get('status') != 'released' for entry in entries):
             raise ValueError('Finalize the private changelog draft before building a release; previews cannot be published.')
-        if entries[0].get('version') != version:
+        if entries[0].get('version') != (unchanged_from or version):
+            if unchanged_from is not None:
+                raise ValueError('The newest changelog entry must match --unchanged-changelog-from.')
             raise ValueError('The newest changelog entry must match the release version.')
         for entry in entries:
             for change in entry.get('changes', []):
@@ -148,6 +161,7 @@ def arguments():
     parser.add_argument('--repository', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--minimum-helper-version', default='1.16.0')
+    parser.add_argument('--unchanged-changelog-from', metavar='VERSION', help='Explicitly retain the released notes from this older version for an authorized patch release.')
     parser.add_argument('--private-key', type=Path, default=Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'iKnowReadingHelperPublisher/signing-key.xml')
     parser.add_argument('--replace', action='store_true')
     return parser.parse_args()

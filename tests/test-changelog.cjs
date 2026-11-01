@@ -12,7 +12,10 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
   assert.equal(bundled.schemaVersion, 1);
   assert.equal(bundled.entries.length, 4, "history retains every published entry from the bilingual button fix onward");
   assert.equal(bundled.entries[0].status, "released");
-  assert.equal(bundled.entries[0].version, JSON.parse(fs.readFileSync(path.join(source, "manifest.json"), "utf8")).version, "the finalized newest notes match the release");
+  assert.equal(bundled.entries[0].version, "1.41.1", "the small layout patch deliberately retains the published notes");
+  const installedVersion = JSON.parse(fs.readFileSync(path.join(source, "manifest.json"), "utf8")).version;
+  const versionOrder = value => [...value.split('.').map(Number), 0, 0, 0, 0].slice(0, 4).reduce((total, part) => total * 10000 + part, 0);
+  assert.ok(versionOrder(installedVersion) >= versionOrder(bundled.entries[0].version), "historical notes cannot claim a newer installed version");
   assert.deepEqual(bundled.entries.slice(1).map(entry => entry.version), ["1.41.0", "1.40.5", "1.40.4"]);
   assert.ok(bundled.entries.every(entry => entry.status === "released"));
   const levels = bundled.entries[0].changes.find(change => change.title === "Personal learning levels");
@@ -95,7 +98,7 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
     const preview = await load({ payload: entry([change()]) });
     assert.equal(await preview.locator('.release-status').innerText(), "Preview", "draft entries remain clearly distinct from published notes");
     assert.equal(await preview.locator('.release-version').innerText(), "Next update"); await preview.close();
-    console.log("PASS Changelog starts at 1.40.4, matches the release version, distinguishes previews, stays read-only, and fits all four themes on desktop/mobile");
+    console.log("PASS Changelog retains released history from 1.40.4, distinguishes previews, stays read-only, and fits all four themes on desktop/mobile");
 
     const injection = '<img src="https://invalid.example/steal" onerror="window.changelogInjected=true">';
     const inert = await load({ payload: entry([change({ title: injection, description: '<script>window.changelogInjected=true</script>', details: ["<b>Literal detail</b>"] })]) });

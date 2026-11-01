@@ -43,6 +43,13 @@ metadata and source audio links are part of the existing extension; original
 iKnow MP3 recordings are not included. A packaging check is not a copyright
 clearance or an assertion of permission to redistribute upstream course data.
 
+For a small patch that the maintainer explicitly wants to publish without a
+new Changelog entry, pass `--unchanged-changelog-from VERSION` to the builder.
+The value must exactly match the newest existing released notes and be older
+than the package version. The default still requires matching release notes;
+unreleased entries and missing images remain invalid. This option leaves the
+public Changelog unchanged.
+
 ## Verify and publish
 
 Create a text file containing the exact release notes. Verify first:
