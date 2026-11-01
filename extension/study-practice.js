@@ -108,20 +108,56 @@
     if (!Number.isFinite(value) || value < 0 || value >= 1) throw Error("Choose a valid random source.");
     return Math.floor(value * length);
   }
+  function markedSpokenRomaji(details, span) {
+    if (!span) return "";
+    const source = string(details.romaji), spoken = Core?.displayRomaji?.({ ...details, kind: "sentence" }, "spoken") || source;
+    if (spoken === source) return span.text;
+    const before = Core.tokenize(source), after = Core.tokenize(spoken);
+    if (before.length !== after.length) return "";
+    const offset = position => {
+      for (let index = 0; index < before.length; index++) {
+        const old = before[index], next = after[index];
+        if (position < old.start || position > old.end) continue;
+        if (position === old.start) return next.start;
+        if (position === old.end) return next.end;
+        // Only whole confirmed particles change. A partial changed token is
+        // insufficient evidence for a different pronunciation of this target.
+        return old.text === next.text ? next.start + position - old.start : null;
+      }
+      return null;
+    };
+    const start = offset(span.start), end = offset(span.end);
+    return start === null || end === null || end <= start ? "" : spoken.slice(start, end);
+  }
   function buildCloze(record, options = {}) {
     const details = detailsFor(record);
     if (!details) return null;
+    const gapPosition = options.gapPosition ?? "first";
+    if (!["first", "random"].includes(gapPosition)) return null;
+    const preferred = record.kind === "word" ? word(string(record.japanese).trim()) : "";
+    const marked = record.kind === "word" ? Core?.validateClozeTarget?.(details.clozeTarget, details, string(record.japanese).trim()) : null;
+    if (marked) {
+      // A word's explicit source highlight has one stable target. Its actual
+      // sentence form is accepted; its dictionary form is not guessed.
+      if (options.targetIndex !== undefined && options.targetIndex !== 0) return null;
+      const target = marked.japanese, answerKana = marked.kana?.text || "", sourceRomaji = marked.romaji?.text || "";
+      const spokenRomaji = markedSpokenRomaji(details, marked.romaji) || sourceRomaji;
+      return {
+        before: details.japanese.slice(0, target.start), after: details.japanese.slice(target.end),
+        answerJapanese: target.text, answerKana,
+        answerRomaji: options.romajiStyle === "spoken" ? spokenRomaji : sourceRomaji,
+        acceptedAnswers: [...new Set([target.text, answerKana, sourceRomaji, spokenRomaji].filter(Boolean))],
+        targetIndex: 0, details: { ...details }
+      };
+    }
     const source = sourceSegments(details);
     if (!source) return null;
     const candidates = source.segments.filter((segment, index, segments) => meaningful(segment.value) && completeSegment(segment, index, segments));
     if (!candidates.length) return null;
-    const preferred = record.kind === "word" ? word(string(record.japanese).trim()) : "";
     // One exact segmented occurrence is removed. Repeated words elsewhere stay.
     // A word review must actually test that saved word, not a different word
     // that happens to occur in its example sentence (including inflections).
     const choices = record.kind === "word" ? candidates.filter(segment => segment.value === preferred) : candidates;
-    const gapPosition = options.gapPosition ?? "first";
-    if (!["first", "random"].includes(gapPosition)) return null;
     let target;
     if (options.targetIndex !== undefined) {
       if (!Number.isSafeInteger(options.targetIndex) || options.targetIndex < 0) return null;
@@ -155,6 +191,12 @@
       answerRomaji: options.romajiStyle === "spoken" ? answerSpokenRomaji : answerSourceRomaji,
       acceptedAnswers, targetIndex, details: { ...details }
     };
+  }
+  function clozeUnavailableReason(record) {
+    if (buildCloze(record)) return null;
+    const details = detailsFor(record);
+    if (!details) return "example";
+    return sourceSegments(details) ? "target" : "boundaries";
   }
   function checkAnswer(cloze, input) {
     const value = normalizeAnswer(input);
@@ -278,7 +320,7 @@
     return ordered.slice(0, limit);
   }
   const api = Object.freeze({ DAY_MS, DATE_LIMIT, MAX_INTERVAL_DAYS, MAX_SESSION_ITEMS, RATINGS, validReview, nextReview,
-    normalizeAnswer, buildCloze, checkAnswer, normalizeListeningAnswer, buildListening, checkListening,
+    normalizeAnswer, buildCloze, clozeUnavailableReason, checkAnswer, normalizeListeningAnswer, buildListening, checkListening,
     buildReviewQuestion, selectSession, dueCount });
   globalThis.IKnowReaderStudyPractice = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -30,11 +30,14 @@ class FakeRecorder {
 const controls = Object.fromEntries(["record", "stop", "take", "original", "discard"].map(name => [name, {
   dataset: { compareAction: name }, disabled: false,
   closest() { return this; },
+  querySelector() { return {}; },
+  setAttribute() {},
 }]));
 let click;
+const mediaLabels={source:{},time:{},progress:{setAttribute(){}},microphone:{setAttribute(){},style:{setProperty(){}}}},recordingLabels={mode:{hidden:true,setAttribute(){}},idle:{hidden:false,setAttribute(){}},player:{},time:{},label:{}},media={hidden:true,dataset:{},querySelector:selector=>selector==='progress'?mediaLabels.progress:selector==='[data-audio-source]'?mediaLabels.source:mediaLabels.time};
 const host = {
   dataset: {}, classList: { add() {} }, setAttribute() {},
-  querySelector(selector) { return selector === ".focus-compare-status" ? this.status : controls[/action="([^"]+)/.exec(selector)[1]]; },
+  querySelector(selector) { return selector === ".focus-compare-status" ? this.status : selector === '.focus-recording-switch-surface' ? null : selector === '.focus-compare-media' ? media : selector==='[data-microphone-meter]'?mediaLabels.microphone:selector==='[data-recording-time]'?recordingLabels.time:selector==='.focus-recording-mode'?recordingLabels.mode:selector==='.focus-audio-idle-mode'?recordingLabels.idle:selector==='.focus-take-player'?recordingLabels.player:selector==='[data-recording-label]'?recordingLabels.label:controls[/action="([^"]+)/.exec(selector)[1]]; },
   status: {}, contains: value => Object.values(controls).includes(value),
   addEventListener(name, callback) { if (name === "click") click = callback; },
   removeEventListener() {},
@@ -43,7 +46,7 @@ const context = vm.createContext({
   document, window: { addEventListener() {} }, Audio: FakeAudio, MediaRecorder: FakeRecorder,
   navigator: { mediaDevices: { getUserMedia: () => new Promise(resolve => { resolvePermission = resolve; }) } },
   Blob, URL: { createObjectURL: () => "blob:retained-take", revokeObjectURL: value => revoked.push(value) },
-  setTimeout, clearTimeout,
+  setTimeout, clearTimeout, setInterval, clearInterval,
 });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "../tools/preview/study-focus-audio.js"), "utf8"), context);
 const api = context.IKnowFocusAudio;
@@ -57,11 +60,7 @@ const stream = () => ({ getTracks: () => [{ stop() { stoppedTracks++; } }] });
   for (let index = 0; index < 30; index++) hide();
   api.mount(host, { key: "test", audioUrl: "https://example.invalid/original.mp3" });
   for (let index = 0; index < 30; index++) hide();
-  assert.deepEqual(players.map(value => [value.pauses, value.loads]), [[0, 0], [0, 0]], "idle visibility must not reset dormant players");
-
-  show(); press("original"); await tick(); hide();
-  assert.deepEqual(players.map(value => [value.pauses, value.loads]), [[1, 1], [0, 0]], "only the active original is stopped");
-  hide(); assert.equal(players[0].loads, 1, "repeated hidden events stay idle");
+  assert.deepEqual(players.map(value => [value.pauses, value.loads]), [[0, 0]], "idle visibility must not reset the dormant take player or create a duplicate original");
 
   show(); press("record"); assert.equal(host.dataset.state, "requesting");
   hide(); resolvePermission(stream()); await tick();
@@ -76,8 +75,8 @@ const stream = () => ({ getTracks: () => [{ stop() { stoppedTracks++; } }] });
   assert.equal(revoked.length, 0, "tab switching does not discard the take");
 
   show(); press("take"); await tick(); hide();
-  assert.deepEqual(players.map(value => [value.pauses, value.loads]), [[1, 1], [1, 1]], "take playback still stops normally");
-  hide(); assert.equal(players[1].loads, 1);
+  assert.deepEqual(players.map(value => [value.pauses, value.loads]), [[1, 1]], "take playback still stops normally");
+  hide(); assert.equal(players[0].loads, 1);
   api.reset(); assert.deepEqual(revoked, ["blob:retained-take"]);
-  console.log("PASS: idle media visibility; original/take cancellation; late microphone release; recorded take retention.");
+  console.log("PASS: one dormant take player, idle media visibility, take cancellation, late microphone release and recorded take retention.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

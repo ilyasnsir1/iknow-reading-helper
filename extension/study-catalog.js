@@ -53,7 +53,11 @@
       const itemSignature = expected.items[String(item.id)], prepared = pack?.germanItems?.[String(item.id)]?.signature === itemSignature ? pack.germanItems[String(item.id)] : Core.germanItemFor(bundled, String(item.id), itemSignature);
       word.german = prepared?.text || "";
       const examples = entry.sentences.map(sentenceRecord);
-      const context = examples.find(example => Practice?.buildCloze({ ...word, context: example })) || examples[0];
+      const contexts = examples.map((example, index) => {
+        const clozeTarget = Core.sourceClozeTarget(entry.sentences[index].cue, word.japanese);
+        return clozeTarget ? { ...example, clozeTarget } : example;
+      });
+      const context = contexts.find(example => Practice?.buildCloze({ ...word, context: example })) || contexts[0];
       if (context) { const { kind, courseId: ignoredCourse, courseTitle: ignoredTitle, sourceId, ...details } = context; word.context = details; }
       append(Store.validate(word)); for (const example of examples) append(example);
       if (records.length > Store.MAX_RECORDS) throw Error("This course has too many items for a Study session.");

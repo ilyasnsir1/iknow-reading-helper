@@ -1,0 +1,41 @@
+/* Playback stays attached to its action; recording feedback stays with its controls. */
+.focus-original-button{position:relative;isolation:isolate;overflow:hidden}
+.focus-original-button[data-original-playing=true]{border-color:var(--study-accent);color:var(--ikr-text);background:color-mix(in srgb,var(--study-accent) 13%,var(--study-sheet))}
+.focus-original-button[data-original-playing=true]:not(:disabled):hover{background:color-mix(in srgb,var(--study-accent) 18%,var(--study-sheet));border-color:var(--study-accent)}
+.focus-original-button .focus-original-signal{opacity:.3;animation:focus-original-ripple 1.25s ease-in-out infinite}
+.focus-original-button .focus-original-signal:nth-child(3){animation-delay:.2s}
+@keyframes focus-original-ripple{0%,100%{opacity:.3}45%{opacity:1}}
+.focus-original-visual{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;pointer-events:none}
+.focus-original-visual[hidden],.focus-compare-media[hidden]{display:none!important}
+.focus-compare-media progress{appearance:none;border:0;border-radius:1px;overflow:hidden;background:var(--ikr-line)}
+.focus-compare-media progress::-webkit-progress-bar{background:var(--ikr-line)}
+.focus-compare-media progress::-webkit-progress-value{background:var(--study-accent)}
+.focus-take-player{display:inline-flex;align-items:center;min-width:0;min-height:35px;border:1px solid var(--ikr-line);border-radius:4px;background:color-mix(in srgb,var(--study-tint) 14%,transparent);overflow:hidden}
+.focus-compare-controls .focus-take-player>button{border:0;border-radius:0;background:transparent;min-height:33px;min-inline-size:109px}
+.focus-compare-controls .focus-take-player>button:not(:disabled):hover{background:color-mix(in srgb,var(--study-tint) 35%,transparent);border:0}
+.focus-take-player:has(.focus-compare-media:not([hidden])){border-color:var(--ikr-line-strong)}
+.focus-compare-media{display:inline-flex;align-items:center;gap:9px;margin:0;padding:0 10px 0 3px;min-height:20px;color:var(--ikr-muted);font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.focus-compare-media progress{display:block;width:62px;height:3px}
+.focus-compare-media[data-audio-state=recording]{color:var(--ikr-danger)}
+.focus-compare-controls{position:relative;isolation:auto;perspective:800px;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;min-height:54px;gap:0}
+.focus-audio-idle-mode,.focus-recording-mode{position:relative;grid-area:1/1;backface-visibility:hidden;transform-origin:50% 50%;min-inline-size:min(310px,100%);max-width:100%;border:1px solid transparent;border-radius:6px;background:transparent}
+.focus-audio-idle-mode{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;min-height:54px;padding:8px 10px}
+.focus-audio-idle-mode[hidden]{display:none!important}
+.focus-audio-idle-mode>[data-compare-action=record]{min-inline-size:118px}
+.focus-recording-mode{display:inline-flex;align-items:center;justify-content:center;gap:13px;min-height:54px;padding:8px 10px 8px 13px;border-color:var(--ikr-line);background:var(--study-sheet)}
+.focus-recording-mode[hidden],.focus-take-player[hidden]{display:none!important}
+.focus-recording-signal{--voice-level:0;position:relative;display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;color:var(--ikr-danger);background:color-mix(in srgb,var(--ikr-danger) 7%,var(--study-sheet));isolation:isolate}
+.focus-recording-signal::before{content:"";position:absolute;inset:-2px;border-radius:inherit;border:1px solid var(--ikr-danger);opacity:calc(.12 + var(--voice-level)*.45);transform:scale(calc(.96 + var(--voice-level)*.3));transition:transform 70ms linear,opacity 70ms linear}
+.focus-recording-signal svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.focus-recording-copy{display:flex;flex-direction:column;gap:2px;min-width:83px;text-align:left}
+.focus-recording-copy strong{font-size:12px;font-weight:500;line-height:16px;color:var(--ikr-text)}
+.focus-recording-copy>[data-recording-time]{font-size:10px;line-height:14px;font-variant-numeric:tabular-nums;color:var(--ikr-muted)}
+.focus-recording-mode [data-compare-action=stop]{gap:6px;min-height:31px;padding:6px 9px;color:var(--ikr-danger);border-color:color-mix(in srgb,var(--ikr-danger) 40%,var(--ikr-line));background:transparent}
+.focus-recording-mode [data-compare-action=stop] svg{width:12px;height:12px;fill:currentColor;stroke:none}
+.focus-compare-panel .focus-recording-mode [data-compare-action=stop]::before{display:none}
+.focus-audio-screen-reader{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.focus-compare-controls [data-compare-action=discard]{color:var(--ikr-danger);border-color:transparent}
+.focus-compare-controls [data-compare-action=discard]:not(:disabled):hover{background:color-mix(in srgb,var(--ikr-danger) 8%,transparent);color:var(--ikr-danger);border-color:transparent;text-decoration:none}
+@media(max-width:480px){.focus-compare-media{gap:6px;padding-inline:5px}.focus-compare-media progress{width:40px}.focus-recording-mode{gap:10px;padding-inline:10px}.focus-recording-copy{min-width:78px}}
+@media(max-height:760px) and (min-width:761px){.focus-compare-controls{min-height:44px}.focus-recording-mode{min-height:44px;padding-block:5px}.focus-audio-idle-mode{min-height:44px;padding-block:3px}}
+@media(prefers-reduced-motion:reduce){.focus-original-button .focus-original-signal{animation:none;opacity:1}.focus-recording-signal::before{transform:none;transition:none}}

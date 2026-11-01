@@ -12,7 +12,7 @@ const output = path.resolve(__dirname, "../../tests/study-focus-audio-evidence")
     await page.route("**/*", route => route.request().url() === "http://127.0.0.1/focus-audio-test" ? route.fulfill({ contentType: "text/html", body: '<!doctype html><meta charset="utf-8"><div id="panel"></div>' }) : route.abort());
     await page.goto("http://127.0.0.1/focus-audio-test");
     await page.evaluate(() => {
-      const fixture = window.fixture = { permission: "grant", pending: [], streams: [], recorders: [], plays: [], created: [], revoked: [], stops: 0, fastLimit: false, hidden: false };
+      const fixture = window.fixture = { permission: "grant", pending: [], streams: [], recorders: [], constraints: [], recorderOptions: [], plays: [], created: [], revoked: [], stops: 0, fastLimit: false, hidden: false };
       Object.defineProperty(document, "hidden", { configurable: true, get: () => fixture.hidden });
       const timeout = window.setTimeout.bind(window);
       window.setTimeout = (callback, milliseconds, ...args) => timeout(callback, fixture.fastLimit && milliseconds === 20000 ? 30 : milliseconds, ...args);
@@ -22,7 +22,8 @@ const output = path.resolve(__dirname, "../../tests/study-focus-audio-evidence")
       const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
       URL.createObjectURL = blob => { const url = create(blob); fixture.created.push(url); return url; };
       URL.revokeObjectURL = url => { fixture.revoked.push(url); revoke(url); };
-      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: () => {
+      Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: constraints => {
+        fixture.constraints.push(structuredClone(constraints));
         if (fixture.permission === "deny") return Promise.reject(new DOMException("Denied", "NotAllowedError"));
         const track = { stopped: false, stop() { this.stopped = true; } }, stream = { getTracks: () => [track], track };
         fixture.streams.push(stream);
@@ -30,7 +31,7 @@ const output = path.resolve(__dirname, "../../tests/study-focus-audio-evidence")
       } } });
       window.MediaRecorder = class extends EventTarget {
         static isTypeSupported() { return true; }
-        constructor(stream) { super(); this.stream = stream; this.mimeType = "audio/webm"; this.state = "inactive"; fixture.recorders.push(this); }
+        constructor(stream, options) { super(); this.stream = stream; this.mimeType = "audio/webm"; this.state = "inactive"; fixture.recorders.push(this); fixture.recorderOptions.push(structuredClone(options)); }
         start() { this.state = "recording"; }
         stop() {
           if (this.state === "inactive") return;
@@ -53,12 +54,14 @@ const output = path.resolve(__dirname, "../../tests/study-focus-audio-evidence")
     await page.evaluate(() => fixture.permission = "pending"); await action("record").click(); await action("record").click();
     await page.evaluate(() => fixture.pending.shift()()); await page.waitForFunction(() => fixture.streams[0].track.stopped);
     assert.equal((await metrics()).recordings, 0);
-    // Record, stop, play both sources and retain only a finished take across rerender.
+    // Record, stop and play the take; the main Study row owns the sole original action.
     await page.evaluate(() => fixture.permission = "grant"); await action("record").click(); await recording();
-    assert.equal(await action("original").isDisabled(), true); await action("stop").click(); await ready();
+    assert.deepEqual(await page.evaluate(() => fixture.constraints.at(-1)), { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false }, "Comparison requests the microphone without conference voice processing or forced resampling");
+    assert.equal(await page.evaluate(() => fixture.recorderOptions.at(-1).audioBitsPerSecond), 128000, "The local Opus recording uses an explicit voice-quality bitrate");
+    assert.equal(await page.evaluate(() => fixture.recorders.at(-1).stream === fixture.streams.at(-1)), true, "The recorder receives the microphone stream directly, not an analyser output");
+    assert.equal(await action("original").count(), 0); await action("stop").click(); await ready();
     assert.equal((await metrics()).acquired, (await metrics()).released);
     await action("take").click(); assert.match((await metrics()).plays.at(-1), /^blob:/);
-    await action("original").click(); assert.equal((await metrics()).plays.at(-1), "https://assets0.iknow.jp/test.mp3");
     const takeUrl = (await metrics()).created.at(-1);
     await page.evaluate(() => IKnowFocusAudio.unmount()); await mount("word:1");
     assert.equal(await action("take").isDisabled(), false); assert.equal((await metrics()).revoked.includes(takeUrl), false);
@@ -87,6 +90,6 @@ const output = path.resolve(__dirname, "../../tests/study-focus-audio-evidence")
     await page.evaluate(() => IKnowFocusAudio.reset());
     assert.deepEqual(errors, []); assert.deepEqual(requests, ["http://127.0.0.1/focus-audio-test"]);
     fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({ passed: true, metrics: await metrics(), pageErrors: errors }, null, 2));
-    console.log("PASS Focus compare: explicit microphone access, late permission cancellation, local take/original playback, 20s cap, item/visibility/unmount cleanup, denied/error/support recovery and no uploads");
+    console.log("PASS Focus compare: explicit microphone access, late permission cancellation, local take playback without a duplicate original, 20s cap, item/visibility/unmount cleanup, denied/error/support recovery and no uploads");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

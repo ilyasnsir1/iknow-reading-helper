@@ -18,7 +18,8 @@ SOURCE = ROOT / "tools" / "preview"
 ASSETS = (
     "study-layouts.css",
     "study-focus.js", "study-focus.css", "study-focus-course.js",
-    "study-focus-audio.js", "study-focus-menus.js", "study-focus-menus.css",
+    "study-focus-audio.js", "study-focus-audio.css", "study-focus-menus.js", "study-focus-menus.css",
+    "study-strength-menu.js", "study-strength-menu.css",
     "study-focus-results.js", "study-focus-results.css",
     "study-focus-kana.js", "study-focus-kana.css",
     "study-focus-backup.js", "study-focus-backup.css", "study-focus-danger.css",
@@ -63,12 +64,8 @@ def entry_files() -> dict[str, str]:
                           '  <script src="theme.js"></script>')
     source = replace_once(source, '<script src="study-focus-course.js" defer></script>',
                           '<script src="study-workspace-data.js" defer></script>\n'
-                          '  <script src="study-workspace-actions.js" defer></script>\n'
                           '  <script src="study-workspace-rounds.js" defer></script>\n'
                           '  <script src="study-focus-course.js" defer></script>')
-    source = replace_once(source, '<link rel="stylesheet" href="study-focus-danger.css">',
-                          '<link rel="stylesheet" href="study-focus-danger.css">\n'
-                          '  <link rel="stylesheet" href="study-workspace-actions.css">')
     source = source.replace('/extension/', '')
     if re.search(r'<script\b(?![^>]*\bsrc=)', source, re.I):
         raise ValueError("The generated extension page must not contain inline scripts.")

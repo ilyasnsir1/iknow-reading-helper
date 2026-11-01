@@ -42,6 +42,9 @@ const until=async(fn,label)=>{const start=Date.now();while(!await fn()){if(Date.
   // Model the installer's actual disk version change, not just a developer
   // reload of identical files. Native transaction/signatures are separate tests.
   fs.writeFileSync(path.join(extension,"manifest.json"),JSON.stringify({...installedManifest,version}));
+  const notesPath=path.join(extension,"changelog.json"),notes=JSON.parse(fs.readFileSync(notesPath,"utf8"));
+  const installedNotes=notes.entries.find(entry=>entry.status==="released");installedNotes.version=version;
+  fs.writeFileSync(notesPath,JSON.stringify(notes));
   await worker.evaluate(async version=>{
    await chrome.storage.local.set({iknowReaderUpdateState:{status:"complete",latestVersion:version,reloadedVersion:version,refreshTabs:true,installAttempted:true,lastAttemptAt:Date.now()},testCourseSentinel:{saved:"retained"},iknowReaderSettings:{enabled:false}});
   },version);
@@ -59,12 +62,24 @@ const until=async(fn,label)=>{const start=Date.now();while(!await fn()){if(Date.
   assert.deepEqual(await worker.evaluate(async()=>(await chrome.storage.local.get("testCourseSentinel")).testCourseSentinel),{saved:"retained"});
   assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get("iknowReaderSettings")).iknowReaderSettings.enabled),false);
   console.log("PASS Real runtime.reload loads the target and automatically reloads both iKnow tabs without reopening the popup; unrelated pages and saved data remain unchanged");
+  const notesURL=`chrome-extension://${new URL(worker.url()).host}/changelog.html#${installedNotes.id}`;
+  await until(()=>context.pages().some(page=>page.url()===notesURL),"automatic release-specific changelog tab");
+  const notesPage=context.pages().find(page=>page.url()===notesURL);
+  await until(()=>notesPage.locator(`#${installedNotes.id} .release-version`).textContent().then(text=>text===`Version ${version}`),"new release's bundled notes");
+  assert.equal(await notesPage.locator("#changelog-installed").textContent(),`Installed · ${version}`);
+  assert.equal(await worker.evaluate(async()=>{const [tab]=await chrome.tabs.query({active:true,currentWindow:true});return tab.url;}),notesURL);
+  console.log("PASS A new focused changelog tab automatically shows the exact installed release after the verified target and page refresh complete");
+  let extraPages=0;context.on("page",()=>extraPages++);
   const again=context.waitForEvent("serviceworker");await worker.evaluate(()=>chrome.runtime.reload()).catch(()=>{});
   await context.pages().find(page=>page.url()===urls[0]).bringToFront();worker=await again;
   await until(()=>worker.evaluate(async()=>!!(await chrome.storage.local.get("iknowReaderUpdateState")).iknowReaderUpdateState.autoRefreshCompleteVersion),"restored completion");
   await new Promise(resolve=>setTimeout(resolve,350));assert.deepEqual(urls.map(url=>loads.get(url)),[2,2,1]);assert.equal(await worker.evaluate(()=>chrome.action.getBadgeText({})),"");
+  // Brave may close its extension pages on runtime.reload. Closing the notes
+  // page must not trigger another automatic notes tab on the next worker load.
+  assert.equal(extraPages,0);
+  assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get("iknowReaderUpdateState")).iknowReaderUpdateState.changelogOpenedVersion),version);
   assert.deepEqual(errors,[]);
-  const passed={badgeWithoutPopup:true,realExtensionReload:true,automaticIKnowRefresh:true,noRepeatedPageRefresh:true,unrelatedTabUnchanged:true,storedDataRetained:true,externalRequests:"All website requests fulfilled locally; native metadata is an explicit fixture",scope:"Real browser lifecycle and tab effects; no actual release installation or user profile used"};
+  const passed={badgeWithoutPopup:true,realExtensionReload:true,automaticIKnowRefresh:true,automaticReleaseNotes:true,noRepeatedChangelog:true,noRepeatedPageRefresh:true,unrelatedTabUnchanged:true,storedDataRetained:true,externalRequests:"All website requests fulfilled locally; native metadata is an explicit fixture",scope:"Real browser lifecycle and tab effects; no actual release installation or user profile used"};
   fs.writeFileSync(path.join(out,"results.json"),JSON.stringify(passed,null,2));
   console.log("PASS A second real extension reload preserves completion and does not reload pages again; all fixture browser checks are error-free");
  }finally{await context.close();}

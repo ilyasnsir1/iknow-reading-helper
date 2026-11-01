@@ -2,6 +2,49 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "study-refinements",
+      "version": "1.41.1",
+      "status": "released",
+      "date": "2026-11-01",
+      "title": "A tidier study space",
+      "summary": "A cleaner course picker and space for your notes and recordings.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Personal learning levels",
+          "description": "Right-click a saved word or sentence to set its learning level.",
+          "details": [
+            "Choose New, Weak, Learning or Strong.",
+            "Choose Automatic to use your practice results again."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/author-341e93ea2e8ca9fe0e5e87bfbf34c57a.png",
+              "alt": "A saved word with the right-click menu open, showing Automatic, New, Weak, Learning and Strong.",
+              "caption": "Right-click a saved card to choose its learning level."
+            }
+          ]
+        },
+        {
+          "type": "improved",
+          "title": "Study details",
+          "description": "A cleaner look while you learn.",
+          "details": [
+            "A tidier Kana chart, without the extra character at the top.",
+            "A neater course picker with clearer loading and error messages.",
+            "A new Fill the gap icon.",
+            "Clearer playback controls and a focused recording view.",
+            "Full-width notes that reopen in read view, with smoother transitions.",
+            "Less automatic processing on microphone recordings.",
+            "Fill the gap now recognises the word forms used in iKnow examples.",
+            "Delete a saved note directly from its panel.",
+            "Switch between saved words and practice options without flashing."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
       "id": "new-study-space",
       "version": "1.41.0",
       "status": "released",

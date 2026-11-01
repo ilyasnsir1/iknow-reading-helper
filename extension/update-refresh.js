@@ -12,13 +12,39 @@
       return Number.isInteger(tab?.id) && tab.id >= 0 && url.protocol === "https:" && HOSTS.has(url.hostname) && !url.port;
     } catch { return false; }
   }
-  function create({ chrome, getVersion, getState, save, getActivity = async () => false }) {
+  function create({ chrome, getVersion, getState, save, getActivity = async () => false, getChangelogEntry = async () => null }) {
     let running = null;
     const result = (ok, extra = {}) => ({ ok, state: getState(), ...extra });
     const matchingTabs = async () => (await chrome.tabs.query({ url: URLS })).filter(eligible);
     // A subsequent release can be discovered while the previous install's page
     // refresh waits for preparation/audio. Keep that newer update's notice.
     const refreshMessage = message => getState().status === "available" ? {} : { message };
+    async function openChangelog(version) {
+      const eligible = () => validVersion(version) && getVersion() === version &&
+        getState().autoRefreshTarget === version && getState().autoRefreshCompleteVersion === version &&
+        getState().changelogTarget === version && getState().changelogOpenedVersion !== version && refreshable(getState());
+      if (!eligible()) return;
+      let previous;
+      try {
+        const entry = await getChangelogEntry(version);
+        if (!eligible() || typeof entry !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(entry)) return;
+        previous = getState().changelogOpenedVersion || null;
+        // Claim before opening. A worker stopped after tabs.create cannot open
+        // the same release again on restart, even if its reply was interrupted.
+        await save({ changelogOpenedVersion: version });
+        if (getVersion() !== version || getState().changelogTarget !== version) return;
+        try { await chrome.tabs.create({ url: chrome.runtime.getURL("changelog.html") + "#" + entry, active: true }); }
+        catch (error) {
+          // A definite browser refusal has no side effect and may be retried.
+          await save({ changelogOpenedVersion: previous });
+          throw error;
+        }
+      } catch (error) {
+        // Notes must never turn an installed update or completed page refresh
+        // into an error. The normal Changelog link remains available.
+        globalThis.IKnowReaderDiagnosticHistory?.exception("updates", error, { code: "update_changelog_open_failed" });
+      }
+    }
     async function fallback(code, message) {
       await save({ refreshTabs: true, ...refreshMessage(message) });
       return result(false, { code });
@@ -28,7 +54,10 @@
       // This target is written by updates.js after a verified, explicit install;
       // helper status payloads must never supply or overwrite it.
       if (!manual && (!validVersion(version) || state.autoRefreshTarget !== version ||
-        !refreshable(state) || state.autoRefreshCompleteVersion === version)) return result(true);
+        !refreshable(state) || state.autoRefreshCompleteVersion === version)) {
+        await openChangelog(version);
+        return result(true);
+      }
       if (await getActivity()) {
         await save({ refreshTabs: true, ...refreshMessage("Updated. Pause preparation to refresh your open iKnow pages automatically.") });
         return result(false, { deferred: true, code: "preparation_active" });
@@ -114,6 +143,7 @@
       if (plan.remaining.length || plan.claimed.length) return fallback("refresh_incomplete", "Updated. Some iKnow pages could not be refreshed. Choose Refresh iKnow pages to retry.");
       await save({ autoRefreshPlan: null, autoRefreshCompleteVersion: version, refreshTabs: false,
         ...refreshMessage("Your open iKnow pages have been refreshed.") });
+      await openChangelog(version);
       return result(true);
     }
     function run({ manual = false } = {}) {

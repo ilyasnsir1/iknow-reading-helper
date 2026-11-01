@@ -79,11 +79,17 @@
   function createClient({fetchImpl = globalThis.fetch?.bind(globalThis)} = {}) {
     if (!Catalog || typeof fetchImpl !== "function") throw Error("Course data is unavailable.");
     if(globalThis.IKnowStudyWorkspaceProduction){
+      const retainTargets = async catalog => {
+        // An explicitly opened course can fill missing source metadata in older
+        // bookmarks. The store keeps notes, progress and existing source text.
+        try { await globalThis.IKnowReaderStudyStore?.enrich(catalog.records); } catch { /* Course practice remains usable if optional enrichment cannot save. */ }
+        return catalog;
+      };
       return Object.freeze({
-        load:value=>Catalog.load(Catalog.courseId(value)),
+        load:value=>Catalog.load(Catalog.courseId(value)).then(retainTargets),
         cached:async value=>{
           const storage={get:keys=>chrome.storage.local.get(keys),set:async()=>{throw Error('A cache-only read cannot write.');}};
-          try{return await Catalog.createBackend(storage,{fetchImpl:async()=>{throw Error('No saved course.');}}).load(Catalog.courseId(value));}catch{return null;}
+          try{return await retainTargets(await Catalog.createBackend(storage,{fetchImpl:async()=>{throw Error('No saved course.');}}).load(Catalog.courseId(value)));}catch{return null;}
         },
         courseId:Catalog.courseId
       });

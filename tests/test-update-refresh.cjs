@@ -9,15 +9,18 @@ function fixture(options = {}) {
   const tabs = new Map((options.tabs || [
     { id: 1, url: "https://iknow.jp/courses/19053" }, { id: 2, url: "https://en.iknow.jp/series/1" }, { id: 3, url: "https://ja.iknow.jp/dashboard" }
   ]).map(tab => [tab.id, { ...tab }]));
-  const reloads = [], writes = [], failures = new Set(), lookupFailures = new Set();
+  const reloads = [], writes = [], opened = [], failures = new Set(), lookupFailures = new Set();
   let queryError = false, onReload = null, onGet = null, onSave = null, onActivity = null, saveError = null;
-  const chrome = { tabs: {
+  let notesError = false, entry = "new-study-space", onOpen = null;
+  const chrome = { runtime: { getURL: file => "chrome-extension://fixture/" + file }, tabs: {
     query: async filter => { assert.deepEqual(Array.from(filter.url), ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"]); if (queryError) throw Error("query failed"); return [...tabs.values()]; },
     get: async id => { if (onGet) await onGet(id); if (!tabs.has(id) || lookupFailures.has(id)) throw Error("no tab"); return tabs.get(id); },
-    reload: async id => { reloads.push(id); if (onReload) await onReload(id); if (failures.has(id)) throw Error("reload failed"); }
+    reload: async id => { reloads.push(id); if (onReload) await onReload(id); if (failures.has(id)) throw Error("reload failed"); },
+    create: async value => { if (notesError) throw Error("tab refused"); opened.push(structuredClone(value)); if (onOpen) await onOpen(value); return { id: 20 }; }
   } };
   const context = vm.createContext({ URL, Promise }); vm.runInContext(source, context);
   const make = () => context.IKnowReaderUpdateRefresh.create({ chrome, getVersion: () => version, getState: () => state,
+    getChangelogEntry: async target => { assert.equal(target, VERSION); return entry; },
     getActivity: async () => { if (onActivity) await onActivity(); return active; }, save: async patch => {
       if (saveError?.(patch)) throw Error("storage failed");
       state = { ...state, ...structuredClone(patch) }; stored = structuredClone(state); writes.push(structuredClone(patch));
@@ -25,11 +28,12 @@ function fixture(options = {}) {
       return state;
     } });
   let runner = make();
-  return { run: value => runner.run(value), reloads, writes, tabs, failures, lookupFailures,
+  return { run: value => runner.run(value), reloads, writes, opened, tabs, failures, lookupFailures,
     state: () => structuredClone(state), stored: () => structuredClone(stored), patch: value => { state = { ...state, ...value }; },
     active: value => { active = value; }, version: value => { version = value; }, queryError: value => { queryError = value; },
     onReload: value => { onReload = value; }, onGet: value => { onGet = value; }, onSave: value => { onSave = value; }, saveError: value => { saveError = value; },
     onActivity: value => { onActivity = value; },
+    notesError: value => { notesError = value; }, entry: value => { entry = value; }, onOpen: value => { onOpen = value; },
     restart() { state = structuredClone(stored); runner = make(); }
   };
 }
@@ -180,4 +184,48 @@ function fixture(options = {}) {
   empty.tabs.set(7, { id: 7, url: "https://iknow.jp/" }); empty.restart(); await empty.run(); assert.deepEqual(empty.reloads, []);
   const legacy = fixture({ state: { autoRefreshTarget: null } }); await legacy.run({ manual: true }); assert.deepEqual(legacy.reloads, [1, 2, 3]);
   console.log("PASS Loaded target is rechecked during the batch; no-open-tabs completes once; legacy explicit Refresh remains available");
+
+  const notes = fixture({ state: { changelogTarget: VERSION } });
+  notes.onOpen(() => {
+    assert.equal(notes.stored().autoRefreshCompleteVersion, VERSION);
+    assert.equal(notes.stored().changelogOpenedVersion, VERSION);
+    assert.deepEqual(notes.reloads, [1, 2, 3]);
+  });
+  await Promise.all([notes.run(), notes.run(), notes.run({ manual: true })]);
+  assert.deepEqual(notes.opened, [{ url: "chrome-extension://fixture/changelog.html#new-study-space", active: true }]);
+  notes.restart(); await notes.run(); await notes.run({ manual: true }); assert.equal(notes.opened.length, 1);
+  console.log("PASS A newly installed loaded target opens its bundled release notes once, focused, after safe page refresh; concurrent calls, manual refresh and restart do not duplicate it");
+
+  for (const state of [
+    { changelogTarget: null }, { changelogTarget: "9.0.0" },
+    { changelogTarget: VERSION, autoRefreshTarget: null },
+    { changelogTarget: VERSION, status: "error" },
+    { changelogTarget: VERSION, status: "installing" }
+  ]) {
+    const f = fixture({ state }); await f.run(); assert.equal(f.opened.length, 0);
+  }
+  const notLoaded = fixture({ version: "1.35.3", state: { changelogTarget: VERSION } }); await notLoaded.run(); assert.equal(notLoaded.opened.length, 0);
+  assert.equal(all.opened.length, 0);
+  console.log("PASS Developer reloads, another target, failed or incomplete installs and the still-running old version do not open changelog tabs");
+
+  const waits = fixture({ state: { changelogTarget: VERSION } }); waits.active(true);
+  await waits.run(); assert.equal(waits.opened.length, 0);
+  waits.active(false); waits.tabs.get(1).audible = true; await waits.run(); assert.equal(waits.opened.length, 0);
+  waits.tabs.get(1).audible = false; waits.failures.add(2); await waits.run(); assert.equal(waits.opened.length, 0);
+  waits.failures.clear(); await waits.run(); assert.equal(waits.opened.length, 1);
+  const noPages = fixture({ tabs: [], state: { changelogTarget: VERSION } }); await noPages.run(); assert.equal(noPages.opened.length, 1);
+  console.log("PASS Notes wait for preparation/audio and successful pending refreshes, and still open after an update when no iKnow tabs are open");
+
+  const retryNotes = fixture({ state: { changelogTarget: VERSION } }); retryNotes.notesError(true);
+  assert.equal((await retryNotes.run()).ok, true); assert.equal(retryNotes.state().refreshTabs, false); assert.equal(retryNotes.state().status, "current");
+  assert.equal(retryNotes.state().changelogOpenedVersion, null);
+  retryNotes.notesError(false); retryNotes.restart(); await retryNotes.run(); assert.equal(retryNotes.opened.length, 1);
+  const interruptedNotes = fixture({ state: { changelogTarget: VERSION, autoRefreshCompleteVersion: VERSION, changelogOpenedVersion: VERSION } });
+  interruptedNotes.restart(); await interruptedNotes.run(); assert.equal(interruptedNotes.opened.length, 0);
+  const missingNotes = fixture({ state: { changelogTarget: VERSION } }); missingNotes.entry(null); await missingNotes.run(); assert.equal(missingNotes.opened.length, 0);
+  for (const invalid of ["../popup", "https://example.com", "<script>", "a".repeat(81)]) {
+    missingNotes.entry(invalid); await missingNotes.run(); assert.equal(missingNotes.opened.length, 0);
+  }
+  missingNotes.entry("new-study-space"); await missingNotes.run(); assert.equal(missingNotes.opened.length, 1);
+  console.log("PASS A browser refusal retries without invalidating installation; an interrupted claimed open never duplicates; only a safe exact-release entry can open");
 })().catch(error => { console.error(error); process.exitCode = 1; });

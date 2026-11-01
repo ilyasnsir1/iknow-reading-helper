@@ -28,10 +28,18 @@
       lastErrorCode: ok ? null : next.code || "update_check_failed", lastErrorMessage: ok ? null : next.message || "The update check did not finish." };
   }
   const refresher = globalThis.IKnowReaderUpdateRefresh?.create({ chrome, getVersion: () => version, getState: () => state,
-    save: value => save(value), getActivity: async () => await globalThis.IKnowReaderUpdateActivity?.() === true });
+    save: value => save(value), getActivity: async () => await globalThis.IKnowReaderUpdateActivity?.() === true,
+    getChangelogEntry: async target => {
+      const reply = await fetch(chrome.runtime.getURL("changelog.json"), { cache: "no-cache", redirect: "error" });
+      if (!reply.ok) return null;
+      const data = await reply.json();
+      if (data?.schemaVersion !== 1 || !Array.isArray(data.entries) || data.entries.length > 100) return null;
+      return data.entries.find(entry => entry?.status === "released" && entry.version === target &&
+        typeof entry.id === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/.test(entry.id))?.id || null;
+    } });
   function storedRefreshMarkers(value) {
     const markers = {};
-    for (const key of ["autoRefreshTarget", "autoRefreshCompleteVersion"]) if (validVersion(value?.[key])) markers[key] = value[key];
+    for (const key of ["autoRefreshTarget", "autoRefreshCompleteVersion", "changelogTarget", "changelogOpenedVersion"]) if (validVersion(value?.[key])) markers[key] = value[key];
     const plan = value?.autoRefreshPlan;
     if (plan && validVersion(plan.version)) markers.autoRefreshPlan = { version: plan.version,
       remaining: Array.isArray(plan.remaining) ? [...new Set(plan.remaining.filter(id => Number.isInteger(id) && id >= 0))].slice(0, 2000) : [],
@@ -100,7 +108,7 @@
     if (!validVersion(target)) throw Error("The installed update has no valid version.");
     await save({ ...next, latestVersion: target });
     if (target === version) {
-      await save({ status: "current", installAttempted: false, autoRefreshTarget: target,
+      await save({ status: "current", installAttempted: false, autoRefreshTarget: target, changelogTarget: target,
         refreshTabs: state.autoRefreshCompleteVersion !== target, message: state.autoRefreshCompleteVersion === target ? "Your iKnow pages are up to date." : "Updated. Refreshing your open iKnow pages…" });
       await refresher?.run(); return;
     }
@@ -109,7 +117,7 @@
     }
     if (reloadScheduled) return;
     reloadScheduled = true;
-    await save({ status: "complete", reloadedVersion: target, autoRefreshTarget: target, autoRefreshPlan: null,
+    await save({ status: "complete", reloadedVersion: target, autoRefreshTarget: target, autoRefreshPlan: null, changelogTarget: target,
       refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
     setTimeout(() => chrome.runtime.reload(), 500);
   }
@@ -141,7 +149,7 @@
       // too. A same-version developer reload alone carries no such intent.
       const installed = state.status === "complete" || state.installAttempted || state.reloadedVersion === version;
       await save({ status: "current", installAttempted: false,
-        ...(installed && state.refreshTabs ? { autoRefreshTarget: version } : {}),
+        ...(installed && state.refreshTabs ? { autoRefreshTarget: version, changelogTarget: version } : {}),
         message: state.refreshTabs ? "Updated. Refreshing your open iKnow pages…" : "You are up to date." });
     } else if (state.status === "checking") await save({ status: "idle", message: "" });
     else if (state.status === "complete") await finishInstall(state);

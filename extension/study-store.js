@@ -8,7 +8,8 @@
   const DEFAULT_PREFERENCES = Object.freeze({ attempts: "retry", gapPosition: "random" });
   const THEMES = ["paper", "midnight", "tokyo", "forest"], RATINGS = ["again", "hard", "good"];
   const MAX_TIMESTAMP = 8640000000000000, PERSONAL_KEYS = ["notes", "review"];
-  const DETAIL_KEYS = ["japanese", "jpan", "kana", "romaji", "english", "german", "audioUrl"];
+  const TEXT_DETAIL_KEYS = ["japanese", "jpan", "kana", "romaji", "english", "german", "audioUrl"];
+  const DETAIL_KEYS = [...TEXT_DETAIL_KEYS, "clozeTarget"];
   const RECORD_KEYS = ["kind", "courseId", "courseTitle", "sourceId", ...DETAIL_KEYS, "context", ...PERSONAL_KEYS, "key", "createdAt", "updatedAt"];
   const HOSTS = new Set(["iknow.jp", "en.iknow.jp", "ja.iknow.jp", "assets.iknow.jp", "assets0.iknow.jp", "assets1.iknow.jp", "assets2.iknow.jp", "assets3.iknow.jp"]);
   const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -78,8 +79,14 @@
   }
   function details(input) {
     if (!object(input)) throw Error("The study item is not valid.");
-    return { japanese: text(input.japanese, 5000, true), jpan: text(input.jpan, 5000), kana: text(input.kana, 5000), romaji: text(input.romaji, 5000),
+    const result = { japanese: text(input.japanese, 5000, true), jpan: text(input.jpan, 5000), kana: text(input.kana, 5000), romaji: text(input.romaji, 5000),
       english: text(input.english, 5000), german: text(input.german, 5000), audioUrl: audioUrl(input.audioUrl) };
+    if (input.clozeTarget !== undefined) {
+      const target = core()?.validateClozeTarget?.(input.clozeTarget, result);
+      if (!target) throw Error("The saved example has an invalid vocabulary target.");
+      result.clozeTarget = target;
+    }
+    return result;
   }
   function validate(input) {
     if (!object(input) || !["word", "sentence"].includes(input.kind)) throw Error("Choose a word or sentence to save.");
@@ -87,6 +94,7 @@
     if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(sourceId)) throw Error("The study item has no stable source identifier.");
     const result = { kind: input.kind, courseId: id, courseTitle: text(input.courseTitle, 500), sourceId, ...details(input) };
     if (input.context !== undefined) result.context = details(input.context);
+    if (result.kind === "word" && result.context?.clozeTarget && result.context.clozeTarget.vocabulary !== result.japanese) throw Error("The saved example belongs to another vocabulary word.");
     if (own(input, "notes")) result.notes = notes(input.notes);
     if (own(input, "review")) result.review = review(input.review);
     return result;
@@ -160,7 +168,7 @@
     const data = bounded({ schemaVersion: 1, records });
     return { data, summary: { newItems, existingItems, totalItems: Object.keys(records).length,
       backupItems: Object.keys(backup.library.records).length, hasSettings: Boolean(backup.settings && Object.keys(backup.settings).length),
-      added: newItems, updated, kept, learningItems: Object.keys(backup.learning?.records || {}).length } };
+      added: newItems, updated, kept, learningItems: new Set([...Object.keys(backup.learning?.records || {}), ...Object.keys(backup.learning?.assessments || {})]).size } };
   }
   function selectedKeys(input) {
     if (!Array.isArray(input) || input.length > MAX_RECORDS) throw Error("Choose valid saved items to delete.");
@@ -243,11 +251,19 @@
             const record = { ...previous };
             // Enrichment never overwrites a learner's notes, review history or
             // existing source text. It only fills fields absent in old saves.
-            for (const field of ["courseTitle", ...DETAIL_KEYS]) if (!record[field] && value[field]) record[field] = value[field];
+            for (const field of ["courseTitle", ...TEXT_DETAIL_KEYS]) if (!record[field] && value[field]) record[field] = value[field];
+            if (!record.clozeTarget && value.clozeTarget) {
+              const target = core()?.validateClozeTarget?.(value.clozeTarget, record);
+              if (target) record.clozeTarget = target;
+            }
             if (!record.context && value.context) record.context = value.context;
             else if (record.context && value.context && record.context.japanese === value.context.japanese) {
               record.context = { ...record.context };
-              for (const field of DETAIL_KEYS) if (!record.context[field] && value.context[field]) record.context[field] = value.context[field];
+              for (const field of TEXT_DETAIL_KEYS) if (!record.context[field] && value.context[field]) record.context[field] = value.context[field];
+              if (!record.context.clozeTarget && value.context.clozeTarget) {
+                const target = core()?.validateClozeTarget?.(value.context.clozeTarget, record.context, record.japanese);
+                if (target) record.context.clozeTarget = target;
+              }
             }
             if (JSON.stringify(record) !== JSON.stringify(previous)) { record.updatedAt = now(); data.records[key] = record; enriched++; }
           }
@@ -275,8 +291,9 @@
         return transaction(async () => {
           const Core = core(); if (!Core) throw Error("Reading preferences are unavailable. Reload Reading Helper and try again.");
           const Learning = learning(), stored = await storage.get([KEY, Core.STORAGE_KEY, APP_THEME_KEY, PANEL_THEME_KEY, PREFERENCES_KEY, Learning.KEY]);
+          const progress = Learning.normalizeData(stored[Learning.KEY]);
           return parseBackup({ format: BACKUP_FORMAT, schemaVersion: 1, exportedAt: now(), library: library(stored[KEY]),
-            learning: { records: Learning.normalizeData(stored[Learning.KEY]).records },
+            learning: { records: progress.records, ...(progress.assessments ? { assessments: progress.assessments } : {}) },
             settings: { reading: Core.normalizeSettings(stored[Core.STORAGE_KEY]), appTheme: THEMES.includes(stored[APP_THEME_KEY]) ? stored[APP_THEME_KEY] : "paper",
               panelTheme: THEMES.includes(stored[PANEL_THEME_KEY]) ? stored[PANEL_THEME_KEY] : "paper", study: storedPreferences(stored[PREFERENCES_KEY]) } });
         });
@@ -301,7 +318,7 @@
           }
           if (backup.learning) {
             const Learning = learning(), current = Learning.normalizeData((await storage.get(Learning.KEY))[Learning.KEY]);
-            patch[Learning.KEY] = { ...current, records: Learning.mergeProgress(current, backup.learning).records };
+            patch[Learning.KEY] = { ...current, ...Learning.mergeProgress(current, backup.learning) };
           }
           await storage.set(patch);
           return { ...summary, importedSettings: Boolean(options.includeSettings && summary.hasSettings) };

@@ -8,19 +8,23 @@ const out=path.join(__dirname,'changelog-preview-evidence');fs.mkdirSync(out,{re
  const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce'}),page=await context.newPage(),errors=[],requests=[];
  page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));
  try{
-  await page.goto('http://127.0.0.1:52332/extension/changelog.html#new-study-space');
-  await page.locator('#new-study-space .change').last().waitFor();
-  assert.equal(await page.locator('#new-study-space .change').count(),2,'One new Study workspace and one improvement to existing theme menus');
-  assert.equal(await page.locator('#new-study-space .change').first().locator('.change-details li').count(),6);
-  assert.equal(await page.locator('.release-entry').count(),3,'The public history is retained beside the next update');
-  assert.equal(await page.locator('#new-study-space .release-status').innerText(),'Released');
-  assert.equal(await page.locator('#new-study-space .release-version').innerText(),'Version 1.41.0');
-  assert.equal(await page.locator('#changelog-installed').innerText(),'Installed · 1.41.0');
-  assert.deepEqual(await page.locator('#new-study-space .change-type').allTextContents(),['Added','Improved']);
-  assert.deepEqual(await page.locator('#new-study-space .change h3').allTextContents(),['Study workspace','Theme menus']);
-  assert.doesNotMatch(await page.locator('body').innerText(),/Preview|Next update|Local preview/,'Display exactly the intended release layout');
-  assert.equal(await page.locator('#new-study-space .changelog-image-button').count(),2);
-  for(const button of await page.locator('#new-study-space .changelog-image-button').all()){
+  await page.goto('http://127.0.0.1:52332/extension/changelog.html#study-refinements');
+  const release=page.locator('#study-refinements');await release.locator('.change').last().waitFor();
+  assert.equal(await release.locator('.change').count(),2,'Personal learning levels debut beside improvements to the existing Study details');
+  assert.equal(await page.locator('.release-entry').count(),4,'The public history is retained beside the intended release');
+  assert.equal(await release.locator('.release-status').innerText(),'Released');
+  assert.equal(await release.locator('.release-version').innerText(),'Version 1.41.1');
+  assert.equal(await release.locator('.release-date').getAttribute('datetime'),'2026-11-01');
+  assert.equal(await page.locator('#changelog-installed').innerText(),'Installed · 1.41.1');
+  assert.deepEqual(await release.locator('.change-type').allTextContents(),['Added','Improved']);
+  assert.deepEqual(await release.locator('.change h3').allTextContents(),['Personal learning levels','Study details']);
+  const personal=release.locator('.change').first();
+  assert.match(await personal.innerText(),/Right-click a saved word or sentence to set its learning level\./);
+  assert.deepEqual(await personal.locator('.change-details li').allTextContents(),['Choose New, Weak, Learning or Strong.','Choose Automatic to use your practice results again.']);
+  assert.equal(await page.locator('#new-study-space .change').first().locator('.change-details li').count(),6,'The earlier workspace introduction remains grouped in its original entry');
+  assert.doesNotMatch(await page.locator('body').innerText(),/Preview|Next update|Local preview|\bdemo\b/i,'Display exactly the intended release layout');
+  assert.equal(await release.locator('.changelog-image-button').count(),1,'Personal learning levels have one clear screenshot');
+  for(const button of await release.locator('.changelog-image-button').all()){
    await button.click();await page.locator('#changelog-image-dialog[open]').waitFor();await page.waitForFunction(()=>document.getElementById('changelog-image-full').naturalWidth>0);await page.locator('#changelog-image-close').click();
   }
   assert.equal(await page.locator('#edit-changelog').isHidden(),true,'The web review is read-only');
@@ -42,6 +46,6 @@ const out=path.join(__dirname,'changelog-preview-evidence');fs.mkdirSync(out,{re
   assert.equal(await page.locator('html').getAttribute('data-ikr-theme'),'midnight','The web review pages share the app-theme preview preference');
   assert.ok(requests.every(url=>url.startsWith('http://127.0.0.1:52332/')),'The review does not contact a publisher or upload anything');
   assert.deepEqual(errors,[]);
-  console.log('PASS Final Changelog appearance: one Added workspace with its features, one Improved theme menu, intended version/date and two enlargable screenshots; no Preview/demo badges; read-only isolation');
+  console.log('PASS Final 1.41.1 Changelog: Added personal learning levels, Improved Study details, retained four-release history, intended version/date and one enlargable screenshot; no Preview/demo badges; read-only isolation and four-theme controls');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

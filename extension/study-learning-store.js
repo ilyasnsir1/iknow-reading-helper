@@ -42,18 +42,33 @@
     return result;
   }
   function validateProgress(input) {
-    fields(input, ["records"]);
+    fields(input, ["records", "assessments"]);
     const result = { records: records(input.records) };
+    if (own(input, "assessments")) result.assessments = assessments(input.assessments);
     if (bytes(result) > MAX_BYTES) throw Error("This learning history exceeds its size limit.");
     return result;
   }
+  function assessments(input) {
+    if (!object(input) || Object.keys(input).length > MAX_RECORDS) throw Error("The personal learning levels are invalid or too large.");
+    const result = {};
+    for (const [id, value] of Object.entries(input)) {
+      key(id); if (!Learning.validAssessment(value)) throw Error("Choose a valid personal learning level.");
+      result[id] = { level: value.level, updatedAt: value.updatedAt };
+    }
+    return result;
+  }
   function mergeProgress(current, incoming) {
-    const local = validateProgress({ records: current.records }), added = validateProgress(incoming), result = local.records;
+    const local = validateProgress({ records: current.records, ...(current.assessments ? { assessments: current.assessments } : {}) }), added = validateProgress(incoming), result = local.records;
     for (const [id, modes] of Object.entries(added.records)) {
       const target = result[id] ||= {};
       for (const [mode, skill] of Object.entries(modes)) if (!target[mode] || skill.lastReviewedAt > target[mode].lastReviewedAt) target[mode] = skill;
     }
-    return validateProgress({ records: result });
+    const merged = { records: result };
+    if (local.assessments || added.assessments) {
+      merged.assessments = { ...local.assessments };
+      for (const [id, value] of Object.entries(added.assessments || {})) if (!merged.assessments[id] || value.updatedAt > merged.assessments[id].updatedAt) merged.assessments[id] = value;
+    }
+    return validateProgress(merged);
   }
   function cards(input) {
     if (!Array.isArray(input) || !input.length || input.length > MAX_SESSION_ITEMS) throw Error("Choose between 1 and 2,000 practice items.");
@@ -111,9 +126,10 @@
   }
   function normalizeData(input) {
     if (input === undefined) return { schemaVersion: 1, records: {}, session: null };
-    fields(input, ["schemaVersion", "records", "session"]);
+    fields(input, ["schemaVersion", "records", "session", "assessments"]);
     if (input.schemaVersion !== 1 || !own(input, "session")) throw Error("This learning history version is unsupported. Its data has been kept.");
     const result = { schemaVersion: 1, records: records(input.records), session: input.session === null ? null : session(input.session) };
+    if (own(input, "assessments")) result.assessments = assessments(input.assessments);
     if (bytes(result) > MAX_BYTES) throw Error("This learning history exceeds its size limit.");
     return result;
   }
@@ -127,7 +143,20 @@
     const write = async value => { const clean = normalizeData(value); await storage.set({ [KEY]: clean }); return clean; };
     return Object.freeze({
       getData: () => transaction(read),
-      progress: () => transaction(async () => ({ records: (await read()).records })),
+      progress: () => transaction(async () => { const data = await read(); return validateProgress({ records: data.records, ...(data.assessments ? { assessments: data.assessments } : {}) }); }),
+      setAssessment(input) {
+        fields(input, ["key", "level"]); const id = key(input.key);
+        if (!Learning.LEVELS.includes(input.level)) throw Error("Choose a valid personal learning level.");
+        return transaction(async () => {
+          const saved = (await storage.get(Study.KEY))[Study.KEY]?.records?.[id];
+          if (!saved || Study.makeKey(saved) !== id) throw Error("This saved word or sentence no longer exists.");
+          const data = await read(), previous = data.assessments?.[id];
+          data.assessments ||= {};
+          data.assessments[id] = { level: input.level, updatedAt: Math.max(now(), (previous?.updatedAt || 0) + 1) };
+          const next = await write(data);
+          return validateProgress({ records: next.records, assessments: next.assessments });
+        });
+      },
       getSession: () => transaction(async () => (await read()).session),
       setSessionState(value, state) {
         const id = sessionId(value);
@@ -203,7 +232,7 @@
   let listening = false;
   function listenBackground() {
     if (listening) return; listening = true;
-    const backend = createBackend(chrome.storage.local), commands = ["progress", "session:get", "session:start", "session:state", "attempt", "commit", "session:end"];
+    const backend = createBackend(chrome.storage.local), commands = ["progress", "assessment", "session:get", "session:start", "session:state", "attempt", "commit", "session:end"];
     chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (!commands.some(type => message?.type === "ikr:learning:" + type)) return;
       let trusted = false;
@@ -215,6 +244,7 @@
       if (!trusted) { respond({ ok: false, message: "Open Your study space to manage learning progress." }); return; }
       const operation = async () => {
         if (message.type === "ikr:learning:progress") return { ok: true, progress: await backend.progress() };
+        if (message.type === "ikr:learning:assessment") return { ok: true, progress: await backend.setAssessment(message.assessment) };
         if (message.type === "ikr:learning:session:get") return { ok: true, session: await backend.getSession() };
         if (message.type === "ikr:learning:session:start") return { ok: true, session: await backend.startSession(message.session) };
         if (message.type === "ikr:learning:session:state") return { ok: true, session: await backend.setSessionState(message.sessionId, message.state) };
@@ -227,7 +257,7 @@
     });
   }
   const api = Object.freeze({ KEY, MAX_RECORDS, MAX_SESSION_ITEMS, MAX_SESSION_BYTES, MAX_BYTES, validateProgress, mergeProgress, normalizeData, createBackend, listenBackground,
-    progress: () => command("progress"), getSession: () => command("session:get"), startSession: value => command("session:start", { session: value }),
+    progress: () => command("progress"), setAssessment: value => command("assessment", { assessment: value }), getSession: () => command("session:get"), startSession: value => command("session:start", { session: value }),
     setSessionState: (id, state) => command("session:state", { sessionId: id, state }),
     checkpointAttempt: value => command("attempt", { attempt: value }), commit: value => command("commit", { result: value }), endSession: id => command("session:end", { sessionId: id }) });
   globalThis.IKnowReaderStudyLearningStore = api;

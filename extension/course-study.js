@@ -57,10 +57,13 @@
       english: globalThis.IKnowReaderTranslationCorrections?.get(source)?.text || fields[1], german: matched?.german?.text || "", audioUrl: sound(source.sound) };
   }
   function linkedExample(entry, japanese) {
-    const candidates = (entry.sentences || []).slice(0, 100).filter(source => source?.cue?.text).map(example);
-    // Prefer a complete source token. An inflected or unrelated example remains
-    // useful for listening, but the cloze engine will not quiz another word.
-    return candidates.find(value => value.jpan && value.jpan.replace(/\s/gu, "") === value.japanese.replace(/\s/gu, "") &&
+    const candidates = (entry.sentences || []).slice(0, 100).filter(source => source?.cue?.text).map(source => {
+      const details = example(source), clozeTarget = globalThis.IKnowReaderCore.sourceClozeTarget(source.cue, japanese);
+      return clozeTarget ? { ...details, clozeTarget } : details;
+    });
+    // The course's own marked span identifies its vocabulary, including the
+    // form used in this example. Older unmarked examples keep the exact fallback.
+    return candidates.find(value => value.clozeTarget) || candidates.find(value => value.jpan && value.jpan.replace(/\s/gu, "") === value.japanese.replace(/\s/gu, "") &&
       value.jpan.trim().split(/\s+/u).some(token => token.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "") === japanese)) || candidates[0];
   }
   function sentence(state, courseId, courseTitle) {

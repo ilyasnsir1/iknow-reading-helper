@@ -10,13 +10,16 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
 (async () => {
   const bundled = JSON.parse(fs.readFileSync(path.join(source, "changelog.json"), "utf8"));
   assert.equal(bundled.schemaVersion, 1);
-  assert.equal(bundled.entries.length, 3, "history retains the button fix, Romaji choice and new Study release");
+  assert.equal(bundled.entries.length, 4, "history retains every published entry from the bilingual button fix onward");
   assert.equal(bundled.entries[0].status, "released");
   assert.equal(bundled.entries[0].version, JSON.parse(fs.readFileSync(path.join(source, "manifest.json"), "utf8")).version, "the finalized newest notes match the release");
-  assert.equal(bundled.entries[1].version, "1.40.5");
-  assert.equal(bundled.entries[1].status, "released");
-  assert.equal(bundled.entries[2].version, "1.40.4");
-  assert.equal(bundled.entries[0].changes[0].title, "Study workspace");
+  assert.deepEqual(bundled.entries.slice(1).map(entry => entry.version), ["1.41.0", "1.40.5", "1.40.4"]);
+  assert.ok(bundled.entries.every(entry => entry.status === "released"));
+  const levels = bundled.entries[0].changes.find(change => change.title === "Personal learning levels");
+  assert.equal(levels.type, "added");
+  assert.match(levels.description, /Right-click/);
+  assert.ok(levels.details.some(detail => detail.includes("Automatic")));
+  assert.equal(levels.images.length, 1, "the new right-click menu is illustrated");
   const extension = require("./fixtures/isolate-extension.cjs")(source, out);
   fs.mkdirSync(path.join(extension, "changelog-media"), { recursive: true });
   fs.copyFileSync(path.join(extension, "icons/icon128.png"), path.join(extension, "changelog-media/test-fixture.png"));

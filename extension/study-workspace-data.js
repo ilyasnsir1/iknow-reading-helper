@@ -24,7 +24,7 @@
       const [backup, active] = await Promise.all([Store.exportBackup(), Progress.getSession()]);
       const snapshot = {
         library: copy(backup.library),
-        learning: { schemaVersion: 1, records: copy(backup.learning?.records || {}), session: copy(active) },
+        learning: { schemaVersion: 1, records: copy(backup.learning?.records || {}), ...(backup.learning?.assessments ? { assessments: copy(backup.learning.assessments) } : {}), session: copy(active) },
         reading: Core.normalizeSettings(backup.settings?.reading),
         preferences: copy(backup.settings?.study || { attempts: "retry", gapPosition: "random" }),
         appTheme: THEMES.includes(backup.settings?.appTheme) ? backup.settings.appTheme : "paper",
@@ -37,7 +37,7 @@
       if (!latestSnapshot) return fullSnapshot();
       const next = { ...latestSnapshot }, jobs = [];
       if (keys.has(Store.KEY)) jobs.push(Store.list({order:"added"}).then(records => {next.library = {schemaVersion:1,records:Object.fromEntries(records.map(record=>[record.key,record]))};}));
-      if (keys.has(Progress.KEY)) jobs.push(Promise.all([Progress.progress(),Progress.getSession()]).then(([progress,session])=>{next.learning={schemaVersion:1,records:progress.records,session};}));
+      if (keys.has(Progress.KEY)) jobs.push(Promise.all([Progress.progress(),Progress.getSession()]).then(([progress,session])=>{next.learning={schemaVersion:1,...progress,session};}));
       if (keys.has(Store.PREFERENCES_KEY)) jobs.push(Store.getPreferences().then(value=>{next.preferences=value;}));
       const preferences=[Core.STORAGE_KEY,themeKey].filter(key=>keys.has(key));
       if (preferences.length) jobs.push(browser.storage.local.get(preferences).then(stored=>{
@@ -69,7 +69,7 @@
           if(!watched.has(key)||key===panelThemeKey)continue;
           const {oldValue,newValue}=changes[key];
           if(key===Core.STORAGE_KEY&&same(readingProjection(oldValue),readingProjection(newValue)))continue;
-          if(key===Progress.KEY&&same(oldValue?.records||{},newValue?.records||{}))continue;
+          if(key===Progress.KEY&&same(oldValue?.records||{},newValue?.records||{})&&same(oldValue?.assessments||{},newValue?.assessments||{}))continue;
           if(key!==Store.KEY&&key!==Progress.KEY&&same(oldValue,newValue))continue;
           pending.add(key);
         }
@@ -111,6 +111,7 @@
       remove: key => Store.remove(key),
       removeAll: keys => Store.clearLibrary({ expectedKeys: keys }),
       updateNotes: (key, notes) => Store.updateNotes(key, notes),
+      setAssessment: (key, level) => Progress.setAssessment({ key, level }),
       exportBackup: () => Store.exportBackup(),
       previewBackup: backup => Store.previewBackup(backup),
       importBackup: (backup, preferences = {}) => Store.importBackup(backup, preferences),
@@ -126,7 +127,7 @@
         if (!THEMES.includes(theme)) throw Error("Choose a valid theme.");
         await browser.storage.local.set({ [themeKey]: theme }); return theme;
       }),
-      strength: (key, history, mode = "review") => Learning.strength(history?.records?.[key]?.[Learning.MODES.includes(mode) ? mode : "review"]),
+      strength: (key, history, mode = "review") => Learning.strengthFor(key, history, mode),
       beginRound,
       submitAttempt: (sessionId, index, attempt) => Progress.checkpointAttempt({ sessionId, index, attempt }),
       commitAnswer: (sessionId, index, outcome) => Progress.commit({ sessionId, index, outcome, firstCorrect: outcome === "good" }),

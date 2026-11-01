@@ -23,6 +23,15 @@
     if (skill.lastRating === "again") return "weak";
     return skill.lastRating === "good" && skill.correctDays.length >= 3 ? "strong" : "learning";
   }
+  const LEVELS = Object.freeze(["auto", "new", "weak", "learning", "strong"]);
+  function validAssessment(value) {
+    return object(value) && Object.keys(value).length === 2 && LEVELS.includes(value.level) && timestamp(value.updatedAt);
+  }
+  function strengthFor(key, progress, mode = "review") {
+    const manual = progress?.assessments?.[key];
+    if (validAssessment(manual) && manual.level !== "auto") return manual.level;
+    return strength(progress?.records?.[key]?.[MODES.includes(mode) ? mode : "review"]);
+  }
   function next(previous, outcome, now = Date.now()) {
     if (!OUTCOMES.includes(outcome) || !timestamp(now)) throw Error("Choose a valid learning result and time.");
     if (previous !== undefined && previous !== null && !validSkill(previous)) throw Error("This learning history is invalid.");
@@ -50,14 +59,15 @@
       if (!object(record) || !["word", "sentence"].includes(record.kind) || typeof record.key !== "string" || seen.has(record.key)) continue;
       seen.add(record.key);
       const skill = histories[record.key]?.[mode];
-      if (validSkill(skill) && (strength(skill) === "weak" || skill.dueAt <= now)) selected.push(record);
+      const manual = progress?.assessments?.[record.key];
+      if (validAssessment(manual) && manual.level !== "auto" ? manual.level === "weak" : validSkill(skill) && (strength(skill) === "weak" || skill.dueAt <= now)) selected.push(record);
     }
     return selected.sort((a, b) => {
-      const left = histories[a.key][mode], right = histories[b.key][mode];
-      return Number(strength(left) !== "weak") - Number(strength(right) !== "weak") || left.dueAt - right.dueAt || a.key.localeCompare(b.key);
+      const left = histories[a.key]?.[mode], right = histories[b.key]?.[mode];
+      return Number(strengthFor(a.key, progress, mode) !== "weak") - Number(strengthFor(b.key, progress, mode) !== "weak") || (left?.dueAt || 0) - (right?.dueAt || 0) || a.key.localeCompare(b.key);
     });
   }
-  const api = Object.freeze({ DAY_MS, DATE_LIMIT, MAX_INTERVAL_DAYS, MAX_COUNTER, MODES, OUTCOMES, validSkill, strength, next, chooseWeak });
+  const api = Object.freeze({ DAY_MS, DATE_LIMIT, MAX_INTERVAL_DAYS, MAX_COUNTER, MODES, OUTCOMES, LEVELS, validAssessment, validSkill, strength, strengthFor, next, chooseWeak });
   globalThis.IKnowReaderStudyLearning = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();

@@ -187,6 +187,65 @@
       return match;
     }).trim();
   }
+  // Preserve iKnow's explicit vocabulary highlight before its HTML is removed.
+  // Offsets always address the same plain text shown elsewhere in the app.
+  const CLOZE_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
+  const CLOZE_JAPANESE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+  const clozeObject = value => value && typeof value === "object" && !Array.isArray(value);
+  const clozeKeys = (value, keys) => clozeObject(value) && Object.keys(value).every(key => keys.includes(key));
+  const clozeText = value => typeof value === "string" && value.length > 0 && value.length <= 5000 &&
+    value === value.trim() && !CLOZE_CONTROL.test(value) && !/[<>]/u.test(value);
+  const clozeBoundary = (text, offset) => !(offset > 0 && offset < text.length &&
+    /[\uD800-\uDBFF]/u.test(text[offset - 1]) && /[\uDC00-\uDFFF]/u.test(text[offset]));
+  function validateClozeTarget(value, details, vocabulary) {
+    if (!clozeKeys(value, ["vocabulary", "japanese", "kana", "romaji"]) || !["vocabulary", "japanese"].every(key => Object.hasOwn(value, key)) || !clozeObject(details) ||
+        !clozeText(value.vocabulary) || !CLOZE_JAPANESE.test(value.vocabulary) ||
+        vocabulary !== undefined && value.vocabulary !== vocabulary) return null;
+    const result = { vocabulary: value.vocabulary };
+    for (const field of ["japanese", "kana", "romaji"]) {
+      if (field !== "japanese" && !Object.hasOwn(value, field)) continue;
+      const span = value[field], source = details[field];
+      if (!clozeKeys(span, ["start", "end", "text"]) || !["start", "end", "text"].every(key => Object.hasOwn(span, key)) ||
+          typeof source !== "string" || source.length > 5000 || CLOZE_CONTROL.test(source) ||
+          !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) || span.start < 0 ||
+          span.end <= span.start || span.end > source.length || !clozeText(span.text) ||
+          !clozeBoundary(source, span.start) || !clozeBoundary(source, span.end) ||
+          source.slice(span.start, span.end) !== span.text) return null;
+      if (field === "japanese" && !CLOZE_JAPANESE.test(span.text) ||
+          field === "kana" && !/^[\p{Script=Hiragana}\p{Script=Katakana}ー\s]+$/u.test(span.text) ||
+          field === "romaji" && (!/\p{Script=Latin}/u.test(span.text) || !/^[\p{Script=Latin}\p{M}\d\s'’ʼ-]+$/u.test(span.text))) return null;
+      result[field] = { start: span.start, end: span.end, text: span.text };
+    }
+    return result;
+  }
+  function sourceClozeTarget(cue, vocabulary) {
+    if (!clozeObject(cue) || typeof vocabulary !== "string" || vocabulary.length > 10000) return null;
+    const marked = raw => {
+      if (typeof raw !== "string" || raw.length > 10000 || CLOZE_CONTROL.test(raw)) return { invalid: true };
+      if (!/[<>]/u.test(raw)) return { missing: true };
+      // No attributes, nested tags or extra highlights may supply answer text.
+      const match = /^([^<>]*)<b>([^<>]+)<\/b>([^<>]*)$/iu.exec(raw);
+      if (!match) return { invalid: true };
+      const decode = part => plainText("\uE000" + part + "\uE001").slice(1, -1);
+      const before = decode(match[1]), inside = decode(match[2]), after = decode(match[3]);
+      const combined = before + inside + after, text = combined.trim();
+      if (text !== plainText(raw) || text.length > 5000) return { invalid: true };
+      const answer = inside.trim(), start = before.length + inside.length - inside.trimStart().length -
+        (combined.length - combined.trimStart().length);
+      return { text, span: { start, end: start + answer.length, text: answer } };
+    };
+    const japanese = marked(cue.text);
+    if (!japanese.span) return null;
+    const details = { japanese: japanese.text }, result = { vocabulary: plainText(vocabulary), japanese: japanese.span };
+    for (const [field, key] of [["kana", "Hrkt"], ["romaji", "Latn"]]) {
+      const raw = cue.transliterations?.[key];
+      if (raw === undefined || raw === null || raw === "") continue;
+      const reading = marked(raw);
+      if (reading.invalid) return null;
+      if (reading.span) { details[field] = reading.text; result[field] = reading.span; }
+    }
+    return validateClozeTarget(result, details, result.vocabulary);
+  }
   function expectedSource(source) {
     const result = { items: {}, sentences: {}, owners: {}, orphans: [] };
     for (const entry of source?.goal_items || []) {
@@ -363,7 +422,7 @@
     const waiting = unknown.filter(stage => stage !== queue?.stage).map(stage => `${names[stage]} estimate after it starts`).join(" · ");
     return `Measuring ${names[queue?.stage] || "preparation"} speed…${waiting ? ` · ${waiting}` : ""}`;
   }
-  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, audioVolume, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
+  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, audioVolume, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, sourceClozeTarget, validateClozeTarget, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IKnowReaderCore = api;
 })();

@@ -21,6 +21,11 @@ const out=path.join(__dirname,'study-workspace-inline-notes-evidence');fs.mkdirS
   await page.locator('[data-action="note"]').click();await page.locator('#focus-note-input').waitFor();assert.equal(await page.locator('[role="dialog"]').count(),0,'The Note button opens an inline editor');assert.equal(await page.locator('[data-action="save-note"]').isDisabled(),true);
   const raw='  My own note\nA second line.  ';await page.locator('#focus-note-input').fill(raw);await page.locator('[data-action="save-note"]').click();await page.locator('#focus-note[data-note-state="read"]').waitFor();assert.equal(await page.locator('.focus-note-text').textContent(),raw,'Saved note preserves whitespace and line breaks');
   assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('iknowReaderStudyLibrary')).iknowReaderStudyLibrary.records['word:19055:two'].notes),raw);
+  await page.locator('[data-action="note"]').click();await page.locator('#focus-note').waitFor({state:'hidden'});
+  await page.locator('[data-action="note"]').click();await page.locator('#focus-note[data-note-state="read"]').waitFor();
+  assert.equal(await page.locator('.focus-note-text').textContent(),raw,'Reopening a saved note starts in the read view');
+  assert.equal(await page.locator('#focus-note-input').count(),0,'The Note toggle never edits an existing note implicitly');
+  assert.equal(await page.locator('[data-action="edit-note"]').isVisible(),true,'Editing remains an explicit action');
   await page.locator('[data-action="edit-note"]').click();await page.locator('#focus-note-input').fill('Discard this draft');await page.locator('[data-action="cancel-note"]').click();assert.equal(await page.locator('.focus-note-text').textContent(),raw,'Cancel restores the saved note');
   await page.locator('[data-action="edit-note"]').click();await page.locator('#focus-note-input').fill('Keep this unsaved draft');await page.locator(one).click();assert.equal(await page.locator('.focus-note-text').innerText(),'First line\nA saved reminder.');await page.locator(two).click();assert.equal(await page.locator('#focus-note-input').inputValue(),'Keep this unsaved draft','Switching vocabulary keeps the draft for its own word');
   await page.locator('[data-action="compare"]').click();await page.locator('#focus-compare:not([hidden])').waitFor();
@@ -44,6 +49,6 @@ const out=path.join(__dirname,'study-workspace-inline-notes-evidence');fs.mkdirS
    await page.setViewportSize({width:1440,height:900});await page.screenshot({path:path.join(out,`${theme}-inline.png`)});
   }
   await page.reload();await page.locator(one).waitFor();await page.locator(one).click();assert.equal(await page.locator('.focus-note-text').innerText(),'First line\nA saved reminder.','Original saved notes survive reload');
-  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'geometry.json'),JSON.stringify(evidence,null,2)+'\n');console.log('PASS Inline notes: saved text visible, inline edit/save/cancel/remove, per-word drafts, live editor/caret retention, failed write retry, actual storage and four-theme desktop/mobile geometry');
+  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'geometry.json'),JSON.stringify(evidence,null,2)+'\n');console.log('PASS Inline notes: saved text visible and reopens read-only, explicit edit/save/cancel/remove, per-word drafts, live editor/caret retention, failed write retry, actual storage and four-theme desktop/mobile geometry');
  }finally{await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

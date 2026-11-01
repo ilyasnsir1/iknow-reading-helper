@@ -8,7 +8,7 @@
   const paths = {
     book:'<path d="M3 4h5l2 2 2-2h5v12h-5l-2 1-2-1H3zM10 6v11"/>',
     listen:'<path d="M3 8v4m3-7v10m4-12v14m4-11v8m3-6v4"/>',
-    gap:'<path d="M3 5h14M3 10h4m6 0h4M3 15h14M9 8v4m2-4v4"/>',
+    gap:'<path d="M3 5h8M3 10h4M3 17h14m-6-6 5-5 2 2-5 5-3 1 1-3Zm4-4 2 2"/>',
     test:'<path d="M6 4H3v13h14V4h-3M7 2h6v4H7zM7 10h6M7 14h4"/>',
     library:'<path d="M3 3h4v14H3zM9 5h4v12H9zM15 4l3 12"/>',
     moon:'<path d="M16 12A6.1 6.1 0 0 1 8 4a6.5 6.5 0 1 0 8 8Z"/>',
@@ -33,7 +33,9 @@
   let items = [], current = "", version = "c", libraryOpen = true, course = "", view = "study", mode = "review", language = "en", search = "", kind = "", strength = "", drawer = false, selectionMode = false, picker = false, pickerPurpose = "practice", pickerSearch = "", setupModal = false, session = null, revealed = false, audio = null, toastTimer;
   const libraryScroll = new Map(),libraryRowItems=new WeakMap();
   const tokenReveals = new Map(),noteDrafts=new Map();
-  let compareOpen = false, compareKey = "", compareAnimation = null, compareRevision = 0;
+  const expansionOrders=new Map(),expansionAnimations=new Map();
+  let compareOpen = false, compareKey = "", dockAnimation = null, dockRevision = 0;
+  let panelResizeObserver=null,panelLayoutFrame=0;
   let menuCleanup = null, resultsCleanup = null, kanaCleanup = null, previousTestReport = null;
   let practiceAttempts = "retry", practiceGapPosition = "random", practiceSource = "saved", practiceOrder = "course", practiceContent = "word";
   const courseClient = globalThis.IKnowFocusCourse.createClient(), reviewCache = new WeakMap();
@@ -42,7 +44,7 @@
   let practiceCatalog = null, practiceCourseInput = "19053", practiceCourseBusy = false, practiceCourseError = "", practiceRevision = 0;
   let answerComposing = false;
   let runtimeSnapshot=null,runtimeBusy=false,disposeRuntime=null;
-  let libraryActions=null;
+  let libraryActions=null,strengthMenu=null;
   const Rounds=Runtime?globalThis.IKnowStudyWorkspaceRounds.create({runtime:Runtime,practice:Practice,reviewQuestion,getLanguage:()=>language,getGapPosition:()=>practiceGapPosition}):null;
   const practiceCourseCache = new WeakMap();
   const selected = new Set();
@@ -105,7 +107,8 @@
   }
   function row(item, checkboxes = false, pickerRow = false) {
     const checked = selected.has(item.key);
-    return `<button class="library-row" type="button" data-item="${escape(item.key)}"${pickerRow ? ' data-picker-row="true"' : ""} aria-current="${!checkboxes && current===item.key}">${checkboxes ? `<input type="checkbox" aria-label="Select ${escape(item.japanese)}" tabindex="-1"${checked?" checked":""}>` : ""}<span class="item-main"><span class="jp" lang="ja">${escape(item.japanese)}</span><span class="en">${escape(meaning(item))}</span><span class="strength" data-strength="${item.strength}">${strengthLabel(item.strength)}</span></span></button>`;
+    const manual=(Runtime?runtimeSnapshot?.learning:previewLearning)?.assessments?.[item.key]?.level;
+    return `<button class="library-row" type="button" data-item="${escape(item.key)}"${pickerRow ? ' data-picker-row="true"' : ' aria-description="Right-click or press Shift+F10 to set your learning level."'} aria-current="${!checkboxes && current===item.key}">${checkboxes ? `<input type="checkbox" aria-label="Select ${escape(item.japanese)}" tabindex="-1"${checked?" checked":""}>` : ""}<span class="item-main"><span class="jp" lang="ja">${escape(item.japanese)}</span><span class="en">${escape(meaning(item))}</span><span class="strength" data-strength="${item.strength}" data-manual="${Boolean(manual&&manual!=='auto')}">${strengthLabel(item.strength)}</span></span></button>`;
   }
   function libraryPane() {
     return `<aside class="library-pane" aria-label="Saved for later"><div class="library-heading"><h2>Saved for later <span>${items.length}</span></h2><button class="quiet" data-action="delete-all">Delete all</button></div><div class="library-search">${filterFields()}</div><div class="library-list" id="demo-library-list">${filtered().map(item=>row(item)).join("")}</div><div class="library-bottom">${items.length} saved items</div></aside>`;
@@ -121,42 +124,112 @@
   }
   function noteState(item){
     let draft=noteDrafts.get(item.key);const saved=String(item.notes||'');
-    if(!draft){draft={saved,value:saved,editing:false,busy:false,error:''};noteDrafts.set(item.key,draft);}
+    if(!draft){draft={saved,value:saved,open:Boolean(saved),editing:false,busy:false,error:''};noteDrafts.set(item.key,draft);}
     else if(draft.saved!==saved){if(draft.value===draft.saved&&!draft.busy)draft.value=saved;draft.saved=saved;}
     return draft;
   }
   function noteMarkup(item){
-    if(!Runtime||!item)return '';
+    if(!item)return '';
     const draft=noteState(item),editing=draft.editing;
-    if(!editing&&!draft.saved)return '<section id="focus-note" class="focus-note" hidden></section>';
-    return `<section id="focus-note" class="focus-note" data-note-state="${editing?'edit':'read'}"><div class="focus-note-heading"><h3>Note</h3>${editing?'':`<button type="button" class="quiet" data-action="edit-note">Edit</button>`}</div>${editing?`<textarea id="focus-note-input" rows="3" maxlength="4000" aria-label="Your note" spellcheck="true"${draft.busy?' disabled':''}>${escape(draft.value)}</textarea><footer class="focus-note-footer"><p class="focus-note-status" role="status" data-error="${Boolean(draft.error)}">${escape(draft.error)}</p><div><button type="button" class="quiet" data-action="cancel-note"${draft.busy?' disabled':''}>Cancel</button><button type="button" class="primary" data-action="save-note"${draft.busy||draft.value===draft.saved?' disabled':''}>Save note</button></div></footer>`:`<p class="focus-note-text">${escape(draft.saved)}</p>`}</section>`;
+    if(!draft.open)return '<section id="focus-note" class="focus-note" data-study-panel="note" hidden></section>';
+    const remove=draft.saved?`<button type="button" class="quiet focus-note-delete" data-action="delete-note"${draft.busy?' disabled':''}>Delete note</button>`:'';
+    return `<section id="focus-note" class="focus-note" data-study-panel="note" data-note-state="${editing?'edit':'read'}"><div class="focus-note-inner">${editing?'':`<div class="focus-note-heading"><h3>${icon('note')}Note</h3><div>${remove}<button type="button" class="quiet" data-action="edit-note"${draft.busy?' disabled':''}>Edit</button></div></div>`}${editing?`<textarea id="focus-note-input" rows="2" maxlength="4000" aria-label="Your note" spellcheck="true"${draft.busy?' disabled':''}>${escape(draft.value)}</textarea><footer class="focus-note-footer"><p class="focus-note-status" role="status" data-error="${Boolean(draft.error)}">${escape(draft.error)}</p><div>${remove}<button type="button" class="quiet" data-action="cancel-note"${draft.busy?' disabled':''}>Cancel</button><button type="button" class="primary" data-action="save-note"${draft.busy||draft.value===draft.saved?' disabled':''}>Save note</button></div></footer>`:`<p class="focus-note-text">${escape(draft.saved)}</p>${draft.error?`<p class="focus-note-status" role="status" data-error="true">${escape(draft.error)}</p>`:''}`}</div></section>`;
   }
-  function updateInlineNote(focus=false){
+  function syncStudyPanels(opening,animate=false){
+    const container=document.querySelector('.focus-expansions');if(!container)return;
+    const item=items.find(record=>record.key===current),grid=container.querySelector('.focus-panel-grid');if(!item||!grid)return;
+    const desired={note:noteState(item).open,compare:compareOpen};
+    const shown=Object.keys(desired).filter(name=>desired[name]);
+    const panels=[...grid.children],gridTop=grid.getBoundingClientRect().top;
+    const before=new Map(panels.map(panel=>[panel,{open:panel.dataset.motionOpen==='true',hidden:panel.hidden,top:panel.getBoundingClientRect().top-gridTop,opacity:panel.hidden?0:Number(getComputedStyle(panel).opacity)}]));
+    const newlyOpened=opening&&desired[opening]&&!before.get(grid.querySelector(`[data-study-panel="${opening}"]`))?.open;
+    const order=(expansionOrders.get(current)||[]).filter(name=>desired[name]&&(!newlyOpened||name!==opening));
+    for(const name of shown)if((!newlyOpened||name!==opening)&&!order.includes(name))order.push(name);
+    if(newlyOpened)order.push(opening);
+    expansionOrders.set(current,order);
+    container.dataset.count=String(shown.length);
+    container.dataset.open=String(Boolean(shown.length));
+    const revision=++dockRevision,from=container.hidden?0:container.getBoundingClientRect().height;
+    dockAnimation?.cancel();dockAnimation=null;
+    container.hidden=false;container.style.height=from+'px';
+    let nextTop=12;
+    for(const name of order){
+      const panel=grid.querySelector(`[data-study-panel="${name}"]`);
+      expansionAnimations.get(panel)?.cancel();expansionAnimations.delete(panel);
+      panel.hidden=false;panel.style.transform='';panel.style.opacity='';
+      grid.append(panel);panel.style.top=nextTop+'px';
+      const height=panel.getBoundingClientRect().height;panel.dataset.layoutHeight=String(height);
+      nextTop+=height+12;
+    }
+    const to=shown.length?nextTop-8:0,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for(const panel of panels){
+      const open=desired[panel.dataset.studyPanel],previous=before.get(panel);
+      expansionAnimations.get(panel)?.cancel();expansionAnimations.delete(panel);
+      panel.dataset.motionOpen=String(open);panel.inert=!open;panel.setAttribute('aria-hidden',String(!open));
+      if(!animate||reduced||!open&&previous.hidden){panel.hidden=!open;panel.style.transform='';panel.style.opacity='';continue;}
+      panel.hidden=false;
+      const offset=open?(previous.hidden?5:previous.top-Number.parseFloat(panel.style.top||'0')):0;
+      if(open&&previous.open&&Math.abs(offset)<.25&&previous.opacity>.99)continue;
+      const animation=panel.animate([{opacity:previous.opacity,transform:`translateY(${offset}px)`},{opacity:open?1:0,transform:open?'translateY(0)':'translateY(-3px)'}],{duration:open&&previous.open?260:180,easing:'cubic-bezier(.22,.68,.2,1)',fill:'forwards'});
+      expansionAnimations.set(panel,animation);
+      animation.finished.then(()=>{if(expansionAnimations.get(panel)!==animation)return;panel.hidden=!open;expansionAnimations.delete(panel);animation.cancel();}).catch(()=>{});
+    }
+    const action=document.querySelector('[data-action="note"]');action?.setAttribute('aria-expanded',String(shown.includes('note')));
+    if(action)action.disabled=noteState(item).busy;
+    const finish=()=>{if(revision!==dockRevision||!container.isConnected)return;container.style.height=to+'px';container.hidden=!to;dockAnimation=null;if(!to)expansionOrders.delete(current);};
+    if(!animate||Math.abs(from-to)<.5||reduced)finish();
+    else{const animation=container.animate([{height:from+'px'},{height:to+'px'}],{duration:260,easing:'cubic-bezier(.22,.68,.2,1)',fill:'forwards'});dockAnimation=animation;animation.finished.then(()=>{finish();animation.cancel();}).catch(()=>{});}
+  }
+  function observeStudyPanels(){
+    panelResizeObserver?.disconnect();
+    if(!globalThis.ResizeObserver)return;
+    panelResizeObserver=new ResizeObserver(entries=>{
+      if(!entries.some(entry=>entry.target.dataset.motionOpen==='true'&&Math.abs(entry.target.getBoundingClientRect().height-Number(entry.target.dataset.layoutHeight||0))>.5)||panelLayoutFrame)return;
+      panelLayoutFrame=requestAnimationFrame(()=>{panelLayoutFrame=0;if(view==='study'&&!session)syncStudyPanels(null,true);});
+    });
+    for(const panel of document.querySelectorAll('.focus-panel-grid>[data-study-panel]'))panelResizeObserver.observe(panel);
+  }
+  function updateInlineNote(focus=false,animate=false){
     const item=items.find(record=>record.key===current),section=$('focus-note');if(!item||!section)return;
-    const template=document.createElement('template');template.innerHTML=noteMarkup(item);section.replaceWith(template.content.firstElementChild);
-    if(focus){const input=$('focus-note-input');input?.focus({preventScroll:true});input?.setSelectionRange(input.value.length,input.value.length);$('focus-note')?.scrollIntoView({block:'nearest',behavior:'instant'});}
+    const draft=noteState(item),focusWasInside=section.contains(document.activeElement);
+    if(draft.open){
+      expansionAnimations.get(section)?.cancel();expansionAnimations.delete(section);
+      const wasOpen=section.dataset.motionOpen==='true',template=document.createElement('template');template.innerHTML=noteMarkup(item);const next=template.content.firstElementChild;next.dataset.motionOpen=String(wasOpen);next.style.cssText=section.style.cssText;next.hidden=!wasOpen;section.replaceWith(next);
+    }
+    if(!draft.open&&focusWasInside)document.querySelector('[data-action="note"]')?.focus({preventScroll:true});
+    syncStudyPanels(draft.open?'note':null,animate);
+    observeStudyPanels();
+    if(focus){const input=$('focus-note-input');input?.focus({preventScroll:true});input?.setSelectionRange(input.value.length,input.value.length);}
+    else if(focusWasInside&&draft.open&&!draft.editing)document.querySelector('[data-action="edit-note"]')?.focus({preventScroll:true});
   }
   function openInlineNote(){
-    if(!Runtime)return;const item=items.find(record=>record.key===current);if(!item)return;
-    const draft=noteState(item);draft.editing=true;draft.error='';updateInlineNote(true);
+    const item=items.find(record=>record.key===current);if(!item)return;
+    const draft=noteState(item);if(draft.busy)return;
+    if(draft.open){draft.open=false;draft.editing=false;draft.value=draft.saved;draft.error='';updateInlineNote(false,true);}
+    else{draft.open=true;draft.editing=!draft.saved;draft.error='';updateInlineNote(draft.editing,true);}
+  }
+  function editInlineNote(){
+    const item=items.find(record=>record.key===current);if(!item)return;
+    const draft=noteState(item);if(draft.busy)return;draft.open=true;draft.editing=true;draft.error='';updateInlineNote(true);
   }
   function cancelInlineNote(){
     const item=items.find(record=>record.key===current);if(!item)return;const draft=noteState(item);if(draft.busy)return;
-    draft.value=draft.saved;draft.editing=false;draft.error='';updateInlineNote();
+    draft.value=draft.saved;draft.editing=false;draft.open=Boolean(draft.saved);draft.error='';updateInlineNote(false,true);
   }
-  async function saveInlineNote(){
-    const item=items.find(record=>record.key===current);if(!Runtime||!item)return;const draft=noteState(item);if(draft.busy||draft.value===draft.saved)return;
-    const key=item.key,value=draft.value;draft.busy=true;draft.error='';updateInlineNote();
+  async function saveInlineNote(remove=false){
+    const item=items.find(record=>record.key===current);if(!item)return;const draft=noteState(item);if(draft.busy||(remove?!draft.saved:draft.value===draft.saved))return;
+    const key=item.key,value=remove?'':draft.value;draft.busy=true;draft.error='';updateInlineNote();
     try{
-      const record=await Runtime.updateNotes(key,value);draft.saved=value;draft.value=value;draft.editing=false;
-      receiveRuntimeSnapshot({...runtimeSnapshot,library:{schemaVersion:1,records:{...runtimeSnapshot.library.records,[key]:record}}});
+      if(Runtime){const record=await Runtime.updateNotes(key,value);draft.saved=value;draft.value=value;draft.editing=false;draft.open=Boolean(value);
+        receiveRuntimeSnapshot({...runtimeSnapshot,library:{schemaVersion:1,records:{...runtimeSnapshot.library.records,[key]:record}}});}
+      else{await updatePreviewLibrary(records=>{records[key]={...records[key],notes:value,updatedAt:Date.now()};});draft.saved=value;draft.value=value;draft.editing=false;draft.open=Boolean(value);}
     }catch(error){draft.error=String(error.message||'The note could not be saved. Try again.');}
-    finally{draft.busy=false;if(current===key)updateInlineNote();}
+    finally{draft.busy=false;if(current===key)updateInlineNote(false,true);}
   }
   function detail(focus = false) {
     const item = getItem(current);
     if (!item) return '<article class="focus-card focus-empty"><h2>Your library is empty.</h2><p>Save a word or sentence from an iKnow course.</p></article>';
-    if(focus) return `<article class="focus-card" data-compare-open="${compareOpen}"><p class="eyebrow">${subtitle(item)} · ${sourceCourseLink(item)}</p><h2 class="japanese" lang="ja">${escape(item.japanese)}</h2><p class="kana" lang="ja">${escape(item.kana)}</p>${reading(item)}${meanings(item,true)}${noteMarkup(item)}<div class="practice-tools"><button data-action="play" class="audio-mini">${icon("listen")}Listen to original</button><button data-action="compare" class="quiet" aria-expanded="${compareOpen}" aria-controls="focus-compare">Listen & compare</button>${globalThis.IKnowReaderVolumeControls.button()}</div><section id="focus-compare" class="focus-compare-panel" aria-label="Listen and compare" aria-hidden="${!compareOpen}"${compareOpen?"":" hidden inert"}></section></article>`;
+    if(focus) return `<article class="focus-card" data-compare-open="${compareOpen}"><p class="eyebrow">${subtitle(item)} · ${sourceCourseLink(item)}</p><h2 class="japanese" lang="ja">${escape(item.japanese)}</h2><p class="kana" lang="ja">${escape(item.kana)}</p>${reading(item)}${meanings(item,true)}<div class="practice-tools"><button data-action="play" class="audio-mini">${icon("listen")}Listen to original<span id="focus-audio-visualization" hidden></span></button><button data-action="compare" class="quiet" aria-expanded="${compareOpen}" aria-controls="focus-compare">Listen & compare</button>${globalThis.IKnowReaderVolumeControls.button()}</div><div class="focus-expansions" data-count="0" hidden><div class="focus-panel-grid">${noteMarkup(item)}<section id="focus-compare" class="focus-compare-panel" data-study-panel="compare" aria-label="Listen and compare" aria-hidden="${!compareOpen}"${compareOpen?"":" hidden inert"}></section></div></div></article>`;
     return `<article class="detail"><div class="detail-inner"><div class="detail-top"><p class="eyebrow">${subtitle(item)} · ${escape(item.courseTitle||`Course ${item.courseId}`)}</p><button class="quiet delete-item" data-action="delete">${icon("trash")}Delete</button></div><h2 class="japanese" lang="ja">${escape(item.japanese)}</h2><p class="kana" lang="ja">${escape(item.kana)}</p>${reading(item)}${meanings(item)}<div class="practice-tools"><button class="primary" data-action="practise-item">Practise this ${item.kind}</button><button class="quiet" data-action="play">${icon("listen")}Listen to original</button></div><div class="detail-note"><label for="demo-note">A note to yourself</label><textarea id="demo-note" rows="2" placeholder="A reminder, an example, or a way to remember it."></textarea></div><div class="detail-footer"><span>${items.findIndex(i=>i.key===current)+1} of ${items.length} saved items</span><button class="quiet" data-action="next">${nextSavedLabel()}</button></div></div></article>`;
   }
   function choiceStepper(id,name,label,choices,value,disabled=false){
@@ -168,6 +241,53 @@
   const contentChoices=()=>[['word','Vocabulary'],['sentence','Sentences'],['both','Vocabulary & sentences']];
   const orderChoices=()=>[['course',practiceSource==='course'?'Course order':'Library order'],['shuffle','Shuffle']];
   const gapChoices=()=>[['random','Random word'],['first','First word']];
+  function hasSentenceGaps(){
+    return mode==='cloze'&&(practiceSource==='course'?practiceContent!=='word':items.some(item=>selected.has(item.key)&&item.kind==='sentence'));
+  }
+  function practiceOptions(){
+    return choiceStepper('demo-attempts','attempts','Attempts',attemptChoices(),practiceAttempts)+choiceStepper('demo-practice-order','practice-order','Order',orderChoices(),practiceOrder)+(hasSentenceGaps()?choiceStepper('demo-gap-position','gap-position','Gap position',gapChoices(),practiceGapPosition):'');
+  }
+  function updatePracticeOptions(){
+    const container=document.querySelector('[data-practice-options]');
+    if(!container)return;
+    const gap=container.querySelector('[data-choice="gap-position"]')?.closest('.focus-choice-field');
+    if(gap&&!hasSentenceGaps())gap.remove();
+    else if(!gap&&hasSentenceGaps())container.insertAdjacentHTML('beforeend',choiceStepper('demo-gap-position','gap-position','Gap position',gapChoices(),practiceGapPosition));
+  }
+  function refreshActivity(test=false){
+    if(session||view!==(test?'test':'practice'))return;
+    const surface=document.querySelector('.focus-desk>.activity-pane>.activity-inner');
+    if(!surface||Boolean(surface.querySelector('[data-practice-source]'))===test){render();return;}
+    const template=document.createElement('template');template.innerHTML=activity(test);
+    // Reconcile only setup content. Clicked mode/source buttons, text fields
+    // and arrow controls keep their focus, hover paint and DOM identity.
+    const key=node=>node.nodeType===Node.ELEMENT_NODE?node.tagName+':'+(node.id||['data-action','data-mode','data-practice-source','data-choice'].map(name=>node.getAttribute(name)||'').join(':')+':'+node.className):'#'+node.nodeType;
+    const sync=(target,next)=>{
+      const previous=[...target.childNodes],used=new Set();
+      const pairs=[...next.childNodes].map(fresh=>{
+        const match=previous.find(node=>!used.has(node)&&key(node)===key(fresh));
+        if(match)used.add(match);
+        return{fresh,match,node:match||fresh};
+      });
+      // Remove the departing Course block before ordering its siblings, so
+      // retained controls never move merely to step over a removed panel.
+      for(const node of previous)if(!used.has(node))node.remove();
+      let cursor=target.firstChild;
+      for(const{fresh,match,node}of pairs){
+        if(match){
+          if(match.nodeType===Node.TEXT_NODE){if(match.data!==fresh.data)match.data=fresh.data;}
+          else if(match.nodeType===Node.ELEMENT_NODE){
+            for(const attr of [...match.attributes])if(!fresh.hasAttribute(attr.name))match.removeAttribute(attr.name);
+            for(const attr of fresh.attributes)if(match.getAttribute(attr.name)!==attr.value)match.setAttribute(attr.name,attr.value);
+            if(match instanceof HTMLInputElement&&match.value!==fresh.value)match.value=fresh.value;
+            sync(match,fresh);
+          }
+        }
+        if(node===cursor)cursor=cursor.nextSibling;else target.insertBefore(node,cursor);
+      }
+    };
+    sync(surface,template.content.querySelector('.activity-inner'));
+  }
   function stepChoice(name,direction){
     if(runtimeBusy||session)return;
     const settings={
@@ -194,15 +314,54 @@
     const plan = test ? testPlan() : null;
     const heading=`<div class="activity-heading"><div><p class="eyebrow">${test ? "Check your progress" : "Your pace"}</p><h2>${test ? "Course test" : "Practice"}</h2></div>${modal ? close : test ? "" : `<small>${count} ${coursePractice?'available':'selected'}</small>`}</div>`;
     const modes=`<div class="mode-grid" role="group" aria-label="Practice mode">${[["review","book","Review","Find the meaning."],["cloze","gap","Fill the gap","Complete the sentence."],["listening","listen","Listening","Listen, then write."]].map(([id,graphic,label,description])=>`<button class="mode-card" data-mode="${id}" aria-pressed="${mode===id}">${icon(graphic)}<span>${label}</span><small>${description}</small></button>`).join("")}</div>`;
-    const options=`<div class="setup-fields">${choiceStepper('demo-attempts','attempts','Attempts',attemptChoices(),practiceAttempts)}${choiceStepper('demo-practice-order','practice-order','Order',orderChoices(),practiceOrder)}${mode==="cloze"?choiceStepper('demo-gap-position','gap-position','Gap position',gapChoices(),practiceGapPosition):''}</div>`;
+    const options=`<div class="setup-fields" data-practice-options>${practiceOptions()}</div>`;
     const selection=`<div class="activity-selection"><div><p>${count ? `${count} selected` : "Choose what you want to practise"}</p><small>${[...selected].map(key=>getItem(key)).filter(Boolean).filter(i=>i.kind==="word").length} words · ${[...selected].map(key=>getItem(key)).filter(Boolean).filter(i=>i.kind==="sentence").length} sentences</small></div><button data-action="choose">Choose words &amp; sentences</button></div>`;
     const sources=`<div class="practice-sources" role="group" aria-label="Practice source"><button type="button" data-practice-source="saved" aria-pressed="${!coursePractice}">Saved library</button><button type="button" data-practice-source="course" aria-pressed="${coursePractice}">Course</button></div>`;
     const practiceCourse=coursePractice?practiceCourseMarkup(practicePlan):'';
     const loaded=courseMatchesInput()&&!courseError&&!courseBusy;
-    const course=test?`<div class="setup-course"><h3 id="demo-test-title">${escape(testCatalog?.title || "Load a course")}</h3><div class="setup-fields"><label>Course ID or link<input id="demo-test-course" type="text" value="${escape(testCourseInput)}" maxlength="200" placeholder="19053" autocomplete="off"${courseBusy?" disabled":""}></label><button type="button" class="quiet" data-action="load-test-course"${courseBusy||loaded||!testCourseInput.trim()?" disabled":""}>${testLoadLabel()}</button>${choiceStepper('demo-test-content','test-content','Content',contentChoices(),testContent,courseBusy)}</div><p class="small" id="demo-test-source-status" role="status"${plan.label?"":" hidden"}>${escape(plan.label)}</p></div>`:"";
+    const course=test?`<div class="setup-course" aria-busy="${courseBusy}"><h3 id="demo-test-title">${escape(testCatalog?.title || "Load a course")}</h3>${courseSourceFields('test',testCourseInput,testContent,courseBusy,courseError,loaded,testLoadLabel())}${courseFeedback('demo-test-source-status',plan,courseBusy,courseError)}</div>`:"";
     return `<section class="activity-pane"><div class="activity-inner">${heading}${test?course:sources+modes+(coursePractice?practiceCourse:'')+options+(coursePractice?'':selection)}<div class="setup-start"><button class="primary" data-action="start"${test?!plan.ready?" disabled":"":coursePractice?!practicePlan.ready?' disabled':'':!count?" disabled":""}>${test ? `Start test<span id="demo-test-total">${plan.count?` (${plan.count})`:""}</span>` : coursePractice?`Start practice (${count})`:"Start session"}</button></div></div></section>`;
   }
+  function courseSourceFields(kind,value,content,busy,error,loaded,loadLabel){
+    return `<div class="setup-fields course-source-fields"><div class="course-entry"><label for="demo-${kind}-course">Course ID or link</label><div class="course-input-action"><input id="demo-${kind}-course" type="text" value="${escape(value)}" maxlength="200" placeholder="19053" autocomplete="off" aria-describedby="demo-${kind}-source-status" aria-invalid="${Boolean(error)}"${busy?' disabled':''}><button type="button" class="course-load" data-action="load-${kind}-course"${busy||loaded||!value.trim()?' disabled':''}${loaded?' hidden':''}>${loadLabel}</button><span class="course-source-ready" role="status"${loaded?'':' hidden'}>Ready</span></div></div>${choiceStepper(`demo-${kind}-content`,`${kind}-content`,'Content',contentChoices(),content,busy)}</div>`;
+  }
+  function updateCourseSource(kind,value,busy,error,loaded,label){
+    const load=document.querySelector(`[data-action="load-${kind}-course"]`);if(!load)return;
+    load.disabled=busy||loaded||!value.trim();load.hidden=loaded;load.textContent=label;
+    load.parentElement.querySelector('.course-source-ready').hidden=!loaded;
+  }
+  function courseFeedback(id,plan,busy,error){
+    const state=error?'error':busy?'loading':'idle';
+    return `<div class="course-feedback" data-state="${state}"${plan.label?'':' hidden'}><p class="small" id="${id}" role="${error?'alert':'status'}" aria-atomic="true">${escape(plan.label)}</p></div>`;
+  }
+  function updateCourseFeedback(id,plan,busy,error){
+    const status=$(id);if(!status)return;
+    const feedback=status.closest('.course-feedback');
+    feedback.dataset.state=error?'error':busy?'loading':'idle';feedback.hidden=!plan.label;
+    status.setAttribute('role',error?'alert':'status');status.textContent=plan.label;
+    const container=feedback.closest('.setup-course');container.setAttribute('aria-busy',String(busy));
+    container.querySelector('input').setAttribute('aria-invalid',String(Boolean(error)));
+  }
   function practiceCourseMatchesInput(){try{return practiceCatalog?.courseId===courseClient.courseId(practiceCourseInput);}catch{return false;}}
+  function unavailableReason(record,exerciseMode=mode){
+    if(exerciseMode==='cloze')return Practice.clozeUnavailableReason?.(record)||(record.kind==='word'?!record.context?'example':'target':'boundaries');
+    if(exerciseMode==='listening')return record.audioUrl||record.context?.audioUrl?'answer':'audio';
+    return record.english||germanMeaning(record)?'choices':'meaning';
+  }
+  function unavailableMessage(entries){
+    const counts=new Map();for(const entry of entries)counts.set(entry.reason,(counts.get(entry.reason)||0)+1);
+    const phrase=(count,singular,plural)=>`${count} ${count===1?singular:plural}`;
+    const descriptions={
+      example:count=>phrase(count,'word has no example sentence.','words have no example sentence.'),
+      boundaries:count=>phrase(count,'example has no reliable word boundaries.','examples have no reliable word boundaries.'),
+      target:count=>phrase(count,'word could not be matched to its example.','words could not be matched to their examples.'),
+      audio:count=>phrase(count,'question has no original recording.','questions have no original recording.'),
+      answer:count=>phrase(count,'recording has no usable answer text.','recordings have no usable answer text.'),
+      meaning:count=>phrase(count,'question has no usable meaning.','questions have no usable meaning.'),
+      choices:count=>phrase(count,'question has no distinct answer choices.','questions have no distinct answer choices.')
+    };
+    return [...counts].map(([reason,count])=>descriptions[reason](count)).join(' ');
+  }
   function practiceCoursePlan(){
     if(practiceCourseBusy)return{count:0,ready:false,records:[],label:'Loading course…'};
     if(practiceCourseError)return{count:0,ready:false,records:[],label:practiceCourseError};
@@ -210,21 +369,29 @@
     const pool=practiceCatalog.records;
     let cache=practiceCourseCache.get(pool);if(!cache){cache=new Map();practiceCourseCache.set(pool,cache);}
     const cacheKey=mode+':'+(language==='de'?'de':'en');
-    if(!cache.has(cacheKey))cache.set(cacheKey,pool.filter(record=>mode==='cloze'?Boolean(Practice.buildCloze(record,{gapPosition:'first'})):mode==='listening'?Boolean(Practice.buildListening(record)):Boolean(reviewQuestion(record,pool))));
-    const records=cache.get(cacheKey).filter(record=>practiceContent==='both'||record.kind===practiceContent);
-    const total=pool.filter(record=>practiceContent==='both'||record.kind===practiceContent).length,skipped=total-records.length;
-    return{count:records.length,ready:records.length>0,records,label:skipped?`${skipped} ${skipped===1?'question is':'questions are'} unavailable for this exercise.`:practiceCatalog.stale?'Using the saved course copy.':''};
+    if(!cache.has(cacheKey)){
+      const records=[],missing=[];
+      for(const record of pool){
+        const valid=mode==='cloze'?Boolean(Practice.buildCloze(record,{gapPosition:'first'})):mode==='listening'?Boolean(Practice.buildListening(record)):Boolean(reviewQuestion(record,pool));
+        if(valid)records.push(record);else missing.push({kind:record.kind,reason:unavailableReason(record)});
+      }
+      cache.set(cacheKey,{records,missing});
+    }
+    const matches=record=>practiceContent==='both'||record.kind===practiceContent;
+    const records=cache.get(cacheKey).records.filter(matches),missing=cache.get(cacheKey).missing.filter(matches);
+    return{count:records.length,ready:records.length>0,records,label:missing.length?unavailableMessage(missing):practiceCatalog.stale?'Using the saved course copy.':''};
   }
   function practiceCourseMarkup(plan){
     const loaded=practiceCourseMatchesInput()&&!practiceCourseError&&!practiceCourseBusy;
-    return `<div class="setup-course practice-course"><h3 id="demo-practice-title">${escape(practiceCatalog?.title||'Load a course')}</h3><div class="setup-fields"><label>Course ID or link<input id="demo-practice-course" type="text" value="${escape(practiceCourseInput)}" maxlength="200" autocomplete="off"${practiceCourseBusy?' disabled':''}></label><button type="button" class="quiet" data-action="load-practice-course"${practiceCourseBusy||loaded||!practiceCourseInput.trim()?' disabled':''}>${practiceCourseBusy?'Loading…':loaded?'Loaded':'Load course'}</button>${choiceStepper('demo-practice-content','practice-content','Content',contentChoices(),practiceContent,practiceCourseBusy)}</div><p class="small" id="demo-practice-source-status" role="status"${plan.label?'':' hidden'}>${escape(plan.label)}</p></div>`;
+    return `<div class="setup-course practice-course" aria-busy="${practiceCourseBusy}"><h3 id="demo-practice-title">${escape(practiceCatalog?.title||'Load a course')}</h3>${courseSourceFields('practice',practiceCourseInput,practiceContent,practiceCourseBusy,practiceCourseError,loaded,practiceCourseBusy?'Loading…':loaded?'Loaded':'Load course')}${courseFeedback('demo-practice-source-status',plan,practiceCourseBusy,practiceCourseError)}</div>`;
   }
   function updatePracticeSummary(){
     if(view!=='practice'||practiceSource!=='course'||session)return;
-    const plan=practiceCoursePlan(),status=$('demo-practice-source-status');if(status){status.textContent=plan.label;status.hidden=!plan.label;}
-    const loaded=practiceCourseMatchesInput()&&!practiceCourseError&&!practiceCourseBusy,load=document.querySelector('[data-action="load-practice-course"]');if(load){load.disabled=practiceCourseBusy||loaded||!practiceCourseInput.trim();load.textContent=practiceCourseBusy?'Loading…':loaded?'Loaded':'Load course';}
+    const plan=practiceCoursePlan();updateCourseFeedback('demo-practice-source-status',plan,practiceCourseBusy,practiceCourseError);
+    const loaded=practiceCourseMatchesInput()&&!practiceCourseError&&!practiceCourseBusy;updateCourseSource('practice',practiceCourseInput,practiceCourseBusy,practiceCourseError,loaded,practiceCourseBusy?'Loading…':loaded?'Loaded':'Load course');
     const start=document.querySelector('[data-action="start"]');if(start){start.disabled=!plan.ready;start.textContent=`Start practice (${plan.count})`;}
     const count=document.querySelector('.activity-heading small');if(count)count.textContent=plan.count?`${plan.count} available`:'';
+    updatePracticeOptions();
   }
   async function loadPracticeCourse(){
     if(practiceCourseBusy||session||!practiceCourseInput.trim()||(practiceCourseMatchesInput()&&!practiceCourseError&&!practiceCatalog?.stale))return;
@@ -234,11 +401,11 @@
     practiceCatalog=cached;
     // Validate the saved source before rendering. A warm course never paints
     // the generic loading title, zero count or disabled Start button.
-    if(cached&&!cached.stale){practiceCourseBusy=false;retainPracticeSetup();if(!session&&view==='practice'&&practiceSource==='course')render();return;}
-    if(!session&&view==='practice'&&practiceSource==='course')render();
+    if(cached&&!cached.stale){practiceCourseBusy=false;retainPracticeSetup();if(!session&&view==='practice'&&practiceSource==='course')refreshActivity();return;}
+    if(!session&&view==='practice'&&practiceSource==='course')refreshActivity();
     try{const catalog=await courseClient.load(input);if(revision===practiceRevision)practiceCatalog=catalog;}
     catch(error){if(revision===practiceRevision)practiceCourseError=String(error.message||'Course could not be loaded. Try again.');}
-    finally{if(revision===practiceRevision){practiceCourseBusy=false;if(practiceCatalog)retainPracticeSetup();if(!session&&view==='practice'&&practiceSource==='course')render();}}
+    finally{if(revision===practiceRevision){practiceCourseBusy=false;if(practiceCatalog)retainPracticeSetup();if(!session&&view==='practice'&&practiceSource==='course')refreshActivity();}}
   }
   function restorePracticeSetup(){
     try{
@@ -281,14 +448,14 @@
     if(courseError)return{count:0,ready:false,label:courseError};
     if(!testCatalog||!courseMatchesInput())return{count:0,ready:false,label:"Load this course to begin."};
     const records=testCatalog.records.filter(item=>testContent==="both"||item.kind===testContent);
-    const unavailable=records.filter(item=>!reviewQuestion(item,testCatalog.records)).length;
-    return{count:records.length,ready:records.length>0&&!unavailable,label:unavailable?`${unavailable} ${unavailable===1?"question has":"questions have"} no usable meaning for this test.`:testCatalog.stale?"Using the saved course copy.":""};
+    const unavailable=records.filter(item=>!reviewQuestion(item,testCatalog.records)).map(record=>({reason:unavailableReason(record,'review')}));
+    return{count:records.length,ready:records.length>0&&!unavailable.length,label:unavailable.length?unavailableMessage(unavailable):testCatalog.stale?"Using the saved course copy.":""};
   }
   function updateTestSummary() {
     if(view!=="test"||session)return;const plan=testPlan();
     if($("demo-test-total"))$("demo-test-total").textContent=plan.count?` (${plan.count})`:"";
-    if($("demo-test-source-status")){$("demo-test-source-status").textContent=plan.label;$("demo-test-source-status").hidden=!plan.label;}
-    const load=document.querySelector('[data-action="load-test-course"]');if(load){const loaded=courseMatchesInput()&&!courseError&&!courseBusy;load.disabled=courseBusy||loaded||!testCourseInput.trim();load.textContent=testLoadLabel();}
+    updateCourseFeedback('demo-test-source-status',plan,courseBusy,courseError);
+    updateCourseSource('test',testCourseInput,courseBusy,courseError,courseMatchesInput()&&!courseError&&!courseBusy,testLoadLabel());
     const start=document.querySelector('[data-action="start"]');if(start)start.disabled=!plan.ready;
   }
   async function loadTestCourse() {
@@ -299,11 +466,11 @@
     const cached=prior||await courseClient.cached(input);
     if(revision!==courseRevision)return;
     testCatalog=cached;
-    if(cached&&!cached.stale){courseBusy=false;retainTestSetup();if(!session&&view==="test")render();return;}
-    if(!session&&view==="test")render();
+    if(cached&&!cached.stale){courseBusy=false;retainTestSetup();if(!session&&view==="test")refreshActivity(true);return;}
+    if(!session&&view==="test")refreshActivity(true);
     try{const catalog=await courseClient.load(input);if(revision!==courseRevision)return;testCatalog=catalog;}
     catch(error){if(revision===courseRevision)courseError=String(error.message||"Course could not be loaded. Try again.");}
-    finally{if(revision===courseRevision){courseBusy=false;if(testCatalog)retainTestSetup();if(!session&&view==="test")render();}}
+    finally{if(revision===courseRevision){courseBusy=false;if(testCatalog)retainTestSetup();if(!session&&view==="test")refreshActivity(true);}}
   }
   function workspaceA() {
     return `<div class="app-frame"><div class="frame-toolbar">${tabs()}<div class="spacer"></div><span class="counter">${items.length} saved items</span><button class="quiet delete-all" data-action="delete-all">Delete all</button></div>${libraryPane()}${view==="study"?detail():activity(view==="test")}${overlays()}</div>`;
@@ -314,17 +481,40 @@
   function workspaceC() {
     const list = filtered();
     const navigation=`<nav class="item-navigation" aria-label="Saved words and sentences"><button data-action="previous"${list.length?"":" disabled"}>Previous</button><button data-action="next"${list.length?"":" disabled"}>${nextSavedLabel()}</button></nav>`;
-    const desk = `<section class="focus-desk">${view==="study"?`<div class="focus-top">${Runtime&&current?`<div class="focus-study-actions"><button type="button" class="quiet" data-action="note">${icon("note")}Note</button><button type="button" class="quiet" data-action="delete">${icon("trash")}Delete</button></div>`:""}</div><div class="focus-main">${detail(true)}</div><footer class="focus-bottom">${navigation}<button class="primary" data-action="practise-item"${current?"":" disabled"}>Practice this ${noun([getItem(current)])}</button></footer>`:view==='kana'?(globalThis.IKnowFocusKana?.render()||''):activity(view==="test")}</section>`;
+    const desk = `<section class="focus-desk">${view==="study"?`<div class="focus-top">${current?`<div class="focus-study-actions"><button type="button" class="quiet" data-action="note" aria-controls="focus-note">${icon("note")}Note</button><button type="button" class="quiet" data-action="delete">${icon("trash")}Delete</button></div>`:""}</div><div class="focus-main">${detail(true)}</div><footer class="focus-bottom">${navigation}<button class="primary" data-action="practise-item"${current?"":" disabled"}>Practice this ${noun([getItem(current)])}</button></footer>`:view==='kana'?(globalThis.IKnowFocusKana?.render()||''):activity(view==="test")}</section>`;
     return `<div class="app-frame"><nav class="focus-rail" aria-label="Study activity">${[["study","book","Study"],["practice","listen","Practice"],["test","test","Test"],["kana","kana","Kana"]].map(([id,graphic,label])=>`<button data-view="${id}" aria-pressed="${view===id}">${icon(graphic)}${label}</button>`).join("")}<button data-action="browse" aria-expanded="${libraryOpen&&view==="study"}" aria-controls="focus-library">${icon("library")}Library</button></nav><div class="focus-body">${libraryOpen&&view==="study"?focusLibrary():""}${desk}</div>${overlays()}</div>`;
   }
   function focusLibrary() {
     const courses=new Map(items.map(item=>[item.courseId,item.courseTitle||`Course ${item.courseId}`]));
-    return `<aside class="focus-library" id="focus-library" aria-label="Saved for later"><div class="focus-library-controls"><div class="focus-library-heading"><h2>Saved for later <span class="count">${filtered().length}</span></h2>${Runtime?`<button type="button" class="quiet" data-action="delete-all"${items.length?"":" disabled"}>Delete all</button>`:""}</div><div class="library-search"><input type="search" id="demo-search" value="${escape(search)}" placeholder="Find a word or sentence" aria-label="Find a word or sentence" autocomplete="off"><div class="library-filters"><select id="demo-course" aria-label="Course"><option value="">All courses</option>${[...courses].map(([id,title])=>`<option value="${escape(id)}"${course===id?' selected':''}>${escape(title)}</option>`).join('')}</select>${kindSelect()}</div></div></div><div id="demo-library-list" class="library-list">${filtered().map(item=>row(item)).join("")||'<p class="no-results">No words or sentences found.</p>'}</div></aside>`;
+    return `<aside class="focus-library" id="focus-library" aria-label="Saved for later"><div class="focus-library-controls"><div class="focus-library-heading"><h2>Saved for later <span class="count">${filtered().length}</span></h2><button type="button" class="quiet" data-action="delete-all"${items.length?"":" disabled"}>Delete all</button></div><div class="library-search"><input type="search" id="demo-search" value="${escape(search)}" placeholder="Find a word or sentence" aria-label="Find a word or sentence" autocomplete="off"><div class="library-filters"><select id="demo-course" aria-label="Course"><option value="">All courses</option>${[...courses].map(([id,title])=>`<option value="${escape(id)}"${course===id?' selected':''}>${escape(title)}</option>`).join('')}</select>${kindSelect()}</div></div></div><div id="demo-library-list" class="library-list">${filtered().map(item=>row(item)).join("")||'<p class="no-results">No words or sentences found.</p>'}</div></aside>`;
   }
   function navigateItem(step) {
     const list=filtered();if(!list.length)return;
-    const at=list.findIndex(item=>item.key===current);current=list[(at<0?step<0?list.length-1:0:(at+step+list.length)%list.length)].key;
-    revealed=false;render();
+    const at=list.findIndex(item=>item.key===current),key=list[(at<0?step<0?list.length-1:0:(at+step+list.length)%list.length)].key;
+    selectStudyItem(key);
+  }
+  function cancelStudyPanelMotion(){
+    dockRevision++;dockAnimation?.cancel();dockAnimation=null;
+    panelResizeObserver?.disconnect();panelResizeObserver=null;cancelAnimationFrame(panelLayoutFrame);panelLayoutFrame=0;
+    for(const animation of expansionAnimations.values())animation.cancel();expansionAnimations.clear();
+  }
+  function selectStudyItem(key){
+    const item=items.find(record=>record.key===key);if(!item)return;
+    const card=document.querySelector('.focus-main>.focus-card');
+    const local=version==='c'&&view==='study'&&!picker&&!setupModal&&!session&&card&&!card.classList.contains('focus-empty');
+    if(local&&key===current)return;
+    if(!local){current=key;view='study';revealed=false;if(version==='b')drawer=true;render();return;}
+    strengthMenu?.close();globalThis.IKnowReaderVolumeControls?.close();stopAudio();
+    cancelStudyPanelMotion();globalThis.IKnowFocusAudio?.reset();compareOpen=false;compareKey=key;
+    current=key;revealed=false;
+    // Keep the library, its hovered row and the card surface mounted. Replacing
+    // the whole desk restarted hover/focus paints on every vocabulary click.
+    const template=document.createElement('template');template.innerHTML=detail(true);
+    const next=template.content.firstElementChild;card.dataset.compareOpen='false';card.replaceChildren(...next.childNodes);
+    const main=card.parentElement;main.scrollTop=0;
+    const practise=document.querySelector('.focus-bottom>[data-action="practise-item"]');if(practise)practise.textContent=`Practice this ${noun([item])}`;
+    updateLists();const nextButton=document.querySelector('.item-navigation [data-action="next"]');if(nextButton)nextButton.textContent=nextSavedLabel();
+    mountStudyTools(item);rememberStudySelection();
   }
   function pickerMarkup() {
     const query=pickerSearch.trim().toLowerCase();
@@ -348,6 +538,7 @@
     return `${setupModal?`<div class="overlay setup-overlay">${activity(view==="test",true)}</div>`:""}${picker?pickerMarkup():""}${session?sessionMarkup():""}`;
   }
   function render() {
+    strengthMenu?.close();
     const hash = "#" + view;
     if(location.hash !== hash)history.replaceState(history.state,"",location.pathname+location.search+hash);
     globalThis.IKnowReaderVolumeControls?.close();stopAudio();
@@ -355,7 +546,7 @@
     menuCleanup?.();menuCleanup=null;
     resultsCleanup?.();resultsCleanup=null;
     kanaCleanup?.();kanaCleanup=null;
-    compareRevision++;compareAnimation?.cancel();compareAnimation=null;
+    cancelStudyPanelMotion();
     globalThis.IKnowFocusAudio?.unmount();
     if(compareKey!==current||view!=="study"||session){globalThis.IKnowFocusAudio?.reset();compareOpen=false;}
     compareKey=current;
@@ -369,7 +560,7 @@
     for(const node of document.querySelectorAll('#demo-library-list>.library-row'))libraryRowItems.set(node,visibleItems.get(node.dataset.item));
     document.querySelector(".focus-rail").inert=Boolean(session&&!session.finishedAt);document.querySelector(".focus-body").inert=Boolean(session);
     const scroll=libraryScroll.get("docked");if(scroll)$("demo-library-list")?.scrollTo(scroll.left,scroll.top);
-    if($("focus-compare"))globalThis.IKnowFocusAudio?.mount($("focus-compare"),{key:current,audioUrl:getItem(current).audioUrl,stopOtherAudio:stopAudio});
+    if($("focus-compare"))mountStudyTools(getItem(current));
     if(session?.finishedAt)resultsCleanup=globalThis.IKnowFocusResults.mount?.(document.querySelector('.focus-results'),session,{items,language});
     if(view==='kana'&&!session)kanaCleanup=globalThis.IKnowFocusKana?.mount(document.querySelector('[data-kana-root]'));
     if(session&&!session.finishedAt&&session.results.some(row=>row.key===session.keys[session.index]))showSolution();
@@ -387,19 +578,18 @@
   function refreshHeader(){
     menuCleanup?.();const template=document.createElement('template');template.innerHTML=header();document.querySelector('.app-header')?.replaceWith(template.content.firstElementChild);mountHeaderMenus();
   }
+  function mountStudyTools(item){
+    globalThis.IKnowFocusAudio?.mount($('focus-compare'),{key:current,audioUrl:item.audioUrl,stopOtherAudio:stopAudio,visualHost:$('focus-audio-visualization')});
+    syncStudyPanels();
+    observeStudyPanels();
+  }
   function toggleCompare() {
     const panel=$("focus-compare"),button=document.querySelector('[data-action="compare"]');if(!panel||!button)return;
-    const revision=++compareRevision,from=panel.hidden?0:panel.getBoundingClientRect().height,opacity=panel.hidden?0:Number(getComputedStyle(panel).opacity);
-    compareAnimation?.cancel();compareAnimation=null;compareOpen=!compareOpen;
+    compareOpen=!compareOpen;
     if(!compareOpen)globalThis.IKnowFocusAudio?.stopMedia();
-    button.setAttribute("aria-expanded",String(compareOpen));panel.inert=!compareOpen;panel.setAttribute("aria-hidden",String(!compareOpen));
+    button.setAttribute("aria-expanded",String(compareOpen));
     document.querySelector(".focus-card").dataset.compareOpen=String(compareOpen);
-    panel.hidden=false;panel.style.height="auto";const to=compareOpen?panel.scrollHeight:0;
-    const finish=()=>{if(revision!==compareRevision||!panel.isConnected)return;panel.style.height="";panel.style.opacity="";panel.hidden=!compareOpen;compareAnimation=null;};
-    if(matchMedia("(prefers-reduced-motion: reduce)").matches){finish();return;}
-    panel.style.height=from+"px";panel.style.opacity=String(opacity);
-    const animation=panel.animate([{height:from+"px",opacity},{height:to+"px",opacity:compareOpen?1:0}],{duration:260,easing:"cubic-bezier(.22,.68,.2,1)",fill:"forwards"});compareAnimation=animation;
-    animation.finished.then(()=>{finish();animation.cancel();}).catch(()=>{});
+    syncStudyPanels(compareOpen?'compare':null,true);
   }
   function updateReading() {
     const words=romajiFor(getItem(current)).split(/\s+/).filter(Boolean),tokens=tokenReveals.get(current)||new Set();
@@ -455,10 +645,10 @@
       const oldItems=new Map(items.map(item=>[item.key,item]));
       items=savedByAdded(snapshot.library).map(record=>{
         const next={...record,strength:Runtime.strength(record.key,snapshot.learning,mode)},old=oldItems.get(record.key);
-        return old&&JSON.stringify(old)===JSON.stringify(next)?old:next;
+        return old&&previous?.learning.assessments===snapshot.learning.assessments&&JSON.stringify(old)===JSON.stringify(next)?old:next;
       });
-    }else if(previous.learning.records!==snapshot.learning.records){
-      items=items.map(item=>{const strength=Runtime.strength(item.key,snapshot.learning,mode);return item.strength===strength?item:{...item,strength};});
+    }else if(previous.learning.records!==snapshot.learning.records||previous.learning.assessments!==snapshot.learning.assessments){
+      items=items.map(item=>{const strength=Runtime.strength(item.key,snapshot.learning,mode);return item.strength===strength&&previous.learning.assessments===snapshot.learning.assessments?item:{...item,strength};});
     }
     const available=new Set(items.map(record=>record.key));current=available.has(oldCurrent)?oldCurrent:items[0]?.key||'';
     for(const key of selected)if(!available.has(key))selected.delete(key);
@@ -483,10 +673,10 @@
       const signature=JSON.stringify([...courses]);
       if(select.dataset.courseSignature!==signature){select.innerHTML='<option value="">All courses</option>'+[...courses].map(([id,title])=>`<option value="${escape(id)}"${course===id?' selected':''}>${escape(title)}</option>`).join('');select.dataset.courseSignature=signature;}
     }
-    if(previous?.notes!==next?.notes&&detailSignature(previous)===detailSignature(next)&&!readingChanged)updateInlineNote();
+    if(previous?.notes!==next?.notes&&detailSignature(previous)===detailSignature(next)&&!readingChanged)updateInlineNote(false,true);
     if(detailSignature(previous)!==detailSignature(next)||readingChanged){
       globalThis.IKnowFocusAudio?.unmount();compareOpen=false;compareKey=current;globalThis.IKnowFocusAudio?.reset();
-      const main=document.querySelector('.focus-main');if(main){main.innerHTML=detail(true);if($('focus-compare'))globalThis.IKnowFocusAudio?.mount($('focus-compare'),{key:current,audioUrl:next.audioUrl,stopOtherAudio:stopAudio});}
+      const main=document.querySelector('.focus-main');if(main){main.innerHTML=detail(true);if($('focus-compare'))mountStudyTools(next);}
       const studyActions=document.querySelector('.focus-study-actions');if(!next)studyActions?.remove();
       else if(!studyActions){const actions=document.createElement('div');actions.className='focus-study-actions';actions.innerHTML=`<button type="button" class="quiet" data-action="note">${icon('note')}Note</button><button type="button" class="quiet" data-action="delete">${icon('trash')}Delete</button>`;document.querySelector('.focus-top')?.append(actions);}
       const practise=document.querySelector('.focus-bottom>[data-action="practise-item"]');if(practise){practise.disabled=!next;practise.textContent=`Practice this ${noun([next])}`;}
@@ -523,8 +713,7 @@
   function applyBackupSnapshot(data){
     const Store=globalThis.IKnowReaderStudyStore,Core=globalThis.IKnowReaderCore,Learning=globalThis.IKnowReaderStudyLearningStore;
     const learning=data[Learning.KEY]||{schemaVersion:1,records:{},session:null};
-    const oldStrengths=new Map(items.map(record=>[record.key,record.strength]));
-    const nextItems=savedByAdded(data[Store.KEY]).map(record=>({...record,strength:learning.records[record.key]?.review?globalThis.IKnowReaderStudyLearning.strength(learning.records[record.key].review):oldStrengths.get(record.key)||'new'}));
+    const nextItems=savedByAdded(data[Store.KEY]).map(record=>({...record,strength:globalThis.IKnowReaderStudyLearning.strengthFor(record.key,learning,mode)}));
     previewLibrary=structuredClone(data[Store.KEY]);previewLearning=structuredClone(learning);
     previewSettings=Object.fromEntries([Core.STORAGE_KEY,'iknowReaderTheme','iknowReaderPanelTheme'].filter(key=>data[key]!==undefined).map(key=>[key,structuredClone(data[key])]));
     items=nextItems;current=items.some(record=>record.key===current)?current:items[0]?.key||'';
@@ -537,17 +726,38 @@
     const data=await globalThis.IKnowFocusBackup.loadSnapshot();if(!data)return false;
     const Store=globalThis.IKnowReaderStudyStore,Core=globalThis.IKnowReaderCore,Learning=globalThis.IKnowReaderStudyLearningStore;
     const checked=await Store.createBackend({async get(keys){return Object.fromEntries((typeof keys==='string'?[keys]:keys).map(key=>[key,data[key]]));},async set(){throw Error('Unexpected preview restore write.');}}).exportBackup();
-    applyBackupSnapshot({[Store.KEY]:checked.library,[Learning.KEY]:{schemaVersion:1,records:checked.learning?.records||{},session:null},[Store.PREFERENCES_KEY]:checked.settings.study,
+    applyBackupSnapshot({[Store.KEY]:checked.library,[Learning.KEY]:{schemaVersion:1,...checked.learning,records:checked.learning?.records||{},session:null},[Store.PREFERENCES_KEY]:checked.settings.study,
       [Core.STORAGE_KEY]:checked.settings.reading,iknowReaderTheme:checked.settings.appTheme,iknowReaderPanelTheme:checked.settings.panelTheme});
     return true;
   }
+  async function updatePreviewLibrary(change){
+    const library=structuredClone(previewLibrary);change(library.records);
+    const data={...backupSnapshot(),[globalThis.IKnowReaderStudyStore.KEY]:library};
+    await globalThis.IKnowFocusBackup.saveSnapshot(data);applyBackupSnapshot(data);
+  }
+  async function setPersonalLevel(key,level){
+    if(session||runtimeBusy||!items.some(item=>item.key===key))throw Error('Return to your library to change this learning level.');
+    if(Runtime){
+      const progress=await Runtime.setAssessment(key,level);
+      receiveRuntimeSnapshot({...runtimeSnapshot,learning:{...runtimeSnapshot.learning,...progress}});
+    }else{
+      const Learning=globalThis.IKnowReaderStudyLearningStore,learning=structuredClone(previewLearning);
+      learning.assessments||={};learning.assessments[key]={level,updatedAt:Math.max(Date.now(),(learning.assessments[key]?.updatedAt||0)+1)};
+      const data={...backupSnapshot(),[Learning.KEY]:learning};await globalThis.IKnowFocusBackup.saveSnapshot(data);applyBackupSnapshot(data);updateLists();
+    }
+  }
+  function initStrengthMenu(){
+    if(strengthMenu)return;
+    strengthMenu=globalThis.IKnowStudyStrengthMenu?.create({getItem:key=>items.find(item=>item.key===key),getLevel:key=>(Runtime?runtimeSnapshot?.learning:previewLearning)?.assessments?.[key]?.level||'auto',onSelect:setPersonalLevel,onError:toast});
+  }
   let releaseAudioVolume=null;
-  function stopAudio() {releaseAudioVolume?.();releaseAudioVolume=null;if(audio){audio.pause();audio.src="";audio=null;}}
+  function stopAudio() {releaseAudioVolume?.();releaseAudioVolume=null;if(audio){audio.pause();audio.src="";audio=null;}globalThis.IKnowFocusAudio?.observeOriginal(null);}
   function play(record, withPlayer = false) {
     globalThis.IKnowFocusAudio?.stopMedia();
     if(audio){stopAudio();if($("demo-player"))$("demo-player").dataset.playing="false";if($("demo-play-label"))$("demo-play-label").textContent="Play audio";return;}
     if(!record.audioUrl){toast("This word or sentence has no recording.");return;}
     const active=new Audio(record.audioUrl);audio=active;active.preload="none";releaseAudioVolume=globalThis.IKnowReaderCore.audioVolume().bind(active,"original");
+    if(!withPlayer)globalThis.IKnowFocusAudio?.observeOriginal(active);
     const reset=()=>{if(audio===active){releaseAudioVolume?.();releaseAudioVolume=null;audio=null;}if($("demo-player"))$("demo-player").dataset.playing="false";if($("demo-play-label"))$("demo-play-label").textContent="Play again";};
     if(withPlayer){$("demo-player").dataset.playing="true";$("demo-play-label").textContent="Playing";active.addEventListener("timeupdate",()=>{if($("demo-audio-progress"))$("demo-audio-progress").value=active.duration?active.currentTime/active.duration:0;if($("demo-audio-time"))$("demo-audio-time").textContent=`0:${String(Math.floor(active.currentTime)).padStart(2,"0")}`;});}
     active.addEventListener("ended",reset);active.play().catch(()=>{reset();toast("Could not play the recording. Try again.");});
@@ -591,7 +801,11 @@
     const sourcePool=Array.isArray(poolOverride)?poolOverride:test?testCatalog?.records:items;
     if(!Array.isArray(sourcePool)){toast("Load a course before starting its test.");return;}
     const records=new Map(sourcePool.map(record=>[record.key,record]));
-    const exercises=chosen.map(key=>records.has(key)?exerciseFor(records.get(key),sourcePool):null);if(exercises.some(exercise=>!exercise)){toast("Some questions are unavailable for this exercise. Change your selection.");return;}
+    const exercises=chosen.map(key=>records.has(key)?exerciseFor(records.get(key),sourcePool):null);
+    if(exercises.some(exercise=>!exercise)){
+      const unavailable=chosen.flatMap((key,index)=>exercises[index]?[]:records.has(key)?[{reason:unavailableReason(records.get(key))}]:[]);
+      toast(unavailable.length?unavailableMessage(unavailable):'Some selected questions are no longer available. Choose them again.');return;
+    }
     const catalog=test?testCatalog:practiceSource==='course'&&!poolOverride?practiceCatalog:null;
     const draft={keys:chosen,pool:structuredClone(sourcePool),index:0,mode,test,exercises,attempts:test?"single":practiceAttempts,results:[],answerAttempts:chosen.map(()=>0),answerHistory:chosen.map(()=>[]),lastSubmitted:chosen.map(()=>""),complete:false,startedAt:Date.now(),finishedAt:0,courseId:options.catalog?.courseId||catalog?.courseId||"",courseTitle:options.catalog?.title||catalog?.title||""};
     if(Runtime){
@@ -630,11 +844,11 @@
       if(button.dataset.action==="browse"){view="study";libraryOpen=true;render();return;}
     }
     if(button.dataset.choiceStep){const group=button.closest('[data-choice]');if(group)stepChoice(group.dataset.choice,button.dataset.choiceStep);return;}
-    if(button.dataset.practiceSource){practiceSource=button.dataset.practiceSource;retainPracticeSetup();if(practiceSource==='course'&&!practiceCatalog&&!practiceCourseBusy&&!practiceCourseError)void loadPracticeCourse();else render();return;}
-    if(button.dataset.view){view=button.dataset.view;drawer=false;if(view==="test"&&!testCatalog&&!courseBusy&&!courseError)void loadTestCourse();else if(view==='practice'&&practiceSource==='course'&&!practiceCatalog&&!practiceCourseBusy&&!practiceCourseError)void loadPracticeCourse();else render();return;}
-    if(button.dataset.mode){mode=button.dataset.mode;retainPracticeSetup();if(Runtime&&runtimeSnapshot)items=items.map(item=>({...item,strength:Runtime.strength(item.key,runtimeSnapshot.learning,mode)}));render();return;}
+    if(button.dataset.practiceSource){if(practiceSource===button.dataset.practiceSource)return;practiceSource=button.dataset.practiceSource;retainPracticeSetup();if(practiceSource==='course'&&!practiceCatalog&&!practiceCourseBusy&&!practiceCourseError)void loadPracticeCourse();else refreshActivity();return;}
+    if(button.dataset.view){if(view===button.dataset.view&&!session&&!picker&&!setupModal&&!drawer&&!document.querySelector('.focus-results'))return;view=button.dataset.view;drawer=false;if(view==="test"&&!testCatalog&&!courseBusy&&!courseError)void loadTestCourse();else if(view==='practice'&&practiceSource==='course'&&!practiceCatalog&&!practiceCourseBusy&&!practiceCourseError)void loadPracticeCourse();else render();return;}
+    if(button.dataset.mode){if(mode===button.dataset.mode)return;mode=button.dataset.mode;retainPracticeSetup();items=items.map(item=>({...item,strength:globalThis.IKnowReaderStudyLearning.strengthFor(item.key,Runtime?runtimeSnapshot.learning:previewLearning,mode)}));refreshActivity();return;}
     if(button.dataset.reading){const tokens=tokenReveals.get(current)||new Set(),index=Number(button.dataset.readingIndex);tokens.has(index)?tokens.delete(index):tokens.add(index);tokenReveals.set(current,tokens);updateReading();return;}
-    if(button.dataset.item){const key=button.dataset.item;if(button.dataset.pickerRow){if(pickerPurpose==="browse"){current=key;picker=false;view="study";revealed=false;render();return;}selected.has(key)?selected.delete(key):selected.add(key);button.querySelector("input").checked=selected.has(key);$("picker-count").textContent=`${selected.size} selected`;return;}if(version==="b"&&selectionMode){selected.has(key)?selected.delete(key):selected.add(key);button.querySelector("input").checked=selected.has(key);$("collection-count").textContent=`${selected.size} selected`;const practise=document.querySelector(".collection-footer .primary");if(practise)practise.disabled=!selected.size;return;}current=key;view="study";revealed=false;if(version==="b")drawer=true;render();return;}
+    if(button.dataset.item){const key=button.dataset.item;if(button.dataset.pickerRow){if(pickerPurpose==="browse"){current=key;picker=false;view="study";revealed=false;render();return;}selected.has(key)?selected.delete(key):selected.add(key);button.querySelector("input").checked=selected.has(key);$("picker-count").textContent=`${selected.size} selected`;return;}if(version==="b"&&selectionMode){selected.has(key)?selected.delete(key):selected.add(key);button.querySelector("input").checked=selected.has(key);$("collection-count").textContent=`${selected.size} selected`;const practise=document.querySelector(".collection-footer .primary");if(practise)practise.disabled=!selected.size;return;}selectStudyItem(key);return;}
     if(button.dataset.review){if(!session||session.finishedAt)return;const exercise=session.exercises[session.index],correct=button.dataset.review===exercise.correctId,submitted=exercise.choices.find(choice=>choice.id===button.dataset.review)?.label||button.textContent;void answerQuestion(correct,submitted,false,button);return;}
     switch(button.dataset.action){
       case "choose":openPicker("practice");break;
@@ -668,11 +882,13 @@
       case "result-new-round":session=null;render();break;
       case "result-practice-mistakes":{if(!session?.finishedAt)break;const summary=globalThis.IKnowFocusResults.summarize(session),keys=summary.reviewKeys;if(!keys.length)break;const fromTest=session.test||session.fromTest,pool=session.pool;mode=session.mode;view="practice";session=null;void startRound(keys,false,pool).then(()=>{if(session){session.fromTest=fromTest;Rounds?.persistView(session);}});break;}
       case "result-test-report":if(previousTestReport){session=structuredClone(previousTestReport);mode=session.mode;view="test";render();}break;
-      case "delete":case "delete-all":if(Runtime)libraryActions.openDelete({all:button.dataset.action==='delete-all'});else toast("Delete controls are shown for layout review. Demo items are kept.");break;
+      case "delete":case "delete-all":libraryActions?.openDelete({all:button.dataset.action==='delete-all'});break;
       case "backup":backupController?.open();break;
-      case "note":case "edit-note":openInlineNote();break;
+      case "note":openInlineNote();break;
+      case "edit-note":editInlineNote();break;
       case "cancel-note":cancelInlineNote();break;
       case "save-note":void saveInlineNote();break;
+      case "delete-note":void saveInlineNote(true);break;
       case "compare":toggleCompare();break;
     }
   });
@@ -713,12 +929,14 @@
   document.addEventListener("keydown",event=>{if(event.key==="Enter"&&event.target.id==="demo-test-course"){event.preventDefault();void loadTestCourse();}if(event.key==='Enter'&&event.target.id==='demo-practice-course'){event.preventDefault();void loadPracticeCourse();}if(event.key==="Escape"&&(picker||setupModal||drawer)){picker=false;setupModal=false;drawer=false;render();}});
   document.addEventListener("visibilitychange",()=>{if(document.hidden)stopAudio();});
   window.addEventListener("pagehide",()=>{rememberStudySelection();stopAudio();Rounds?.persistView(session);disposeRuntime?.();});
+  window.addEventListener('resize',()=>{if(view==='study'&&!session)syncStudyPanels();});
   window.addEventListener("hashchange",()=>{
     if(runtimeBusy||session&&!session.finishedAt){history.replaceState(history.state,"",location.pathname+location.search+"#"+view);return;}
     view=routeView();session=null;picker=false;setupModal=false;drawer=false;
     if(view==="test"&&!testCatalog&&!courseBusy&&!courseError)void loadTestCourse();else if(view==='practice'&&practiceSource==='course'&&!practiceCatalog&&!practiceCourseBusy&&!practiceCourseError)void loadPracticeCourse();else render();
   });
   async function init(){
+    initStrengthMenu();
     if(globalThis.IKnowStudyWorkspaceProduction){
       try{if(!Runtime)throw Error('The Study data connection is unavailable. Reload Reading Helper.');await initRuntime();}
       catch(error){$('demo').innerHTML='<p class="no-results"></p>';$('demo').querySelector('p').textContent=String(error.message||'The library could not be loaded.');console.error(error);}
@@ -728,7 +946,7 @@
     try{
       const response=await fetch('/library.json');if(!response.ok)throw Error('Library unavailable');const library=await response.json();
       previewLibrary={schemaVersion:1,records:Object.fromEntries(Object.entries(library.records).slice(0,18))};
-      items=savedByAdded(previewLibrary).map((item,index)=>({...item,strength:['new','learning','strong','new','weak','learning'][index%6]}));current=items[0]?.key||'';
+      items=savedByAdded(previewLibrary).map(item=>({...item,strength:globalThis.IKnowReaderStudyLearning.strengthFor(item.key,previewLearning,mode)}));current=items[0]?.key||'';
       let restoreError='';try{await readStoredPreview();}catch(error){restoreError=String(error.message||'The imported preview library could not be restored.');}
       items.slice(0,4).forEach(item=>selected.add(item.key));
       restoreStudySelection();
@@ -736,6 +954,10 @@
         await globalThis.IKnowFocusBackup.saveSnapshot(data);
         applyBackupSnapshot(data);view='study';session=null;picker=false;setupModal=false;course='';kind='';strength='';search='';libraryOpen=true;libraryScroll.clear();render();
       }});
+      libraryActions=globalThis.IKnowStudyWorkspaceActions.create({runtime:{
+        remove:key=>updatePreviewLibrary(records=>{delete records[key];}),
+        removeAll:keys=>updatePreviewLibrary(records=>{for(const key of keys)delete records[key];})
+      },getCurrent:()=>items.find(record=>record.key===current),getItems:()=>items,onChanged:()=>render(),onError:error=>toast(error.message)});
       restoreTestSetup();restorePracticeSetup();view=routeView();
       if(view==="test")void loadTestCourse();else if(view==='practice'&&practiceSource==='course')void loadPracticeCourse();else render();
       if(restoreError)toast(restoreError);
