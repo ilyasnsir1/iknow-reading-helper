@@ -1,0 +1,18 @@
+.ikr-volume-trigger{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:4px;background:transparent;color:var(--ikr-muted);border-color:transparent;font-size:12px;white-space:nowrap}
+.ikr-volume-trigger svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ikr-volume-trigger:not(:disabled):hover{background:transparent;color:var(--ikr-text);border-color:var(--ikr-line)}
+html[data-ikr-theme] .ikr-volume-trigger:focus:not(:focus-visible){outline:none;box-shadow:none}
+html[data-ikr-theme] .ikr-volume-trigger:focus-visible{outline:none;box-shadow:inset 0 0 0 1px var(--ikr-focus)}
+.ikr-volume-menu{position:fixed;inset:auto;margin:0;width:264px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:17px;border:1px solid var(--ikr-line-strong);border-radius:5px;background:var(--ikr-elevated);color:var(--ikr-text);box-shadow:var(--ikr-shadow);z-index:150}
+.ikr-volume-inline{padding:15px 16px;border-top:1px solid var(--ikr-line)}
+.ikr-volume-heading{margin:0 0 16px;font-size:12px;font-weight:550;color:var(--ikr-text)}
+.ikr-volume-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:9px 12px;align-items:center;margin:0 0 17px;padding:0!important;color:var(--ikr-muted);font-size:12px;text-align:left}
+.ikr-volume-row:last-of-type{margin-bottom:0}
+.ikr-volume-row output{font-size:11px;line-height:1;color:var(--ikr-text);font-variant-numeric:tabular-nums;min-width:33px;text-align:right}
+.ikr-volume-row input[type=range]{grid-column:1/-1;width:100%;min-width:0;height:16px;min-height:16px;margin:0;padding:0;border:0;border-radius:0;appearance:none;background:transparent;box-shadow:none;cursor:pointer;accent-color:var(--ikr-accent)}
+.ikr-volume-row input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(to right,var(--ikr-accent) var(--volume,100%),var(--ikr-line-strong) var(--volume,100%))}
+.ikr-volume-row input[type=range]::-webkit-slider-thumb{appearance:none;width:11px;height:11px;margin-top:-4px;border:1px solid var(--ikr-line-strong);border-radius:50%;background:var(--ikr-text)}
+.ikr-volume-row input[type=range]:focus{outline:0;box-shadow:none}
+.ikr-volume-row input[type=range]:focus-visible{outline:1px solid var(--ikr-focus);outline-offset:3px;border-radius:2px}
+.ikr-volume-status{margin:13px 0 0;font-size:11px;color:var(--ikr-danger)}
+.audio-meta .ikr-volume-trigger{position:relative;top:-1px;flex:none;align-self:center;min-height:34px;padding:7px 11px;font:inherit}

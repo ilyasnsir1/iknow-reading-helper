@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-ikr-theme="paper">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Results layouts · iKnow! Reading Helper</title>
+  <link rel="stylesheet" href="/extension/theme.css">
+  <link rel="stylesheet" href="study-focus.css">
+  <link rel="stylesheet" href="study-focus-menus.css">
+  <link rel="stylesheet" href="study-result-designs.css">
+  <script src="/extension/core.js" defer></script>
+  <script src="/extension/study-practice.js" defer></script>
+  <script src="/extension/study-store.js" defer></script>
+  <script src="/extension/course-packs.js" defer></script>
+  <script src="/extension/data.js" defer></script>
+  <script src="/extension/translation-corrections.js" defer></script>
+  <script src="/extension/study-catalog.js" defer></script>
+  <script src="study-result-examples.js" defer></script>
+  <script src="study-focus-menus.js" defer></script>
+  <script src="study-focus-results.js" defer></script>
+  <script src="study-result-designs.js" defer></script>
+</head>
+<body>
+  <div class="results-review-bar">
+    <span>EXAMPLE RESULTS</span>
+    <nav class="result-versions" aria-label="Results layout">
+      <button type="button" data-result-design="report" aria-pressed="true"><small>A</small> Report</button>
+      <button type="button" data-result-design="review" aria-pressed="false"><small>B</small> Review desk</button>
+      <button type="button" data-result-design="map" aria-pressed="false"><small>C</small> Session map</button>
+    </nav>
+    <label class="results-example-size">Example size<select id="results-example-size" aria-label="Example size"><option value="9">9 items</option><option value="200">200 words</option><option value="400">400 words &amp; sentences</option></select></label>
+    <a href="/study-focus.html">Study space</a>
+  </div>
+  <main id="demo" data-layout="c" aria-label="Results design preview"></main>
+  <p class="preview-footnote">Example results. Your tests and saved progress stay unchanged.</p>
+  <div id="result-announcement" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

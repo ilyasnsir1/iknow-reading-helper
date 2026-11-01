@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "study-refinements",
+      "version": "1.41.1",
+      "status": "released",
+      "date": "2026-11-01",
+      "title": "A tidier study space",
+      "summary": "A cleaner course picker and space for your notes and recordings.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Personal learning levels",
+          "description": "Right-click a saved word or sentence to set its learning level.",
+          "details": [
+            "Choose New, Weak, Learning or Strong.",
+            "Choose Automatic to use your practice results again."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/author-341e93ea2e8ca9fe0e5e87bfbf34c57a.png",
+              "alt": "A saved word with the right-click menu open, showing Automatic, New, Weak, Learning and Strong.",
+              "caption": "Right-click a saved card to choose its learning level."
+            }
+          ]
+        },
+        {
+          "type": "improved",
+          "title": "Study details",
+          "description": "A cleaner look while you learn.",
+          "details": [
+            "A tidier Kana chart, without the extra character at the top.",
+            "A neater course picker with clearer loading and error messages.",
+            "A new Fill the gap icon.",
+            "Clearer playback controls and a focused recording view.",
+            "Full-width notes that reopen in read view, with smoother transitions.",
+            "Less automatic processing on microphone recordings.",
+            "Fill the gap now recognises the word forms used in iKnow examples.",
+            "Delete a saved note directly from its panel.",
+            "Switch between saved words and practice options without flashing."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
+      "id": "new-study-space",
+      "version": "1.41.0",
+      "status": "released",
+      "date": "2026-10-31",
+      "title": "Your study space",
+      "summary": "Your library, practice and course tests in one place.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Study workspace",
+          "description": "A new home for learning Japanese.",
+          "details": [
+            "Keep your saved words, sentences and notes close by.",
+            "Practise with Review, Fill the gap and Listening, using your library or a full course.",
+            "Take course tests, see your answers and revisit mistakes.",
+            "Learn Hiragana and Katakana with the groups and characters you choose.",
+            "Back up your library and learning progress, and restore them on another PC.",
+            "Adjust playback volume for original audio and your recordings."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/author-67944234a01ea13752f19007570e4010.png",
+              "alt": "The new Study workspace with a saved library and reading card.",
+              "caption": "Your library and study tools in one place."
+            },
+            {
+              "src": "changelog-media/author-8e448868704a7bf683ece29a2d9541d3.png",
+              "alt": "Hiragana chart with basic, voiced and combination groups.",
+              "caption": "Pick the characters and groups you want to practise."
+            }
+          ]
+        },
+        {
+          "type": "improved",
+          "title": "Theme menus",
+          "description": "One theme picker style across Reading Helper.",
+          "details": [
+            "Color swatches and a checkmark make your selection clear."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
+      "id": "romaji-style",
+      "version": "1.40.5",
+      "status": "released",
+      "date": "2026-10-29",
+      "title": "Your choice of Romaji",
+      "summary": "A new reading option and a home for release notes.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Romaji style",
+          "description": "Choose Source spelling or Pronunciation.",
+          "details": [
+            "Pronunciation shows particles as wa, e and o.",
+            "Available in the course toolbar, popup and Study space."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/romaji-style.png",
+              "alt": "Source spelling and particle pronunciation side by side",
+              "caption": "Choose the reading style that helps you most."
+            }
+          ]
+        },
+        {
+          "type": "added",
+          "title": "Changelog",
+          "description": "See what's changed, with pictures when helpful.",
+          "details": [],
+          "images": []
+        },
+        {
+          "type": "fixed",
+          "title": "Updates section",
+          "description": "Removed the extra outline after installing updates.",
+          "details": [],
+          "images": []
+        }
+      ]
+    },
+    {
+      "id": "bilingual-word-controls",
+      "version": "1.40.4",
+      "status": "released",
+      "date": "2026-10-29",
+      "title": "Keep translations together",
+      "summary": "A small fix for Both languages.",
+      "changes": [
+        {
+          "type": "fixed",
+          "title": "Vocabulary buttons",
+          "description": "Save and practice buttons now sit below English and German.",
+          "details": [],
+          "images": [
+            {
+              "src": "changelog-media/bilingual-word-controls.png",
+              "alt": "Vocabulary buttons before and after the Both languages fix",
+              "caption": "Both translations stay together."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

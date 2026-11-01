@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "owner": "ilyasnsir1",
+  "channel": "stable",
+  "publicKeyXml": "<RSAKeyValue><Modulus>mgV9qFJpg4PeT9kmq1bIESkcTy45f/VZSPK7tdNbFdKF4UHg8I9ojrOVh0HbCxplQijOn/Z2iXtBlLExWU6SvfPuFDW0VGRHtBQa5mHFMUyalE74uddJQzJc1enTk0DVdCtU+ney5WwOSEmZBnjvpsBlkl1/rGLPiDLPdQVwvfqM3TShbKs5QruArN1lKFlLj1mLL/5Sr368zHAq3DTaSTb99H4Asx5+xqR3B4OEAhi+BqU/5vTY8vd/T1XrJJEwATO5ZA7TXFV6snGxJSqQTV3+vrApDa4GbNlRnPT2XZoo3Oo+WPq/Eeb/MwRN40B4ViV8olfo0zCZsBk1GsrXd6ZiEASeZxA/1gsZzNdwMQol4sQdPNAS+7InQg3O+REoqExaG1cvRYhsTJLoyRQLchay0p+tP7U6s9GDJ8Fz9Rg936r1/jNnxF1A/YvBhnaNgYNWWVgbak7m+8XSUksGTme/btcpnbY+QgiBWhWN1Cr686MxJId2RddPkJf46ohV</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>",
+  "schema": 1,
+  "repository": "iknow-reading-helper"
+}

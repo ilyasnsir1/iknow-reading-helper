@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" class="ikr-theme-page" data-ikr-theme="paper">
+<head><link rel="stylesheet" href="theme.css"><script src="theme.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnostics · iKnow! Reading Helper</title>
+  <link rel="stylesheet" href="diagnostics.css">
+  <script src="diagnostic-page-errors.js" defer></script>
+  <script src="diagnostics.js" defer></script>
+<link rel="stylesheet" href="theme-pages.css"></head>
+<body data-ikr-page="diagnostics">
+  <main>
+    <header>
+      <img src="icons/icon128.png" width="48" height="48" alt="">
+      <div><p class="eyebrow">iKnow! Reading Helper</p><h1>Diagnostics</h1></div>
+    </header>
+    <p class="intro">Create one support report with the recent event history, preparation progress, installation checks and Windows update verification.</p>
+    <section class="card" aria-label="Export a diagnostic report">
+      <div class="export-row">
+        <div><h2>A report you can share</h2><p class="muted">Saved locally. No automatic upload.</p></div>
+        <button id="export-diagnostics" type="button"><span class="spinner" aria-hidden="true"></span><span>Export diagnostics</span></button>
+      </div>
+      <p id="diagnostics-status" role="status" aria-live="polite">Ready when you are.</p>
+      <details id="report-preview" hidden>
+        <summary>View report</summary>
+        <pre id="report-text" tabindex="0" aria-label="Diagnostic report JSON"></pre>
+      </details>
+    </section>
+    <p class="footnote">Checks can take up to 45 seconds and may read public release metadata. No update or model is installed. The report still works if the helper is unavailable. History starts with this version; unavailable or truncated information is marked.</p>
+  </main>
+</body>
+</html>
