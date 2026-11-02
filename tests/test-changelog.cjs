@@ -8,15 +8,19 @@ const change = extra => ({ type: "fixed", title: "Buttons below both translation
 (async () => {
   const bundled = JSON.parse(fs.readFileSync(path.join(source, "changelog.json"), "utf8"));
   assert.equal(bundled.schemaVersion, 1);
-  assert.equal(bundled.entries.length, 4, "history retains every published entry from the bilingual button fix onward");
+  assert.equal(bundled.entries.length, 5, "history retains every published entry from the bilingual button fix onward");
   assert.equal(bundled.entries[0].status, "released");
-  assert.equal(bundled.entries[0].version, "1.41.1", "the small layout patch deliberately retains the published notes");
+  assert.equal(bundled.entries[0].version, "1.41.3");
+  assert.equal(bundled.entries[0].id, "practice-layout-and-volume");
+  assert.equal(bundled.entries[0].changes.length, 1);
+  assert.equal(bundled.entries[0].changes[0].type, "fixed");
+  assert.equal(bundled.entries[0].changes[0].details.length, 2);
   const installedVersion = JSON.parse(fs.readFileSync(path.join(source, "manifest.json"), "utf8")).version;
   const versionOrder = value => [...value.split('.').map(Number), 0, 0, 0, 0].slice(0, 4).reduce((total, part) => total * 10000 + part, 0);
   assert.ok(versionOrder(installedVersion) >= versionOrder(bundled.entries[0].version), "historical notes cannot claim a newer installed version");
-  assert.deepEqual(bundled.entries.slice(1).map(entry => entry.version), ["1.41.0", "1.40.5", "1.40.4"]);
+  assert.deepEqual(bundled.entries.slice(1).map(entry => entry.version), ["1.41.1", "1.41.0", "1.40.5", "1.40.4"]);
   assert.ok(bundled.entries.every(entry => entry.status === "released"));
-  const levels = bundled.entries[0].changes.find(change => change.title === "Personal learning levels");
+  const levels = bundled.entries.find(entry => entry.id === "study-refinements").changes.find(change => change.title === "Personal learning levels");
   assert.equal(levels.type, "added");
   assert.match(levels.description, /Right-click/);
   assert.ok(levels.details.some(detail => detail.includes("Automatic")));

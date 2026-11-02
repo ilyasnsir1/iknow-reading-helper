@@ -7,9 +7,14 @@ fs.mkdirSync(out, { recursive: true });
 const until = async (fn, label) => { const start = Date.now(); while (!await fn()) { if (Date.now() - start > 20000) throw Error("Timed out: " + label); await new Promise(resolve => setTimeout(resolve, 35)); } };
 (async () => {
   const extension = require("./fixtures/isolate-extension.cjs")(source, out);
-  const notesPath = path.join(extension, "changelog.json"), originalNotes = fs.readFileSync(notesPath);
+  const manifestPath = path.join(extension, "manifest.json"), manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.version = "1.41.2"; fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  const notesPath = path.join(extension, "changelog.json"), notesFixture = JSON.parse(fs.readFileSync(notesPath, "utf8"));
+  notesFixture.entries = notesFixture.entries.filter(entry => ["study-refinements", "new-study-space", "romaji-style", "bilingual-word-controls"].includes(entry.id));
+  fs.writeFileSync(notesPath, JSON.stringify(notesFixture));
+  const originalNotes = fs.readFileSync(notesPath);
   assert.equal(JSON.parse(fs.readFileSync(path.join(extension, "manifest.json"), "utf8")).version, "1.41.2");
-  assert.equal(JSON.parse(originalNotes).entries[0].version, "1.41.1", "Use the actual patch package's previous release notes without changing their JSON");
+  assert.equal(JSON.parse(originalNotes).entries[0].version, "1.41.1", "The isolated older-patch fixture retains its previous release notes");
 
   fs.writeFileSync(path.join(extension, "patch-reader-native-fixture.js"), `chrome.runtime.connectNative=()=>{const listeners=[];let open=true;return{onMessage:{addListener:fn=>listeners.push(fn)},onDisconnect:{addListener(){}},disconnect(){open=false;},postMessage(message){(async()=>{const previous=(await chrome.storage.local.get("testNativeCalls")).testNativeCalls||[];await chrome.storage.local.set({testNativeCalls:[...previous,{type:message.type,action:message.action}]});if(open)listeners.forEach(fn=>fn({type:"changelog:author:result",requestId:message.requestId,ok:true,available:false,role:"reader"}));})();}};};`);
   const background = path.join(extension, "background.js");

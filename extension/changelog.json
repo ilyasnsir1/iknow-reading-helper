@@ -2,6 +2,26 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "practice-layout-and-volume",
+      "version": "1.41.3",
+      "status": "released",
+      "date": "2026-11-02",
+      "title": "Small interface fixes",
+      "summary": "A tidier course practice screen and volume slider.",
+      "changes": [
+        {
+          "type": "fixed",
+          "title": "Practice and volume controls",
+          "description": "Two small fixes while you study.",
+          "details": [
+            "Course practice fits the available space without unnecessary scrolling.",
+            "Dragging a volume slider no longer adds an extra outline."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
       "id": "study-refinements",
       "version": "1.41.1",
       "status": "released",

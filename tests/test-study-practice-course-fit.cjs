@@ -4,14 +4,18 @@ const {spawnSync}=require('node:child_process');
 const {chromium}=require(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));
 const choose=require('./fixtures/choose-workspace-option.cjs');
 const root=path.resolve(__dirname,'..'),out=path.join(__dirname,'study-practice-course-fit-evidence','run-'+Date.now());fs.mkdirSync(out,{recursive:true});
-const source=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../../native-audio-audit/goal-19053.json'),'utf8'));
-const sizes=[{width:1920,height:1080},{width:1440,height:900},{width:1536,height:864},{width:1366,height:768},{width:1280,height:720}];
+const cue=(id,text,kana,romaji,jpan=text)=>({id,text,transliterations:{Jpan:jpan,Hrkt:kana,Latn:romaji}});
+const vocabulary=[['猫','ねこ','neko','cat'],['犬','いぬ','inu','dog'],['鳥','とり','tori','bird'],['本','ほん','hon','book'],['家','いえ','ie','house'],['魚','さかな','sakana','fish']];
+const source={id:19053,title:'[Legacy] Japanese Core 2000: Step 4',cue_language:'ja',goal_items:vocabulary.map(([jp,kana,romaji,en],index)=>({item:{id:index+1,cue:cue(index+1,jp,kana,romaji),response:{text:en}},sound:'https://assets0.iknow.jp/fixture.mp3',sentences:[{cue:cue(100+index,`${jp}があります。`,`${kana} が あります。`,`${romaji} ga arimasu.`,`${jp} が あります 。`),response:{text:`There is a ${en}.`},sound:'https://assets0.iknow.jp/fixture.mp3'}]}))};
+const sizes=[{width:1920,height:1080},{width:1440,height:1000},{width:1440,height:960},{width:1440,height:920},{width:1440,height:901},{width:1440,height:900},{width:1536,height:864},{width:1366,height:768},{width:1280,height:720},{width:980,height:900},{width:980,height:768},{width:900,height:650}];
 (async()=>{
  const fixture=require('./fixtures/isolate-extension.cjs')(path.join(root,'extension'),out),extension=path.join(out,'extension');fs.renameSync(fixture,extension);
- const stage=spawnSync(path.join(process.env.LOCALAPPDATA,'iKnowLesehilfe/runtime/python/python.exe'),[path.join(root,'tools/preview/stage-study-workspace.py'),'--output',extension],{encoding:'utf8'});assert.equal(stage.status,0,stage.stderr||stage.stdout);
+ const stage=spawnSync(path.join(process.env.USERPROFILE,'AppData/Local/iKnowLesehilfe/runtime/python/python.exe'),[path.join(root,'tools/preview/stage-study-workspace.py'),'--output',extension],{encoding:'utf8'});assert.equal(stage.status,0,stage.stderr||stage.stdout);
+ const manifestPath=path.join(extension,'manifest.json'),manifest=JSON.parse(fs.readFileSync(manifestPath));manifest.permissions=manifest.permissions.filter(value=>value!=='nativeMessaging');fs.writeFileSync(manifestPath,JSON.stringify(manifest));
  const context=await chromium.launchPersistentContext(path.join(out,'profile'),{executablePath:'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe',headless:true,ignoreDefaultArgs:['--disable-extensions'],args:[`--load-extension=${extension}`,`--disable-extensions-except=${extension}`],viewport:sizes[0],reducedMotion:'reduce'});
  const evidence=[],errors=[];
  try{
+  await context.route('https://**/*',route=>route.abort());
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),id=new URL(worker.url()).host;
   const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.addInitScript(()=>sessionStorage.clear());
   const measure=()=>{
@@ -45,6 +49,10 @@ const sizes=[{width:1920,height:1080},{width:1440,height:900},{width:1536,height
     }
     await page.screenshot({path:path.join(out,`${theme}-${size.width}x${size.height}.png`)});
    }
+   await page.setViewportSize({width:900,height:650});
+   await page.locator('#demo-practice-title').evaluate(node=>{node.textContent='A longer course title with additional details '.repeat(12).slice(0,500);});
+   const long=await page.evaluate(measure);assert.ok(long.pane.scrollHeight>long.pane.height,'Genuinely long metadata retains scrolling rather than being clipped');
+   await page.locator('[data-action=start]').scrollIntoViewIfNeeded();assert.ok(await page.locator('[data-action=start]').isVisible());
    await page.setViewportSize({width:390,height:844});await page.locator('[data-mode="cloze"]').click();await choose(page,'#demo-practice-content','both');
    const mobile=await page.evaluate(()=>{const root=document.scrollingElement;return{root:root.scrollHeight>innerHeight+1,containers:[...document.querySelectorAll('.activity-pane,.focus-desk,.focus-body,.app-frame')].filter(node=>node.scrollHeight>node.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(node).overflowY)).length,horizontal:root.scrollWidth<=innerWidth+1};});
    assert.ok(mobile.root||mobile.containers>0,theme+': mobile uses genuine scrolling instead of clipping content');assert.ok(mobile.horizontal,theme+': mobile has no horizontal overflow');
@@ -54,6 +62,6 @@ const sizes=[{width:1920,height:1080},{width:1440,height:900},{width:1536,height
    await page.locator('[data-practice-source="saved"]').scrollIntoViewIfNeeded();assert.ok(await page.locator('[data-practice-source="saved"]').isVisible(),theme+': mobile can return to the source controls');
    await page.screenshot({path:path.join(out,theme+'-mobile.png')});
   }
-  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,desktopCases:evidence.length,evidence},null,2)+'\n');console.log('PASS Practice Course fits all controls without vertical/horizontal overflow or wheel scrolling in 180 desktop cases (four themes, five viewports, three modes and contents); mobile remains genuinely scrollable and reachable');
+  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,desktopCases:evidence.length,evidence},null,2)+'\n');console.log('PASS Practice Course fits all controls without vertical/horizontal overflow or wheel scrolling in 432 desktop cases (four themes, twelve viewports, three modes and contents); mobile remains genuinely scrollable and reachable');
  }finally{await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
