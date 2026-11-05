@@ -2,6 +2,26 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "sharing-hotfix",
+      "version": "1.42.1",
+      "status": "released",
+      "date": "2026-11-05",
+      "title": "Usage sharing fix",
+      "summary": "The sharing prompt is back, with one switch for activity and device details.",
+      "changes": [
+        {
+          "type": "fixed",
+          "title": "Usage sharing",
+          "description": "Choose Enable sharing or Later when you open the update.",
+          "details": [
+            "Use one switch for activity and device details.",
+            "Enable sharing again if the previous version blocked it."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
       "id": "voices-and-flashcards",
       "version": "1.42.0",
       "status": "released",
