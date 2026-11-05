@@ -18,6 +18,7 @@
   let clip = null;
   let nativeStartedAt = 0;
   let preparedRequestId = null;
+  let sentenceEnabled = false;
   const nativeControl = node => node?.closest?.(".sentence-audio-container, .item-audio-container, .item-details .audio-container");
 
   function finishClip(reason = "stopped", error = "") {
@@ -51,17 +52,22 @@
     return { bytes, duration };
   }
   function playVoice(request) {
-    if (!wordEnabled || request.requestId !== preparedRequestId || typeof request.requestId !== "string" || !Number.isFinite(request.intentTime) || request.intentTime < nativeStartedAt || typeof request.data !== "string" || request.data.length > 950000 || request.data.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(request.data) || ![16000, 24000, 44100, 48000].includes(request.sampleRate) || !Number.isFinite(request.duration) || request.duration <= 0 || request.duration > 8) return;
+    const sentence = request.sentence === true, maxDuration = sentence ? 14 : 8;
+    if (!(sentence ? sentenceEnabled : wordEnabled) || request.requestId !== preparedRequestId || typeof request.requestId !== "string" || !Number.isFinite(request.intentTime) || request.intentTime < nativeStartedAt || typeof request.data !== "string" || request.data.length > 950000 || request.data.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(request.data) || !(sentence ? request.sampleRate === 24000 : [16000, 24000, 44100, 48000].includes(request.sampleRate)) || !Number.isFinite(request.duration) || request.duration <= 0 || request.duration > maxDuration) {
+      if (sentence && typeof request.requestId === "string") window.postMessage({ type: "IKR_WORD_AUDIO_RESULT_V1", requestId: request.requestId, status: "stopped" }, location.origin);
+      return;
+    }
     let bytes;
     try { const binary = atob(request.data); bytes = Uint8Array.from(binary, value => value.charCodeAt(0)); } catch { return; }
-    if (bytes.length < 46 || bytes.length > 705644 || (bytes.length - 44) % 2 || bytes.length > request.sampleRate * 8 * 2 + 44) return;
+    if (bytes.length < 46 || bytes.length > 705644 || (bytes.length - 44) % 2 || bytes.length > request.sampleRate * maxDuration * 2 + 44) return;
     const view = new DataView(bytes.buffer), tag = offset => String.fromCharCode(...bytes.subarray(offset, offset + 4));
     if (tag(0) !== "RIFF" || tag(8) !== "WAVE" || tag(12) !== "fmt " || tag(36) !== "data" || view.getUint32(4, true) !== bytes.length - 8 || view.getUint32(16, true) !== 16 || view.getUint16(20, true) !== 1 || view.getUint16(22, true) !== 1 || view.getUint32(24, true) !== request.sampleRate || view.getUint32(28, true) !== request.sampleRate * 2 || view.getUint16(32, true) !== 2 || view.getUint16(34, true) !== 16 || view.getUint32(40, true) !== bytes.length - 44 || Math.abs((bytes.length - 44) / (request.sampleRate * 2) - request.duration) > 1 / request.sampleRate) return;
     finishClip();
-    if (active && active !== clipPlayer) active.pause();
+    if (sentence) lastNative?.pause();
+    else if (active && active !== clipPlayer) active.pause();
     if (!clipPlayer) { clipPlayer = new Audio(); watch(clipPlayer); }
     const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
-    const current = { requestId: request.requestId, start: 0, end: request.duration, pcm: true, voice: true, blobUrl, timer: null, abort: new AbortController() };
+    const current = { requestId: request.requestId, start: 0, end: request.duration, pcm: true, voice: true, sentence, blobUrl, timer: null, abort: new AbortController() };
     clip = current;
     const options = { signal: current.abort.signal };
     clipPlayer.addEventListener("playing", () => {
@@ -72,7 +78,7 @@
     clipPlayer.addEventListener("ended", () => { if (clip === current) finishClip("ended"); }, options);
     clipPlayer.addEventListener("error", () => { if (clip === current) finishClip("error", "voice"); }, options);
     current.timer = setTimeout(() => { if (clip === current) finishClip("error", "load"); }, 10000);
-    clipPlayer.volume=wordVolume;
+    clipPlayer.volume=sentence?originalVolume:wordVolume;
     clipPlayer.preload = "auto";
 
     clipPlayer.defaultPlaybackRate = 1; clipPlayer.playbackRate = 1; clipPlayer.preservesPitch = true;
@@ -207,7 +213,7 @@
   window.addEventListener("message", event => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.type === "IKR_WORD_AUDIO_PREPARE_V1") {
-      if (wordEnabled && typeof event.data.requestId === "string" && event.data.requestId.length <= 100 && Number.isFinite(event.data.intentTime) && event.data.intentTime >= nativeStartedAt) { preparedRequestId = event.data.requestId; finishClip(); }
+      if ((event.data.sentence === true ? sentenceEnabled : wordEnabled) && typeof event.data.requestId === "string" && event.data.requestId.length <= 100 && Number.isFinite(event.data.intentTime) && event.data.intentTime >= nativeStartedAt) { preparedRequestId = event.data.requestId; finishClip(); }
       return;
     }
     if (event.data?.type === "IKR_WORD_AUDIO_PLAY_V1") { playWord(event.data); return; }
@@ -219,13 +225,14 @@
     if (event.data?.type !== "IKR_NATIVE_AUDIO_CONFIG_V1") return;
     enabled = event.data.enabled === true;
     wordEnabled = event.data.wordEnabled === true;
+    sentenceEnabled = event.data.sentenceEnabled === true;
     volumeEnabled=event.data.volumeEnabled===true;
     const level=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1?value:1;
     originalVolume=level(event.data.originalVolume);wordVolume=level(event.data.wordVolume);
     if(volumeEnabled&&lastNative)lastNative.volume=originalVolume;
     else if(lastNative&&nativeVolumes.has(lastNative)){lastNative.volume=nativeVolumes.get(lastNative);nativeVolumes.delete(lastNative);}
-    if(clipPlayer)clipPlayer.volume=wordVolume;
-    if (!wordEnabled) { preparedRequestId = null; finishClip(); }
+    if(clipPlayer)clipPlayer.volume=clip?.sentence?originalVolume:wordVolume;
+    if (clip && !(clip.sentence ? sentenceEnabled : wordEnabled) || !sentenceEnabled && !wordEnabled) { preparedRequestId = null; finishClip(); }
     if (!enabled && !wordEnabled) cancelTick();
     else if (active && !active.paused && !active.ended) { emit(active, "playing"); startTick(); }
   });

@@ -5,9 +5,16 @@
     kanaVisible: true, colorMode: "hover", alignmentMode: "phrases", pronunciation: false, romajiStyle: "source", fontSize: 16,
     sentenceBold: false, groupInfo: false, audioFollow: false, wordAudio: false, wordAudioPolicy: 5, translationLanguage: "en", autoPrepare: false,
     prepareGerman: false, prepareColors: false, prepareAudio: false,
-    wordAudioMode: "neural", wordAudioSpeed: 1, wordNeuralVoice: "female"
+    wordAudioMode: "neural", wordAudioSpeed: 1, wordNeuralVoice: "female", sentenceVoice: "original", nojiVoice: "female"
   });
   const STORAGE_KEY = "iknowReaderSettings";
+  const SENTENCE_VOICES = Object.freeze({ original: "iKnow original", female: "Mao Plain", male: "Nise" });
+  function neuralSentenceText(value) {
+    if (typeof value !== "string" || value.length > 160) return "";
+    const text = value.normalize("NFKC").trim();
+    return /[\u3041-\u3096\u30a1-\u30fa\u3400-\u9fff\uf900-\ufaff]/u.test(text)
+      && /^[\u3041-\u3096\u3099\u309a\u30a1-\u30fa\u3400-\u9fff\uf900-\ufaffー々〆〇ヶ0-9 。、・!?,.:;「」『』()…〜~\-]+$/u.test(text) ? text : "";
+  }
   let volumeService;
   function audioVolume() {
     if (volumeService) return volumeService;
@@ -58,6 +65,8 @@
     if (["source", "spoken"].includes(input.romajiStyle)) output.romajiStyle = input.romajiStyle;
     if (["en", "de", "both"].includes(input.translationLanguage)) output.translationLanguage = input.translationLanguage;
     if (["female", "male"].includes(input.wordNeuralVoice)) output.wordNeuralVoice = input.wordNeuralVoice;
+    if (typeof input.sentenceVoice === "string" && Object.hasOwn(SENTENCE_VOICES, input.sentenceVoice)) output.sentenceVoice = input.sentenceVoice;
+    output.nojiVoice = ["female", "male"].includes(input.nojiVoice) ? input.nojiVoice : input.sentenceVoice === "male" ? "male" : "female";
     if ([.7, .85, 1].includes(Number(input.wordAudioSpeed))) output.wordAudioSpeed = Number(input.wordAudioSpeed);
 
     if (![2, 3, 4, 5].includes(input.wordAudioPolicy)) {
@@ -406,7 +415,7 @@
     const waiting = unknown.filter(stage => stage !== queue?.stage).map(stage => `${names[stage]} estimate after it starts`).join(" · ");
     return `Measuring ${names[queue?.stage] || "preparation"} speed…${waiting ? ` · ${waiting}` : ""}`;
   }
-  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, audioVolume, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, sourceClozeTarget, validateClozeTarget, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
+  const api = Object.freeze({ DEFAULTS, STORAGE_KEY, SENTENCE_VOICES, neuralSentenceText, audioVolume, normalizeSettings, normalizeFeatures, preparationFeatures, featuresKey, fingerprint, tokenize, displayRomaji, courseIdFromUrl, seriesIdFromUrl, courseListIdFromUrl, plainText, sourceClozeTarget, validateClozeTarget, expectedSource, alignmentFor, germanItemFor, audioFor, completeness, courseAvailability, preparationProgress, signature, validGroupRanges, queueProgress, queueEstimate });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IKnowReaderCore = api;
 })();

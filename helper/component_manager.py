@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -267,7 +269,7 @@ def download(cache, artifact, *, opener=urllib.request.urlopen):
     except urllib.error.HTTPError as error:
         if error.code == 416 and partial.is_file() and _digest(partial, cache) == artifact["sha256"]:
             partial.replace(destination); return destination
-        raise
+        raise ComponentError("component_http", f"The model host returned HTTP {error.code}.") from None
     with response:
         final_url = urllib.parse.urlsplit(response.geturl())
         if final_url.scheme != "https" or final_url.username or final_url.password:
@@ -394,6 +396,7 @@ def _dependencies(cache, item):
     name = item.get("requirements")
     if not name:
         return None
+    _checkpoint(cache, phase="dependencies", artifactName=None, message="Checking shared audio libraries", progress=None)
     requirements = HERE / name
     digest = hashlib.sha256(requirements.read_bytes()).hexdigest()
     existing = _root(cache) / "python-packages"
@@ -586,7 +589,7 @@ def install_component(cache, component_id, operation):
     prepared = []
     for index, artifact in enumerate(item["artifacts"]):
         _check_pause(root)
-        _checkpoint(root, fileIndex=index + 1, fileCount=len(item["artifacts"]), phase="checking", message="Checking " + artifact["name"], progress=None, downloadedBytes=None, totalBytes=None, etaSeconds=None)
+        _checkpoint(root, fileIndex=index + 1, fileCount=len(item["artifacts"]), phase="checking", artifactName=artifact["name"], message="Checking " + artifact["name"], progress=None, downloadedBytes=None, totalBytes=None, etaSeconds=None)
         target = _target(root, artifact)
 
         candidates = [target]
@@ -601,22 +604,24 @@ def install_component(cache, component_id, operation):
                 continue
         archive = download(root, artifact)
         if artifact.get("archive"):
+            _checkpoint(root, phase="extracting", message="Extracting " + artifact["name"], progress=None)
             extracted = extract_archive(root, artifact, archive, stage / ("runtime-" + str(index)))
             (extracted / ".component-archive-sha256").write_text(artifact["sha256"], encoding="ascii")
-            prepared.append((extracted, target))
-        else:
-            prepared.append((archive, target))
+            archive = extracted
+        prepared.append((archive, target, artifact["name"]))
     packages = _dependencies(root, item)
     if packages:
         _checkpoint(root, phase="verifying", message="Checking the installed audio libraries", progress=None)
         _command(root, [sys.executable, str(HERE / "component_manager.py"), "_check-libraries", "--cache-root", str(root), "--packages", str(packages), "--component-id", item["id"]], timeout=120)
     _check_pause(root)
-    _checkpoint(root, phase="activating", message="Activating verified component files", progress=None, downloadedBytes=None, totalBytes=None)
+    _checkpoint(root, phase="activating", artifactName=None, message="Activating verified component files", progress=None, downloadedBytes=None, totalBytes=None)
     transaction = Activation(operation, root)
     try:
-        for staged, target in prepared:
+        for staged, target, artifact_name in prepared:
             _check_pause(root)
+            _checkpoint(root, artifactName=artifact_name)
             transaction.replace(staged, target)
+        _checkpoint(root, artifactName=None)
         _activate_config(root, item, packages, stage, transaction)
         if component_id == "voices":
             import setup_neural_voice
@@ -642,6 +647,25 @@ def install_component(cache, component_id, operation):
 
         pass
 
+def _failure_code(error, phase):
+    if isinstance(error, ComponentError):
+        return error.code
+    if isinstance(error, http.client.IncompleteRead):
+        return "component_incomplete"
+    if isinstance(error, urllib.error.URLError):
+        return "component_timeout" if isinstance(error.reason, TimeoutError) else "component_network"
+    if isinstance(error, OSError) and (error.errno == errno.ENOSPC or getattr(error, "winerror", None) in {39, 112}):
+        return "disk_full"
+    if isinstance(error, PermissionError):
+        return "component_access_denied"
+    if phase == "downloading":
+        if isinstance(error, TimeoutError):
+            return "component_timeout"
+        if isinstance(error, ConnectionError):
+            return "component_network"
+    return "component_install_failed"
+
+
 def worker(cache, operation):
     root, directory = _root(cache), _directory(cache)
     worker_lock, acquired = FileLock(directory / "worker.lock"), []
@@ -664,13 +688,13 @@ def worker(cache, operation):
         if state["componentId"] == "voices":
             _voice_maintenance(root)
         install_component(root, state["componentId"], operation)
-        _checkpoint(root, status="complete", phase="complete", message="Component installed. Existing course data is retained.", progress=1, code=None)
+        _checkpoint(root, status="complete", phase="complete", artifactName=None, message="Component installed. Existing course data is retained.", progress=1, code=None)
     except Paused:
         _checkpoint(root, status="paused", phase="paused", message="Installation paused. Resume to reuse verified files and partial downloads.", progress=None, code=None)
     except Exception as error:
-        code = error.code if isinstance(error, ComponentError) else "component_network" if isinstance(error, (OSError, urllib.error.URLError)) else "component_install_failed"
+        failed_phase = (_read(directory / "job.json") or {}).get("phase")
         message = str(error) if isinstance(error, ComponentError) else "Installation could not finish. Completed downloads and the previous installed version are retained. Retry this component."
-        _checkpoint(root, status="error", phase="error", message=message, code=code, progress=None)
+        _checkpoint(root, status="error", phase="error", failedPhase=failed_phase, message=message, code=_failure_code(error, failed_phase), progress=None)
     finally:
         (root / "neural/component-maintenance").unlink(missing_ok=True)
         for lock in reversed(acquired):

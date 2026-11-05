@@ -156,6 +156,21 @@ class Components(unittest.TestCase):
         for lock in locks: lock.release()
         self.assertFalse(manager.is_active(self.root))
 
+    def test_failed_download_retains_artifact_phase_and_reason(self):
+        directory = self.root / "components"
+        directory.mkdir()
+        operation = "7" * 32
+        manager._atomic(directory / "job.json", {"jobId": operation, "componentId": "fixture", "status": "starting"})
+        download = manager.download
+        with patch.object(updater, "installing", return_value=False), patch.object(
+            manager, "download", side_effect=lambda cache, artifact: download(cache, artifact, opener=lambda *_args, **_kwargs: Response(b"x" * len(self.payload)))
+        ):
+            manager.worker(self.root, operation)
+        job = manager.snapshot(self.root)["job"]
+        self.assertEqual((job["status"], job["phase"], job["failedPhase"], job["artifactName"], job["code"]),
+                         ("error", "error", "verifying", "Fixture", "component_checksum"))
+        self.assertFalse(self.target().exists())
+
     def test_native_status_protocol_stays_cold_with_isolated_cache(self):
         payload = json.dumps({"type": "components:status", "requestId": "fixture-status"}).encode()
         output = subprocess.run([sys.executable, "-B", str(HELPER / "native_host.py")], input=struct.pack("<I", len(payload)) + payload,

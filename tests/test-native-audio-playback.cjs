@@ -13,7 +13,7 @@ const nativeScript=`window.fixturePlayer=new Audio();fixturePlayer.fixtureNative
  fixtureClicks.push(performance.now());fixtureHandling=true;fixturePlayer.pause();fixturePlayer.src=window.fixtureSource||'https://assets0.iknow.jp/assets/native-fixture.mp3';const result=fixturePlayer.play();fixtureHandling=false;
  result?.catch(error=>{if(error.name!=='AbortError')fixtureFailures.push(error.name)});
  }));`;
-function wav(){const rate=16000,n=Math.round(rate*2.064),b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(Math.sin(i/rate*2*Math.PI*210)*3000),44+i*2);return b;}
+function wav(rate=16000, seconds=2.064){const n=Math.round(rate*seconds),b=Buffer.alloc(44+n*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(n*2,40);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(Math.sin(i/rate*2*Math.PI*210)*3000),44+i*2);return b;}
 const sentence={cue:{id:246957,text:'それはとてもいい話だ。',transliterations:{Jpan:'それ は とても いい 話 だ。',Hrkt:'それ は とても いい はなし だ。',Latn:'sore ha totemo ii hanashi da.'}},response:{text:"That's a really nice story."},sound:'https://assets0.iknow.jp/assets/native-fixture.mp3'};
 const rows=Array.from({length:200},(_,index)=>{const id=1000+index;return `<div class="item"><div class="item-details"><span class="item-audio-container" role="button" tabindex="0">Word speaker</span><div class="cue-response"><a class="cue" href="/items/${id}">それ</a><p class="response">that</p></div></div><div class="item-sentences"><div class="sentence"><span class="sentence-audio-container" role="button" tabindex="0">Sentence speaker</span><div class="sentence-text"><p class="text">${sentence.cue.text}</p><p class="transliteration">${sentence.cue.transliterations.Hrkt}</p><p class="translation">${sentence.response.text}</p></div></div></div></div>`}).join('');
 const goal={id:19053,title:'Native audio fixture',cue_language:'ja',items_count:200,sentences_count:200,goal_items:Array.from({length:200},(_,i)=>({item:{id:1000+i,cue:{id:1000+i,text:'それ',transliterations:{Hrkt:'それ',Latn:'sore'}},response:{text:'that'}},sentences:[{...sentence,cue:{...sentence.cue,id:246957+i}}],sound:sentence.sound}))};
@@ -78,6 +78,32 @@ const goal={id:19053,title:'Native audio fixture',cue_language:'ja',items_count:
   await page.evaluate(()=>{const intentTime=performance.now();window.postMessage({type:'IKR_WORD_AUDIO_PREPARE_V1',requestId:'volume-word',intentTime},location.origin);window.postMessage({type:'IKR_WORD_AUDIO_PLAY_V1',requestId:'volume-word',intentTime,src:'https://assets0.iknow.jp/assets/native-fixture.mp3',start:0,end:null,duration:0,speed:1},location.origin);});
   await until(()=>page.evaluate(()=>fixtureCalls.some(call=>!call.native&&call.op==='play'&&call.volume===.65)),'independent word voice playback volume');
   console.log('PASS Native original volume updates live without interruption; word playback keeps an independent level');
+  assert.equal(await page.locator('.ikr-sentence-voice').count(),0,'iKnow original is the default');
+  await configure(true,false);
+  await worker.evaluate(async data=>{
+    const key='iknowReaderSettings',stored=await chrome.storage.local.get(key);
+    const listeners=new Set();
+    globalThis.sentenceRequests=[];
+    chrome.runtime.connectNative=()=>({
+      onMessage:{addListener:callback=>listeners.add(callback)},onDisconnect:{addListener(){}},
+      postMessage(message){
+        sentenceRequests.push(message);
+        if(message.type!=='word-neural'||!message.sentence)return;
+        setTimeout(()=>listeners.forEach(callback=>callback({type:'word-neural-result',requestId:message.requestId,voice:message.voice,ok:true,data,sampleRate:24000,duration:10})),180);
+      }
+    });
+    await chrome.storage.local.set({[key]:{...stored[key],sentenceVoice:'male'}});
+  },wav(24000,10).toString('base64'));
+  const localVoice=page.getByRole('button',{name:'Play sentence with Nise'}).first();
+  await localVoice.waitFor();
+  await localVoice.click();
+  await until(()=>page.evaluate(()=>fixtureCalls.some(call=>!call.native&&call.op==='play'&&call.volume===.25)),'local sentence playback at original volume');
+  assert.equal(await worker.evaluate(()=>sentenceRequests.find(request=>request.sentence)?.text),sentence.cue.text);
+  assert.equal(await worker.evaluate(()=>sentenceRequests.find(request=>request.sentence)?.voice),'male');
+  assert.equal(await page.locator('.ikr-speaking').count(),0,'Original timings do not highlight generated audio');
+  await page.locator('.sentence-audio-container').first().click();
+  await until(()=>page.evaluate(()=>!fixturePlayer.paused&&document.querySelectorAll('.ikr-speaking').length>0),'native speaker and Follow still work after local playback');
+  console.log('PASS The selected local sentence voice plays separately with Word audio disabled and leaves the native speaker and its timings available');
   assert.deepEqual(errors,[]);assert.deepEqual(extra,[]);
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,scope:'Real platform Audio and production extension in isolated Brave; public-site handler shape, data/audio fixtures',timings,pageErrors:errors},null,2));
   console.log('PASS Native controls keep priority even inside decorated word layouts; course Romaji preserves source ha spelling');

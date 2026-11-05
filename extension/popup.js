@@ -21,6 +21,8 @@
     wordAudioMode: "neural",
     wordAudioSpeed: 1,
     wordNeuralVoice: "female",
+    sentenceVoice: "original",
+    nojiVoice: "female",
     translationLanguage: "en",
     autoPrepare: false,
     prepareGerman: false,
@@ -73,6 +75,8 @@
     if (TRANSLATION_LANGUAGES.includes(safe.translationLanguage)) normalized.translationLanguage = safe.translationLanguage;
     if (FONT_SIZES.includes(Number(safe.fontSize))) normalized.fontSize = Number(safe.fontSize);
     if (["female", "male"].includes(safe.wordNeuralVoice)) normalized.wordNeuralVoice = safe.wordNeuralVoice;
+    if (["original", "female", "male"].includes(safe.sentenceVoice)) normalized.sentenceVoice = safe.sentenceVoice;
+    normalized.nojiVoice = ["female", "male"].includes(safe.nojiVoice) ? safe.nojiVoice : normalized.sentenceVoice === "male" ? "male" : "female";
     if (WORD_AUDIO_SPEEDS.includes(Number(safe.wordAudioSpeed))) normalized.wordAudioSpeed = Number(safe.wordAudioSpeed);
 
     if (![2, 3, 4, 5].includes(safe.wordAudioPolicy)) {
@@ -96,9 +100,11 @@
     document.getElementById("translationLanguage").value = settings.translationLanguage;
     document.getElementById("fontSize").value = String(settings.fontSize);
     document.getElementById("wordNeuralVoice").value = settings.wordNeuralVoice;
+    document.getElementById("sentenceVoice").value = settings.sentenceVoice;
+    document.getElementById("nojiVoice").value = settings.nojiVoice;
     updateWordPreparation(settings);
     const audioNote = document.getElementById("word-audio-note");
-    if (audioNote) audioNote.textContent = "Local neural voice · Setup: helper/Setup.cmd. No audio timings needed.";
+    if (audioNote) audioNote.textContent = "Local AI voice · Setup: helper/Setup.cmd. No audio timings needed.";
     document.getElementById("wordAudioSpeed").value = String(settings.wordAudioSpeed);
     master.disabled = !initialized;
     for (const fieldset of fieldsets) fieldset.disabled = !initialized || !settings.enabled;
@@ -163,7 +169,7 @@
     else if (key === "translationLanguage") saveSetting(key, event.target.value);
     else if (key === "fontSize") saveSetting(key, Number(event.target.value));
     else if (key === "wordAudioSpeed") saveSetting(key, Number(event.target.value));
-    else if (key === "wordNeuralVoice") saveSetting(key, event.target.value);
+    else if (["wordNeuralVoice", "sentenceVoice", "nojiVoice"].includes(key)) saveSetting(key, event.target.value);
   });
 
   async function initialize() {

@@ -37,7 +37,7 @@ class CompleteDiagnosticsTests(unittest.TestCase):
         self.assertEqual(len(process.stdout), size + 4)
         response = json.loads(process.stdout[4:])
         self.assertTrue(response["ok"])
-        self.assertEqual(response["report"]["diagnosticFormatVersion"], 2)
+        self.assertEqual(response["report"]["diagnosticFormatVersion"], 3)
         self.assertFalse((self.base / "isolated-missing-cache").exists())
 
     def setUp(self):
@@ -61,7 +61,7 @@ class CompleteDiagnosticsTests(unittest.TestCase):
         self.assertEqual(snapshot(self.base), before)
         self.assertFalse(self.cache.exists())
         self.assertEqual(report["schemaVersion"], 1)
-        self.assertEqual(report["diagnosticFormatVersion"], 2)
+        self.assertEqual(report["diagnosticFormatVersion"], 3)
         self.assertEqual(report["localChecks"]["managedFiles"]["status"], "baseline_unavailable")
         self.assertEqual(report["events"]["status"], "missing")
         self.assertFalse(report["collection"]["activeChecksRequested"])

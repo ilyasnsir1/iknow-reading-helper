@@ -24,8 +24,10 @@ ENGINE_VERSION = "1.0.0"
 HOST, PORT = "127.0.0.1", 10103
 SAMPLE_RATE = 44100
 MAX_DURATION, MAX_BYTES = 8.0, 705644
+SENTENCE_RATE, SENTENCE_DURATION = 24000, 14.0
 CACHE_MAX_FILES, CACHE_MAX_BYTES = 8000, 512 * 1024 * 1024
 START_TIMEOUT, REQUEST_TIMEOUT, IDLE_SECONDS = 90, 115, 1200
+READING_TIMEOUT = 10
 VOICES = {
     "female": {"name": "Mao Plain", "speaker": "e756b8e4-b606-4e15-99b1-3f9c6a1b2317", "style": "ふつー"},
     "male": {"name": "Nise", "speaker": "bf56410a-d8e6-430d-a477-f789e16206d3", "style": "ノーマル"},
@@ -34,8 +36,10 @@ PARAMETERS = {"pitchScale": 0.0, "intonationScale": 1.0, "volumeScale": .75,
               "prePhonemeLength": .15, "postPhonemeLength": .15,
               "outputSamplingRate": 44100, "outputStereo": False}
 _requests = queue.Queue(maxsize=1)
+_reading_requests = queue.Queue(maxsize=1)
 _queue_lock = threading.Lock()
 _worker = None
+_reading_worker = None
 
 class NeuralError(RuntimeError):
     def __init__(self, code, message):
@@ -209,6 +213,47 @@ def phonemes(query):
         raise ValueError("The local voice returned no usable word pronunciation.")
     return result
 
+
+def romaji_from_query(query):
+    phonemes(query)
+    phrases = []
+    punctuation = {"、": ",", "。": ".", "？": "?", "！": "!", ",": ",", ".": ".", "?": "?", "!": "!"}
+    for phrase in query["accent_phrases"]:
+        moras = phrase["moras"]
+        roman = []
+        for index, mora in enumerate(moras):
+            vowel = mora["vowel"].lower()
+            consonant = (mora.get("consonant") or "").lower()
+            next_mora = moras[index + 1] if index + 1 < len(moras) else {}
+            following = (next_mora.get("consonant") or "").lower()
+            if vowel == "pau":
+                symbol = mora.get("text")
+                if isinstance(symbol, str) and symbol in punctuation:
+                    roman.append(punctuation[symbol] + " ")
+            elif vowel == "cl":
+                if following == "ch":
+                    roman.append("t")
+                elif re.fullmatch(r"[a-z]{1,3}", following):
+                    roman.append(following[0])
+            elif vowel == "n":
+                next_vowel = next_mora.get("vowel", "").lower()
+                roman.append("n'" if following.startswith("y") or not following and next_vowel in {"a", "e", "i", "o", "u"} else "n")
+            elif vowel in {"a", "e", "i", "o", "u"} and re.fullmatch(r"[a-z]{0,3}", consonant):
+                roman.append(consonant + vowel)
+            else:
+                raise ValueError("The local voice returned an unsupported pronunciation.")
+        text = "".join(roman).strip()
+        if text:
+            if phrase.get("is_interrogative") and not text.endswith(("?", "!", ".", ",")):
+                text += "?"
+            elif phrase.get("pause_mora") and not text.endswith(("?", "!", ".", ",")):
+                text += ","
+            phrases.append(text)
+    result = " ".join(phrases)
+    if not re.search(r"[a-z]", result):
+        raise ValueError("The local voice returned no usable reading.")
+    return result
+
 def _port_open():
     try:
         with socket.create_connection((HOST, PORT), timeout=.3):
@@ -340,15 +385,25 @@ def serve(root):
         finally:
             owner.release()
 
-def _canonical_wav(payload):
+def clean_sentence(value):
+    if not isinstance(value, str) or not 1 <= len(value) <= 160:
+        raise ValueError("Choose a shorter Japanese sentence.")
+    text = unicodedata.normalize("NFKC", value).strip()
+    japanese = "\u3041-\u3096\u3099\u309a\u30a1-\u30fa\u3400-\u9fff\uf900-\ufaff"
+    if not re.search(f"[{japanese}]", text) or not re.fullmatch(f"[{japanese}ー々〆〇ヶ0-9 。、・!?,.:;「」『』()…〜~-]+", text):
+        raise ValueError("Choose a sentence written in Japanese.")
+    return text
+
+
+def _canonical_wav(payload, sample_rate=SAMPLE_RATE, max_duration=MAX_DURATION):
     if not isinstance(payload, bytes) or not 100 <= len(payload) <= 2000000:
         raise ValueError("The local voice returned invalid audio.")
     with wave.open(io.BytesIO(payload), "rb") as source:
         rate, count = source.getframerate(), source.getnframes()
         if source.getnchannels() != 1 or source.getsampwidth() != 2 or source.getcomptype() != "NONE" or rate not in (24000, 44100, 48000):
             raise ValueError("The local voice returned an unsupported WAV format.")
-        if not .04 <= count / rate <= MAX_DURATION:
-            raise ValueError("Choose a shorter Japanese word.")
+        if not .04 <= count / rate <= max_duration:
+            raise ValueError("The local recording exceeds the playback limit.")
         raw = source.readframes(count)
         if len(raw) != count * 2:
             raise ValueError("The local voice returned incomplete audio.")
@@ -356,35 +411,35 @@ def _canonical_wav(payload):
     samples = np.frombuffer(raw, dtype="<i2").copy()
     if not samples.size or int(np.max(np.abs(samples.astype(np.int32)))) == 0:
         raise ValueError("The local voice returned silent audio.")
-    if rate != SAMPLE_RATE:
+    if rate != sample_rate:
         import av
         frame = av.AudioFrame.from_ndarray(samples.reshape(1, -1), format="s16", layout="mono")
         frame.sample_rate = rate
-        resampler = av.AudioResampler(format="s16", layout="mono", rate=SAMPLE_RATE)
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=sample_rate)
         frames = resampler.resample(frame) + resampler.resample(None)
         samples = np.concatenate([item.to_ndarray().reshape(-1) for item in frames])
 
     raw = samples.astype("<i2").tobytes()
     result = io.BytesIO()
     with wave.open(result, "wb") as output:
-        output.setnchannels(1); output.setsampwidth(2); output.setframerate(SAMPLE_RATE)
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(sample_rate)
         output.writeframes(raw)
     return result.getvalue()
 
-def _wav_result(payload, voice, cached):
+def _wav_result(payload, voice, cached, sample_rate=SAMPLE_RATE, max_duration=MAX_DURATION):
     if not 100 <= len(payload) <= MAX_BYTES or payload[:4] != b"RIFF" or payload[8:16] != b"WAVEfmt " or payload[36:40] != b"data":
         raise ValueError("Invalid cached word recording.")
     with wave.open(io.BytesIO(payload), "rb") as audio:
         count = audio.getnframes()
-        if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or audio.getframerate() != SAMPLE_RATE or audio.getcomptype() != "NONE" or len(payload) != 44 + count * 2:
+        if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or audio.getframerate() != sample_rate or audio.getcomptype() != "NONE" or len(payload) != 44 + count * 2:
             raise ValueError("Invalid cached word format.")
-        duration = count / SAMPLE_RATE
-        if not .04 <= duration <= MAX_DURATION or len(audio.readframes(count)) != count * 2:
+        duration = count / sample_rate
+        if not .04 <= duration <= max_duration or len(audio.readframes(count)) != count * 2:
             raise ValueError("Invalid cached word duration.")
     encoded = base64.b64encode(payload).decode("ascii")
     if len(encoded) > 950000:
         raise ValueError("The word recording is too large.")
-    return {"ok": True, "data": encoded, "sampleRate": SAMPLE_RATE, "duration": round(duration, 6),
+    return {"ok": True, "data": encoded, "sampleRate": sample_rate, "duration": round(duration, 6),
             "voice": voice, "voiceName": VOICES[voice]["name"], "voiceVersion": VERSION, "cached": cached}
 
 def _cache_key(reading, written, speed, voice):
@@ -414,17 +469,18 @@ def _prune(directory):
             except OSError:
                 pass
 
-def synthesize(text, speed, root, voice="female", japanese=None):
-    reading, speed, voice = clean_kana(text), clean_speed(speed), clean_voice(voice)
-    written = clean_japanese(japanese, reading)
+def synthesize(text, speed, root, voice="female", japanese=None, sentence=False):
+    reading, speed, voice = (clean_sentence(text) if sentence else clean_kana(text)), clean_speed(speed), clean_voice(voice)
+    written = reading if sentence else clean_japanese(japanese, reading)
+    sample_rate, max_duration = (SENTENCE_RATE, SENTENCE_DURATION) if sentence else (SAMPLE_RATE, MAX_DURATION)
     root = Path(root)
-    directory = root / "neural" / "words"
+    directory = root / "neural" / ("sentences" if sentence else "words")
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / (_cache_key(reading, written, speed, voice) + ".wav")
     if target.is_file():
         try:
             if target.stat().st_size <= MAX_BYTES:
-                result = _wav_result(target.read_bytes(), voice, True)
+                result = _wav_result(target.read_bytes(), voice, True, sample_rate, max_duration)
                 target.touch()
                 _touch(root)
                 return result
@@ -440,7 +496,7 @@ def synthesize(text, speed, root, voice="female", japanese=None):
 
         if target.is_file() and target.stat().st_size <= MAX_BYTES:
             try:
-                result = _wav_result(target.read_bytes(), voice, True)
+                result = _wav_result(target.read_bytes(), voice, True, sample_rate, max_duration)
                 target.touch()
                 return result
             except (OSError, ValueError, wave.Error, EOFError):
@@ -454,10 +510,11 @@ def synthesize(text, speed, root, voice="female", japanese=None):
             if phonemes(candidate) == phonemes(kana_query):
                 query = candidate
         query.update(PARAMETERS)
+        query["outputSamplingRate"] = sample_rate
         query["speedScale"] = speed
         generated = client.request("synthesis", {"speaker": style_id}, query, limit=2000000, timeout=60)
-        payload = _canonical_wav(generated)
-        result = _wav_result(payload, voice, False)
+        payload = _canonical_wav(generated, sample_rate, max_duration)
+        result = _wav_result(payload, voice, False, sample_rate, max_duration)
         temporary = target.with_name(target.name + f".{os.getpid()}.{threading.get_ident()}.tmp")
         try:
             temporary.write_bytes(payload)
@@ -475,56 +532,100 @@ def synthesize(text, speed, root, voice="female", japanese=None):
         finally:
             lock.release()
 
-def enqueue(message, root, send, stopping):
-    envelope = {"type": "word-neural-result", "requestId": message.get("requestId")}
-    try:
-        text = clean_kana(message.get("text"))
-        voice = clean_voice(message.get("voice", "female"))
-        speed = clean_speed(message.get("speed", .85))
-        written = clean_japanese(message.get("japanese"), text)
-    except ValueError as error:
-        send({**envelope, "ok": False, "code": "invalid_word", "error": str(error)[:200]})
-        return
-    global _worker
-    with _queue_lock:
 
+def query_reading(text, root, deadline=None):
+    deadline = deadline if deadline is not None else time.monotonic() + READING_TIMEOUT
+    try:
+        import noji_reading
+        quick = noji_reading.read(text)
+    except ImportError:
+        quick = None
+    if quick:
+        return {"ok": True, "romaji": quick}
+    _touch(root)
+    lock = FileLock(root / "neural" / "synthesis.lock")
+    if not lock.acquire(max(0, deadline - time.monotonic())):
+        raise NeuralError("word_neural_busy", "The local voice is busy.")
+    try:
+        client, speakers = ensure_engine(root, deadline)
+        query = client.query(text, speakers["female"]["styleId"])
+        return {"ok": True, "romaji": romaji_from_query(query)}
+    finally:
         try:
-            previous = _requests.get_nowait()
+            _touch(root)
+        finally:
+            lock.release()
+
+
+def enqueue(message, root, send, stopping):
+    reading = message.get("type") == "noji-reading"
+    envelope = {"type": "noji-reading-result" if reading else "word-neural-result", "requestId": message.get("requestId")}
+    sentence = reading or message.get("sentence") is True
+    try:
+        text = (clean_sentence if sentence else clean_kana)(message.get("text"))
+        voice = None if reading else clean_voice(message.get("voice", "female"))
+        speed = None if reading else clean_speed(message.get("speed", .85))
+        written = None if sentence else clean_japanese(message.get("japanese"), text)
+    except ValueError as error:
+        send({**envelope, "ok": False, "code": "noji_reading_invalid" if reading else "invalid_word", "error": str(error)[:200]})
+        return
+    global _worker, _reading_worker
+    with _queue_lock:
+        requests = _reading_requests if reading else _requests
+        try:
+            previous = requests.get_nowait()
         except queue.Empty:
             previous = None
         if previous is not None:
-            _requests.task_done()
+            requests.task_done()
             if not previous[-1].is_set():
                 try:
-                    previous[-2]({**previous[5], "ok": False, "code": "word_neural_superseded", "error": "A newer word was selected."})
+                    old_reading = previous[5]["type"] == "noji-reading-result"
+                    superseded = "noji_reading_superseded" if old_reading else "word_neural_superseded"
+                    previous[-2]({**previous[5], "ok": False, "code": superseded,
+                                  "error": "A newer reading was requested." if old_reading else "A newer word was selected."})
                 except (BrokenPipeError, OSError, InterruptedError):
                     pass
-        _requests.put_nowait((text, speed, Path(root), voice, written, envelope, send, stopping))
-        if _worker is None or not _worker.is_alive():
-            _worker = threading.Thread(target=_run, name="neural-word-voice", daemon=True)
-            _worker.start()
+        requests.put_nowait((text, speed, Path(root), voice, written, envelope, sentence, time.monotonic() + READING_TIMEOUT if reading else None, send, stopping))
+        worker = _reading_worker if reading else _worker
+        if worker is None or not worker.is_alive():
+            worker = threading.Thread(target=_run, args=(requests,), name="noji-reading" if reading else "neural-word-voice", daemon=True)
+            if reading:
+                _reading_worker = worker
+            else:
+                _worker = worker
+            worker.start()
 
-def _run():
+def _run(requests=None):
+    requests = _requests if requests is None else requests
     while True:
-        text, speed, root, voice, written, envelope, send, stopping = _requests.get()
+        text, speed, root, voice, written, envelope, sentence, deadline, send, stopping = requests.get()
+        reading = envelope["type"] == "noji-reading-result"
         try:
             if stopping.is_set():
                 continue
-            result = synthesize(text, speed, root, voice=voice, japanese=written)
+            if reading and time.monotonic() >= deadline:
+                raise NeuralError("word_neural_timeout", "The local reader took too long.")
+            result = query_reading(text, root, deadline=deadline) if reading else synthesize(text, speed, root, voice=voice, japanese=written, sentence=sentence)
             if not stopping.is_set():
                 send({**envelope, **result})
         except Exception as error:
             if not stopping.is_set():
                 code = error.code if isinstance(error, NeuralError) else "word_neural_failed"
-                message = str(error)[:200] or "Could not prepare the local word pronunciation."
-                if isinstance(error, urllib.error.URLError):
-                    message = "The local voice service stopped. Please click again or rerun Setup-neural-voice.cmd."
+                if reading:
+                    code = {"word_neural_missing": "noji_reading_unavailable", "word_neural_busy": "noji_reading_busy",
+                            "word_neural_timeout": "noji_reading_timeout"}.get(code, "noji_reading_failed")
+                    message = "Could not prepare a local reading."
+                else:
+                    message = str(error)[:200] or "Could not prepare the local word pronunciation."
+                    if isinstance(error, urllib.error.URLError):
+                        message = "The local voice service stopped. Please click again or rerun Setup-neural-voice.cmd."
                 try:
                     send({**envelope, "ok": False, "code": code, "error": message})
                 except (BrokenPipeError, OSError, InterruptedError):
                     pass
         finally:
-            _requests.task_done()
+            requests.task_done()
 
 def main():
     import argparse

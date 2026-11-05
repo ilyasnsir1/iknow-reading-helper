@@ -24,7 +24,7 @@
         library: copy(backup.library),
         learning: { schemaVersion: 1, records: copy(backup.learning?.records || {}), ...(backup.learning?.assessments ? { assessments: copy(backup.learning.assessments) } : {}), session: copy(active) },
         reading: Core.normalizeSettings(backup.settings?.reading),
-        preferences: copy(backup.settings?.study || { attempts: "retry", gapPosition: "random" }),
+        preferences: copy(backup.settings?.study || { attempts: "retry", gapPosition: "random", showRomaji: false }),
         appTheme: THEMES.includes(backup.settings?.appTheme) ? backup.settings.appTheme : "paper",
         panelTheme: THEMES.includes(backup.settings?.panelTheme) ? backup.settings.panelTheme : "paper"
       };
@@ -60,7 +60,7 @@
         },40);
       };
       const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-      const readingProjection=value=>{const normalized=Core.normalizeSettings(value);return[normalized.translationLanguage,normalized.romajiStyle];};
+      const readingProjection=value=>{const normalized=Core.normalizeSettings(value);return[normalized.translationLanguage,normalized.romajiStyle,normalized.sentenceVoice,normalized.nojiVoice];};
       const changed=(changes,area)=>{
         if(area!=="local")return;
         for(const key of Object.keys(changes)){
@@ -114,6 +114,14 @@
       previewBackup: backup => Store.previewBackup(backup),
       importBackup: (backup, preferences = {}) => Store.importBackup(backup, preferences),
       setPreferences: preferences => Store.setPreferences(preferences),
+      setVoice: (source, voice) => settingsTransaction(async () => {
+        const choices = source === "noji" ? ["female", "male"] : source === "iknow" ? ["original", "female", "male"] : [];
+        if (!choices.includes(voice)) throw Error("Choose a valid voice.");
+        const stored = await browser.storage.local.get(Core.STORAGE_KEY);
+        const reading = Core.normalizeSettings(stored[Core.STORAGE_KEY]);
+        reading[source === "noji" ? "nojiVoice" : "sentenceVoice"] = voice;
+        await browser.storage.local.set({ [Core.STORAGE_KEY]: reading }); return reading;
+      }),
       setLanguage: language => settingsTransaction(async () => {
         if (!["en", "de", "both"].includes(language)) throw Error("Choose a valid translation language.");
         const stored = await browser.storage.local.get(Core.STORAGE_KEY);

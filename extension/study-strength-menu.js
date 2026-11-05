@@ -16,7 +16,7 @@
         const button=document.createElement('button');button.type='button';button.dataset.level=value;button.setAttribute('role','menuitemradio');button.setAttribute('aria-checked',String(level===value));
         const dot=document.createElement('span');dot.className='level-dot';dot.dataset.strength=value;
         const title=document.createElement('span');title.textContent=text;
-        const check=document.createElement('span');check.className='level-check';check.textContent='✓';check.setAttribute('aria-hidden','true');button.append(dot,title,check);
+        const ns='http://www.w3.org/2000/svg',check=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');check.setAttribute('class','level-check');check.setAttribute('viewBox','0 0 16 16');check.setAttribute('aria-hidden','true');path.setAttribute('d','m3.5 8 3 3 6-6');check.append(path);button.append(dot,title,check);
         button.addEventListener('click',async()=>{
           if(busy)return;busy=true;const current=panel;current.setAttribute('aria-busy','true');current.querySelectorAll('button').forEach(node=>node.disabled=true);
           try{await onSelect(item.key,value);busy=false;close(true);}

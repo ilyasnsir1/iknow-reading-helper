@@ -20,7 +20,8 @@
   function updateOriginalButton(button,active,elapsed=0,duration=0){
     if(!button)return;
     button.classList.add('focus-original-button');button.dataset.originalPlaying=String(active);button.setAttribute('aria-pressed',String(active));
-    button.setAttribute('aria-label',active?'Stop original audio, '+time(elapsed)+(duration?' of '+time(duration):''):'Listen to original');
+    const label=button.dataset.playLabel||'Listen to original';
+    button.setAttribute('aria-label',active?'Stop '+(label==='Listen to original'?'iKnow audio':'audio')+', '+time(elapsed)+(duration?' of '+time(duration):''):label);
     const graphic=button.querySelector(':scope>svg');
     if(graphic){
       if(!originalIcons.has(graphic))originalIcons.set(graphic,graphic.innerHTML);

@@ -3,8 +3,6 @@
 .focus-backup-dialog:focus{outline:none}
 .focus-backup-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:23px 25px 20px;border-bottom:1px solid var(--ikr-line);flex:none}
 .focus-backup-dialog h2{font-size:23px;margin-top:5px}
-.focus-backup-close{width:32px;height:32px;min-height:32px;display:grid;place-items:center;padding:7px;background:transparent;border-color:transparent;border-radius:4px}
-.focus-backup-close svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.5;fill:none}
 .focus-backup-body{padding:23px 25px;overflow:auto;min-height:0;scrollbar-width:thin}
 .focus-backup-dialog h3{font-size:14px;font-weight:550}
 .focus-backup-dialog p{font-size:12px;color:var(--ikr-muted);line-height:1.6;margin-top:7px}

@@ -29,7 +29,7 @@ class PreviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source, output, publisher = root / "work/source", root / "preview", root / "publisher"
-            for name in ("changelog.html", "changelog.css", "changelog-versions.js", "changelog.js", "changelog-editor.css", "theme.css", "theme.js", "icons/icon128.png"):
+            for name in ("changelog.html", "changelog.css", "changelog-versions.js", "changelog.js", "changelog-editor.css", "theme.css", "theme.js", "form-inputs.js", "icons/icon128.png"):
                 target = source / "extension" / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((SOURCE / "extension" / name).read_bytes())

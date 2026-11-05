@@ -2,11 +2,11 @@
 const vm = require("node:vm"), fs = require("node:fs"), path = require("node:path"), assert = require("node:assert/strict"), { randomUUID } = require("node:crypto");
 const root = path.resolve(__dirname, ".."), app = fs.existsSync(path.join(root, "extension/updates.js")) ? root : path.join(root, "outputs/iknow-lesehilfe");
 const source = fs.readFileSync(path.join(app, "extension/updates.js"), "utf8"), KEY = "iknowReaderUpdateState";
-function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "current", ok = true } = {}) {
+function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "current", ok = true, refresher } = {}) {
   const stored = structuredClone(initial), calls = [], handlers = [], clock = { now: Date.now() }, stats = { reloads: 0, configReads: 0, active: 0 };
   let next = { mode, ok }, activity = false;
   const chrome = { runtime: { id: "testextension", getManifest: () => ({ version }), getURL: value => "chrome-extension://testextension/" + value,
-    onMessage: { addListener: value => handlers.push(value) }, reload: () => { stats.reloads++; }, connectNative: () => {
+    onMessage: { addListener: value => handlers.push(value) }, reload: () => { stats.reloads++; stats.stateAtReload = structuredClone(stored[KEY]); }, connectNative: () => {
       stats.active++; const messages = [], disconnects = []; let active = true;
       return { onMessage: { addListener: value => messages.push(value) }, onDisconnect: { addListener: value => disconnects.push(value) },
         disconnect() { if (!active) return; active = false; stats.active--; for (const callback of disconnects) callback(); },
@@ -15,7 +15,8 @@ function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "cur
     } }, storage: { local: { get: async key => ({ [key]: stored[key] }), set: async value => { Object.assign(stored, structuredClone(value)); } } },
     tabs: { query: async () => [], reload: async () => {} } };
   class Clock extends Date { static now() { return clock.now; } }
-  const context = vm.createContext({ chrome, crypto: { randomUUID }, URL, console, Date: Clock, setTimeout, clearTimeout, Promise, fetch: async () => { stats.configReads++; return { ok: true, json: async () => ({ enabled }) }; }, IKnowReaderUpdateActivity: async () => activity });
+  const context = vm.createContext({ chrome, crypto: { randomUUID }, URL, console, Date: Clock, setTimeout, clearTimeout, Promise, fetch: async () => { stats.configReads++; return { ok: true, json: async () => ({ enabled }) }; }, IKnowReaderUpdateActivity: async () => activity,
+    IKnowReaderUpdateRefresh: refresher });
   vm.runInContext(source, context);
   const own = { id: "testextension", url: "chrome-extension://testextension/popup.html" };
   const send = (action, sender = own) => new Promise(resolve => handlers[0]({ type: "ikr:update:" + action }, sender, value => resolve(structuredClone(value))));
@@ -87,4 +88,24 @@ function fixture({ enabled = true, initial = {}, version = "1.34.0", mode = "cur
   assert.equal((await lateComplete.send("status")).state.status, "complete");
   await new Promise(done => setTimeout(done, 550)); assert.equal(lateComplete.stats.reloads, 1);
   console.log("PASS Interrupted reloads report the actually loaded version; opening a failed install reconciles a helper that finished later");
+
+  const restorePlan = { version: "1.35.0", tabs: [{ id: 1, windowId: 2, index: 3, pinned: true, url: "chrome-extension://testextension/study.html" }] };
+  const captures = [];
+  const refresher = {
+    normalizeExtensionPlan: (_, value) => value?.version === restorePlan.version ? value : null,
+    create: () => ({ run: async () => {}, captureExtensionTabs: async target => { captures.push(target); return restorePlan; } })
+  };
+  const install = fixture({ initial: { [KEY]: { status: "available", latestVersion: restorePlan.version } }, mode: "complete", refresher });
+  assert.equal((await install.send("install")).state.status, "complete");
+  assert.deepEqual(captures, [restorePlan.version]);
+  assert.equal(install.stats.reloads, 0);
+  await new Promise(done => setTimeout(done, 550));
+  assert.equal(install.stats.reloads, 1);
+  assert.deepEqual(install.stats.stateAtReload.extensionTabRestore, restorePlan);
+  const restarted = fixture({ version: restorePlan.version, initial: install.stored, refresher });
+  const reloaded = await restarted.send("status");
+  assert.deepEqual(reloaded.state.extensionTabRestore, restorePlan);
+  assert.equal(restarted.stats.reloads, 0);
+  assert.deepEqual(captures, [restorePlan.version]);
+  console.log("PASS The updater persists open extension tabs before reloading and retains the restoration plan on the target version");
 })().catch(error => { console.error(error); process.exitCode = 1; });

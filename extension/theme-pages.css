@@ -55,7 +55,7 @@ html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup
 
 html:not([data-ikr-theme="paper"]) body[data-ikr-page]:not([data-ikr-page="popup"]) :is(input, select) {
   min-width: 0;
-  caret-color: var(--ikr-accent);
+  caret-color: currentColor;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 

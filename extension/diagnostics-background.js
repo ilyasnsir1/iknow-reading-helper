@@ -65,7 +65,7 @@
             done({ status: "error", code: "invalid_diagnostics_report" }); return;
           }
           const raw = message.report, selected = {};
-          for (const key of ["schemaVersion", "diagnosticFormatVersion", "helperVersion", "platform", "capabilities", "setup", "logs", "jobs", "updates", "localChecks", "events", "checks", "application", "installation", "resources", "runtime", "registration", "integrity", "timeline", "history", "journal", "limits", "scope", "reportTruncated", "limitations", "collection"]) if (raw[key] !== undefined) selected[key] = raw[key];
+          for (const key of ["schemaVersion", "diagnosticFormatVersion", "helperVersion", "platform", "capabilities", "setup", "logs", "jobs", "updates", "localChecks", "technicalProfile", "events", "checks", "application", "installation", "resources", "runtime", "registration", "integrity", "timeline", "history", "journal", "limits", "scope", "reportTruncated", "limitations", "collection"]) if (raw[key] !== undefined) selected[key] = raw[key];
           done({ status: "ready", durationMs: Date.now() - started, report: safeTree(selected) });
         });
         port.onDisconnect.addListener(() => { const reason = chrome.runtime.lastError?.message; done({ status: "missing", code: "helper_unavailable", message: reason ? redact(reason) : "The local helper disconnected.", durationMs: Date.now() - started }); });
@@ -123,7 +123,7 @@
     const [helper, history, storage] = await Promise.all([helperWithFallback(), globalThis.IKnowReaderDiagnosticHistory?.snapshot(), inventory()]);
     const savedUpdate = (await chrome.storage.local.get("iknowReaderUpdateState").catch(() => ({}))).iknowReaderUpdateState;
     const manifest = chrome.runtime.getManifest();
-    const report = { format: "iknow-reader-diagnostics", schemaVersion: 1, diagnosticFormatVersion: 2, createdAt: new Date().toISOString(),
+    const report = { format: "iknow-reader-diagnostics", schemaVersion: 1, diagnosticFormatVersion: 3, createdAt: new Date().toISOString(),
       extension: { name: "iKnow! Reading Helper", version: manifest.version, id: chrome.runtime.id, platform,
         permissions: manifest.permissions || [], hostPermissions: manifest.host_permissions || [],
         browser: typeof navigator !== "undefined" ? { userAgent: redact(navigator.userAgent), language: navigator.language, online: navigator.onLine } : null }, settings: chosen,

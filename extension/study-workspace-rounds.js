@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const KEY='iknowReaderStudyWorkspaceView',LIMIT=1800000;
-  function create({runtime,practice,reviewQuestion,getLanguage,getGapPosition}){
+  function create({runtime,practice,reviewQuestion,getLanguage,getGapPosition,canSynthesize}){
     const storage=()=>globalThis.sessionStorage;
     function persistView(round){
       if(!round?.runtimeId)return;
@@ -35,7 +35,7 @@
     function restore(stored){
       if(!stored)return null;
       const pool=stored.pool||stored.cards,keys=stored.cards.map(card=>card.key),byKey=new Map(pool.map(card=>[card.key,card]));
-      const exercises=keys.map(key=>{const card=byKey.get(key);return stored.mode==='cloze'?practice.buildCloze(card,{targetIndex:stored.targets[key],romajiStyle:'source'}):stored.mode==='listening'?practice.buildListening(card,{romajiStyle:'source'}):reviewQuestion(card,pool);});
+      const exercises=keys.map(key=>{const card=byKey.get(key);return stored.mode==='cloze'?practice.buildCloze(card,{targetIndex:stored.targets[key],romajiStyle:'source'}):stored.mode==='listening'?practice.buildListening(card,{romajiStyle:'source',canSynthesize}):reviewQuestion(card,pool);});
       if(exercises.some(value=>!value))throw Error('This saved session has unavailable questions. Its progress has been kept.');
       const expected=index=>stored.mode==='review'?exercises[index].choices.find(choice=>choice.id===exercises[index].correctId)?.label||byKey.get(keys[index]).english:stored.mode==='cloze'?[exercises[index].answerJapanese,exercises[index].answerRomaji].filter(Boolean).join(' · '):exercises[index].displayRomaji||exercises[index].details.japanese;
       const view=readView(stored),round={keys,pool,index:stored.index,mode:stored.mode,test:stored.kind==='test',exercises,attempts:stored.attemptPolicy,results:[],answerAttempts:keys.map(()=>0),answerHistory:keys.map(()=>[]),lastSubmitted:keys.map(()=>''),complete:false,startedAt:stored.createdAt,finishedAt:0,courseId:stored.courseId||'',courseTitle:stored.label||'',runtimeId:stored.id};
@@ -45,7 +45,7 @@
         const submitted=compatible&&typeof cached.submitted==='string'?cached.submitted.slice(0,5000):'';
         const attempts=compatible&&Number.isSafeInteger(cached.attempts)?cached.attempts:grade.outcome==='hard'?2:1;
         const history=compatible&&Array.isArray(cached.attemptsHistory)?cached.attemptsHistory.slice(-50).filter(row=>row&&typeof row.submitted==='string').map(row=>({submitted:row.submitted.slice(0,5000),correct:row.correct===true,shown:row.shown===true})):[];
-        round.results.push({key:grade.key,japanese:byKey.get(grade.key).japanese,expected:expected(index),submitted,outcome:grade.outcome,attempts,attemptsHistory:history});round.answerAttempts[index]=attempts;round.answerHistory[index]=history;round.lastSubmitted[index]=submitted;
+        round.results.push({key:grade.key,japanese:exercises[index].prompt||byKey.get(grade.key).japanese,expected:expected(index),submitted,outcome:grade.outcome,attempts,attemptsHistory:history});round.answerAttempts[index]=attempts;round.answerHistory[index]=history;round.lastSubmitted[index]=submitted;
       }
       if(view&&view.index===stored.index-1&&savedResults.has(keys[view.index]))round.index=view.index;
       if(stored.index<keys.length){

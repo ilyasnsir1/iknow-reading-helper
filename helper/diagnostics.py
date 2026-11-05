@@ -244,7 +244,7 @@ def collect(cache_root, helper_version, *, active_checks=False, app_root=None):
                 jobs.append(item)
     jobs.sort(key=lambda item: item.get("updatedAt", 0), reverse=True)
     report = {"schemaVersion": SCHEMA_VERSION,
-              "diagnosticFormatVersion": 2,
+              "diagnosticFormatVersion": 3,
               "helperVersion": helper_version if isinstance(helper_version, str) and VERSION.fullmatch(helper_version) else "unknown",
               "platform": {"system": platform.system(), "release": redact(platform.release(), 80), "pythonVersion": sys.version.split()[0]},
               "capabilities": capabilities, "setup": setup_status, "logs": logs, "jobs": jobs[:100],
@@ -255,6 +255,11 @@ def collect(cache_root, helper_version, *, active_checks=False, app_root=None):
                          "jobStatusFilesScannedPerKind": 1000, "exportedJobs": 100, "jobScans": scanned,
                          "matchingJobsFound": len(jobs), "jobsTruncated": len(jobs) > 100, "maxReportBytes": MAX_REPORT},
               "scope": "Project-only local support evidence, structured history, bounded technical logs and file checks; no learning caches, audio, model contents or personal paths."}
+    try:
+        import device_profile
+        report["technicalProfile"] = device_profile.collect(root, helper_version, force=active_checks, cache_hardware=False)
+    except (OSError, ValueError, TypeError, ImportError):
+        report["technicalProfile"] = {"status": "unavailable"}
     if active_checks:
         try:
             import update_diagnostics

@@ -32,6 +32,10 @@ const goal={id:19053,title:"Panel layout fixture",cue_language:"ja",items_count:
   await worker.evaluate(()=>chrome.storage.local.set({iknowReaderSettings:{enabled:true,colorMode:'off'},iknowReaderPanelOrder:'reading-first'}));
   const page=await context.newPage();await page.goto('https://iknow.jp/courses/19053');await page.locator('.ikr-preparation:not([hidden])').waitFor();
   const setState=async state=>{await page.evaluate(state=>document.dispatchEvent(new CustomEvent('fixture-panel-state',{detail:state})),state);await until(async()=>await page.locator('.ikr-preparation').getAttribute('data-saved')===(state==='saved'?'true':'false'),state+' availability');await delay(100);};
+  const checkStripe=()=>page.locator('.ikr-preparation').evaluate(panel=>{
+    const border=getComputedStyle(panel),stripe=getComputedStyle(panel,'::after');
+    return border.borderLeftWidth==='1px'&&stripe.left==='0px'&&stripe.backgroundColor===border.borderLeftColor&&stripe.opacity==='1';
+  });
   const checkGrip=async(state,collapsed,width,theme)=>{
    const value=await page.locator('.ikr-preparation').evaluate(panel=>{const r=panel.getBoundingClientRect(),h=panel.querySelector('.ikr-panel-handle').getBoundingClientRect();return{top:h.top-r.top,left:h.left-r.left,right:h.right<=r.right,bottom:h.bottom<=r.bottom}});
    assert.ok(value.top>=0&&value.top<=20,`${state}/${collapsed}/${width}/${theme}: grip top ${value.top}`);
@@ -45,6 +49,7 @@ const goal={id:19053,title:"Panel layout fixture",cue_language:"ja",items_count:
     for(const state of ['ready','partial','running','paused','saved']){
      await setState(state);
      const collapsed=await page.locator('.ikr-preparation').getAttribute('data-minimized')==='true';if(collapsed)await page.locator('.ikr-preparation-minimize').click();
+     if(state==='saved')assert.ok(await checkStripe(),`${theme} Saved stripe joins the left edge`);
      await checkGrip(state,false,width,theme);
      if(width===1100&&theme==='paper'&&state==='partial')await page.screenshot({path:path.join(out,'1100-paper-partial-expanded.png'),fullPage:true});
      await page.locator('.ikr-preparation-minimize').click();await checkGrip(state,true,width,theme);
@@ -53,6 +58,14 @@ const goal={id:19053,title:"Panel layout fixture",cue_language:"ja",items_count:
     }
     const bounds=await page.locator('.ikr-toolbar').evaluate(toolbar=>{const picker=toolbar.querySelector('.ikr-theme-trigger'),r=toolbar.getBoundingClientRect(),p=picker.getBoundingClientRect();const siblings=[...toolbar.querySelectorAll('label,strong')].map(node=>node.getBoundingClientRect());return{outsideMenus:!picker.closest('.ikr-toolbar-selects'),gap:r.right-p.right,left:p.left>=r.left,right:p.right<=r.right,overlap:siblings.some(b=>Math.min(b.right,p.right)>Math.max(b.left,p.left)&&Math.min(b.bottom,p.bottom)>Math.max(b.top,p.top))}});
     assert.equal(bounds.outsideMenus,true,'Theme is separate from Language/settings menus');assert.ok(bounds.left&&bounds.right&&!bounds.overlap,'Theme stays inside toolbar without overlaps');if(width===1100)assert.ok(bounds.gap>=0&&bounds.gap<=26,'Desktop theme button aligns with right padding');
+    const fields=await page.locator('.ikr-toolbar-controls > .ikr-toolbar-selects > label,.ikr-toolbar-theme-field').evaluateAll(nodes=>nodes.map(node=>{const control=node.querySelector('select,button'),label=node.getBoundingClientRect(),r=control.getBoundingClientRect();return{left:label.left,top:label.top,bottom:label.bottom,controlTop:r.top,height:r.height,inside:r.left>=label.left&&r.right<=label.right+.1};}));
+    assert.equal(fields.length,6);assert.ok(fields.every(field=>field.inside&&field.height===34),'All reading options have contained controls at the same height');
+    if(width===1100)assert.ok(fields.every(field=>Math.abs(field.controlTop-fields[0].controlTop)<.1),'Desktop options share one aligned row');
+    if(width===390)assert.equal(new Set(fields.map(field=>Math.round(field.top))).size,3,'Mobile options use three balanced rows of two');
+    if(width===1100&&theme==='paper'){
+     const markup=await page.locator('.ikr-toolbar').evaluate(node=>{const copy=node.cloneNode(true);copy.querySelector('.ikr-panel-handle')?.remove();const mount=copy.querySelector('.ikr-toolbar-theme');mount.replaceChildren();delete mount.dataset.ikrThemeMounted;for(const input of copy.querySelectorAll('input'))input.toggleAttribute('checked',node.querySelector(`[data-setting="${input.dataset.setting}"]`).checked);for(const select of copy.querySelectorAll('select'))for(const option of select.options)option.toggleAttribute('selected',option.value===node.querySelector(`[data-setting="${select.dataset.setting}"]`).value);return copy.outerHTML;});
+     fs.writeFileSync(path.join(out,'reading-panel.html'),markup);
+    }
     await page.screenshot({path:path.join(out,`${width}-${theme}.png`),fullPage:true});
    }
   }

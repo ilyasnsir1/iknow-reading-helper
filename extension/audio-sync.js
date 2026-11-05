@@ -4,6 +4,7 @@
   let enabled = false;
   let wordEnabled = false;
   let wordMode = "recording", wordSpeed = 1, wordNeuralVoice = "female";
+  let sentenceVoice = "original";
   let wordPlayback = null;
   let gesture = null;
   const wordStates = new Set();
@@ -17,7 +18,7 @@
   const volume = Core?.audioVolume();
   let volumeEnabled = false;
   function sendConfiguration() {
-    window.postMessage({type:'IKR_NATIVE_AUDIO_CONFIG_V1',enabled,wordEnabled,volumeEnabled,originalVolume:volume?.get('original')/100,wordVolume:volume?.get('word')/100},location.origin);
+    window.postMessage({type:'IKR_NATIVE_AUDIO_CONFIG_V1',enabled,wordEnabled,sentenceEnabled:sentenceVoice!=="original",volumeEnabled,originalVolume:volume?.get('original')/100,wordVolume:volume?.get('word')/100},location.origin);
   }
   volume?.subscribe(sendConfiguration);
   void volume?.ready.then(sendConfiguration);
@@ -77,9 +78,9 @@
     const notice = { requestId, state: target.state, target: target.node, shownAt: null, showTimer: null, hideTimer: null, element: null };
     wordNotice = notice;
     notice.showTimer = setTimeout(() => {
-      if (wordNotice !== notice || wordPlayback?.requestId !== requestId || !wordEnabled) return;
+      if (wordNotice !== notice || wordPlayback?.requestId !== requestId) return;
       notice.shownAt = performance.now();
-      showWordNotice(notice, "Word audio");
+      showWordNotice(notice, wordPlayback.mode === "sentence" ? "Preparing sentence audio" : "Word audio");
     }, WORD_NOTICE_DELAY);
   }
   function finishWordNotice(requestId) {
@@ -180,6 +181,32 @@
     state.wordSound = item.sound; state.wordCue = item.cue; state.wordTargets = [];
     addWordTarget(state, state.line); addWordTarget(state, cue);
     wordStates.add(state); syncWords(state);
+  }
+  async function playSentence(state, node) {
+    const wasPlaying = wordPlayback?.mode === "sentence" && wordPlayback.target?.node === node;
+    stopWord();
+    const text = Core.neuralSentenceText(Core.plainText(state.sentence.cue.text)), voice = sentenceVoice;
+    if (wasPlaying || !text || voice === "original") return;
+    clear();
+    const requestId = crypto.randomUUID(), intentTime = performance.now(), target = { node, state };
+    wordPlayback = { requestId, state, nodes: [node], mode: "sentence", target };
+    node.setAttribute("aria-busy", "true");
+    window.postMessage({ type: "IKR_WORD_AUDIO_PREPARE_V1", requestId, intentTime, sentence: true }, location.origin);
+    beginWordNotice(requestId, target);
+    let response;
+    try { response = await chrome.runtime.sendMessage({ type: "ikr:sentence:neural", text, speed: 1, voice }); }
+    catch { response = { ok: false, code: "word_neural_missing" }; }
+    if (wordPlayback?.requestId !== requestId) return;
+    node.removeAttribute("aria-busy");
+    if (!response?.ok) {
+      clearWord();
+      wordError(["word_neural_missing", "neural_voice_missing"].includes(response?.code)
+        ? "Install local voices from Models & voices, then try again."
+        : "Could not prepare the sentence audio. Try again or use the iKnow speaker.", target);
+      return;
+    }
+    finishWordNotice(requestId);
+    window.postMessage({ type: "IKR_WORD_VOICE_PLAY_V1", requestId, intentTime, data: response.data, sampleRate: response.sampleRate, duration: response.duration, sentence: true }, location.origin);
   }
   async function playTarget(target) {
     const { state, index } = target;
@@ -441,11 +468,15 @@
     if (modeChanged || speed !== wordSpeed || voice !== wordNeuralVoice) { stopWord(); status(""); }
     wordMode = mode; wordSpeed = speed; wordNeuralVoice = voice;
     const nextVolumeEnabled=options.volumeEnabled===true;
-    const changed = enabled !== value || wordEnabled !== wordValue || volumeEnabled!==nextVolumeEnabled;
+    const nextSentenceVoice = ["female", "male"].includes(options.sentenceVoice) ? options.sentenceVoice : "original";
+    const sentenceChanged = nextSentenceVoice !== sentenceVoice;
+    if (sentenceChanged && (wordPlayback?.mode === "sentence" || wordNotice)) stopWord();
+    sentenceVoice = nextSentenceVoice;
+    const changed = enabled !== value || wordEnabled !== wordValue || volumeEnabled!==nextVolumeEnabled || sentenceChanged;
     volumeEnabled=nextVolumeEnabled;
     enabled = value;
     wordEnabled = wordValue;
-    if (!wordEnabled) stopWord();
+    if (!wordEnabled && wordPlayback?.mode !== "sentence") stopWord();
     if (wordsChanged) for (const state of wordStates) syncWords(state);
     if (!changed) return;
     if (!enabled) { clear(); lastMessage = null; }
@@ -461,7 +492,11 @@
   window.addEventListener("message", event => {
     if (event.source !== window || event.origin !== location.origin) return;
     if (event.data?.type === "IKR_WORD_AUDIO_RESULT_V1") {
-      if (event.data.requestId === wordPlayback?.requestId) { const target = wordPlayback.target; clearWord(); if (event.data.status === "error") wordError(event.data.error === "duration" ? "Word timings do not match this recording." : "Could not play word audio. Click the word to try again.", target); }
+      if (event.data.requestId === wordPlayback?.requestId) {
+        const { target, mode } = wordPlayback;
+        clearWord();
+        if (event.data.status === "error") wordError(mode === "sentence" ? "Could not play the sentence audio. Try again or use the iKnow speaker." : event.data.error === "duration" ? "Word timings do not match this recording." : "Could not play word audio. Click the word to try again.", target);
+      }
       return;
     }
     if (event.data?.type === "IKR_WORD_VOICE_STATE_V1") {
@@ -471,7 +506,7 @@
     if (event.data?.type !== "IKR_NATIVE_AUDIO_STATE_V1") return;
     const value = event.data;
     if (typeof value.path !== "string" || !Number.isFinite(value.time) || value.time < 0 || !Number.isFinite(value.duration)) return;
-    if (wordPlayback && wordEnabled) {
+    if (wordPlayback && (wordEnabled || wordPlayback.mode === "sentence")) {
       if (value.clip && value.requestId === wordPlayback.requestId && ["play", "playing", "time"].includes(value.kind) && !value.paused) {
         for (const node of wordPlayback.nodes) node.classList.add("ikr-word-playing");
       } else if (!value.clip && ["play", "playing"].includes(value.kind)) { cancelWordNotice(); clearWord(); }
@@ -486,5 +521,5 @@
   window.addEventListener("resize", positionWordNotice, { passive: true });
   window.visualViewport?.addEventListener("resize", positionWordNotice, { passive: true });
   window.visualViewport?.addEventListener("scroll", positionWordNotice, { passive: true });
-  globalThis.IKnowReaderAudio = Object.freeze({ register, remove, registerItem, removeItem: removeWords, configure, clear, refresh });
+  globalThis.IKnowReaderAudio = Object.freeze({ register, remove, registerItem, removeItem: removeWords, configure, clear, refresh, playSentence });
 })();

@@ -8,14 +8,20 @@ function fixture(options = {}) {
   const tabs = new Map((options.tabs || [
     { id: 1, url: "https://iknow.jp/courses/19053" }, { id: 2, url: "https://en.iknow.jp/series/1" }, { id: 3, url: "https://ja.iknow.jp/dashboard" }
   ]).map(tab => [tab.id, { ...tab }]));
-  const reloads = [], writes = [], opened = [], failures = new Set(), lookupFailures = new Set();
+  const reloads = [], writes = [], opened = [], updated = [], failures = new Set(), lookupFailures = new Set();
+  let nextId = 20;
   let queryError = false, onReload = null, onGet = null, onSave = null, onActivity = null, saveError = null;
   let notesError = false, entry = "new-study-space", onOpen = null;
   const chrome = { runtime: { getURL: file => "chrome-extension://fixture/" + file }, tabs: {
-    query: async filter => { assert.deepEqual(Array.from(filter.url), ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"]); if (queryError) throw Error("query failed"); return [...tabs.values()]; },
+    query: async filter => {
+      if (queryError) throw Error("query failed");
+      if (filter.url) assert.deepEqual(Array.from(filter.url), ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"]);
+      return [...tabs.values()];
+    },
     get: async id => { if (onGet) await onGet(id); if (!tabs.has(id) || lookupFailures.has(id)) throw Error("no tab"); return tabs.get(id); },
     reload: async id => { reloads.push(id); if (onReload) await onReload(id); if (failures.has(id)) throw Error("reload failed"); },
-    create: async value => { if (notesError) throw Error("tab refused"); opened.push(structuredClone(value)); if (onOpen) await onOpen(value); return { id: 20 }; }
+    create: async value => { if (notesError) throw Error("tab refused"); opened.push(structuredClone(value)); if (onOpen) await onOpen(value); const tab = { id: nextId++, ...value }; tabs.set(tab.id, tab); return tab; },
+    update: async (id, value) => { updated.push({ id, ...value }); Object.assign(tabs.get(id), value); }
   } };
   const context = vm.createContext({ URL, Promise }); vm.runInContext(source, context);
   const make = () => context.IKnowReaderUpdateRefresh.create({ chrome, getVersion: () => version, getState: () => state,
@@ -27,7 +33,7 @@ function fixture(options = {}) {
       return state;
     } });
   let runner = make();
-  return { run: value => runner.run(value), reloads, writes, opened, tabs, failures, lookupFailures,
+  return { run: value => runner.run(value), capture: value => runner.captureExtensionTabs(value), reloads, writes, opened, updated, tabs, failures, lookupFailures,
     state: () => structuredClone(state), stored: () => structuredClone(stored), patch: value => { state = { ...state, ...value }; },
     active: value => { active = value; }, version: value => { version = value; }, queryError: value => { queryError = value; },
     onReload: value => { onReload = value; }, onGet: value => { onGet = value; }, onSave: value => { onSave = value; }, saveError: value => { saveError = value; },
@@ -227,4 +233,34 @@ function fixture(options = {}) {
   }
   missingNotes.entry("new-study-space"); await missingNotes.run(); assert.equal(missingNotes.opened.length, 1);
   console.log("PASS A browser refusal retries without invalidating installation; an interrupted claimed open never duplicates; only a safe exact-release entry can open");
+
+  const study = { id: 4, windowId: 8, index: 1, pinned: true, active: true, url: "chrome-extension://fixture/study.html#practice" };
+  const notesTab = { id: 5, windowId: 8, index: 3, pinned: false, active: false, url: "chrome-extension://fixture/changelog.html#previous" };
+  const queue = { id: 6, windowId: 12, index: 1, pinned: false, active: false, url: "chrome-extension://fixture/queue.html" };
+  const ownTabs = fixture({ tabs: [notesTab, study, queue, { ...queue, id: 7, url: "chrome-extension://other/study.html" },
+    { ...queue, id: 8, url: "chrome-extension://fixture/popup.html" }, { ...queue, id: 9, incognito: true }] });
+  const restore = await ownTabs.capture(VERSION);
+  assert.deepEqual(structuredClone(restore), { version: VERSION, tabs: [study, notesTab, queue], used: [] });
+
+  const updatedTabs = fixture({ state: { changelogTarget: VERSION, extensionTabRestore: restore },
+    tabs: [{ id: 1, windowId: 8, url: "https://iknow.jp/courses/19053", audible: true }] });
+  await updatedTabs.run();
+  assert.equal(updatedTabs.state().extensionTabRestore, null);
+  assert.deepEqual(updatedTabs.opened, [
+    { url: study.url, pinned: true, active: true, windowId: 8, index: 1 },
+    { url: notesTab.url, pinned: false, active: false, windowId: 8, index: 3 },
+    { url: queue.url, pinned: false, active: false }
+  ]);
+  assert.deepEqual(updatedTabs.reloads, [], "Restore extension tabs even while iKnow audio defers website reload");
+  updatedTabs.restart(); updatedTabs.tabs.get(1).audible = false;
+  await updatedTabs.run();
+  assert.equal(updatedTabs.opened.length, 3);
+  assert.deepEqual(updatedTabs.updated, [{ id: 21, url: "chrome-extension://fixture/changelog.html#new-study-space", active: true }]);
+
+  const interruptedRestore = fixture({ state: { extensionTabRestore: restore }, tabs: [{ ...study, id: 31 }] });
+  await interruptedRestore.run();
+  assert.deepEqual(interruptedRestore.opened.map(tab => tab.url), [notesTab.url, queue.url]);
+  const wrongVersion = fixture({ state: { extensionTabRestore: { ...restore, version: "9.0.0" } } });
+  await wrongVersion.run(); assert.deepEqual(wrongVersion.opened, []);
+  console.log("PASS Own tabs return in their windows with URLs and pins, even when iKnow refresh is deferred; retries and Changelog reuse avoid duplicate tabs");
 })().catch(error => { console.error(error); process.exitCode = 1; });

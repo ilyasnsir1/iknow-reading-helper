@@ -1,0 +1,85 @@
+.app-actions .import-noji-button { min-height: 34px; padding: 6px 10px; white-space: nowrap; }
+.study-noji-dialog {
+  width: min(680px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  margin: auto;
+  padding: 20px;
+  border: 1px solid var(--ikr-line);
+  border-radius: 12px;
+  background: var(--study-sheet);
+  color: var(--ikr-text);
+  box-shadow: var(--ikr-shadow);
+  overflow: hidden;
+}
+.study-noji-dialog[open] { display: flex; flex-direction: column; }
+.study-noji-dialog > header, .study-noji-dialog > .noji-instructions { flex: none; }
+.study-noji-dialog::backdrop { background: color-mix(in srgb, var(--ikr-bg) 76%, transparent); backdrop-filter: blur(5px); }
+.study-noji-dialog, .study-noji-dialog .noji-preview { scrollbar-width: thin; scrollbar-color: var(--ikr-line-strong) transparent; }
+.study-noji-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.study-noji-dialog > header { margin-bottom: 10px; }
+.study-noji-dialog h2 { font-size: 21px; }
+.study-noji-dialog p { color: var(--ikr-muted); margin: 8px 0 12px; font-size: 13px; }
+.study-noji-dialog form, .study-noji-dialog fieldset, .study-noji-dialog label { display: grid; gap: 8px; min-width: 0; }
+.study-noji-dialog form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.study-noji-dialog form > label, .study-noji-dialog .noji-actions { flex: none; }
+.study-noji-dialog .noji-import-fields { display: flex; flex-direction: column; min-height: 0; gap: 8px; overflow: hidden; }
+.study-noji-dialog .noji-import-fields[hidden] { display: none; }
+.study-noji-dialog .noji-import-fields > :not(.noji-preview) { flex: none; }
+.study-noji-dialog fieldset { padding: 0; border: 0; margin: 6px 0 0; }
+.study-noji-dialog fieldset[hidden] { display: none; }
+.study-noji-dialog label { font-size: 12px; }
+.study-noji-dialog input:not([type="checkbox"]), .study-noji-dialog select { width: 100%; min-width: 0; padding: 8px 10px; }
+.study-noji-dialog input[type="file"] { border: 1px dashed var(--ikr-line-strong); border-radius: 4px; }
+.study-noji-dialog input[type="file"]::file-selector-button { margin-right: 8px; font: inherit; cursor: pointer; }
+.study-noji-dialog .noji-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.study-noji-dialog .noji-mapping { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 8px; }
+.study-noji-dialog .noji-mapping[hidden], .study-noji-dialog .noji-extra-columns[hidden] { display: none; }
+.noji-mapping > div { display: grid; min-width: 0; gap: 6px; font-size: 12px; }
+.noji-mapping [draggable] { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: grab; }
+.noji-mapping[data-dragging] [draggable] { cursor: grabbing; }
+.noji-mapping[data-dragging="japanese"] [data-column="meaning"],
+.noji-mapping[data-dragging="meaning"] [data-column="japanese"] { border-color: var(--ikr-accent); }
+.study-noji-dialog .noji-mapping-hint { margin: 0; font-size: 12px; }
+.study-noji-dialog .noji-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.noji-choice legend { margin-bottom: 6px; font-size: 12px; }
+.noji-choice label { position: relative; }
+.noji-choice input { position: absolute; opacity: 0; }
+.noji-choice span { padding: 7px 4px; border: 1px solid var(--ikr-line); border-radius: 4px; text-align: center; cursor: pointer; }
+.noji-choice input:checked + span { background: var(--study-library); border-color: var(--ikr-line-strong); font-weight: 600; }
+.noji-choice input:focus-visible + span { outline: 2px solid var(--ikr-accent); outline-offset: 2px; }
+.study-noji-dialog .noji-checkbox { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.study-noji-dialog .noji-preview { display: block; flex: 0 1 auto; min-height: 0; list-style: none; max-height: 440px; overflow: auto; scrollbar-gutter: stable; padding: 0; margin: 4px 0 0; padding-inline-end: 8px; }
+.study-noji-dialog .noji-preview li { border: 1px solid var(--ikr-line); border-radius: 5px; margin-bottom: 7px; background: transparent; }
+.study-noji-dialog .noji-preview li:last-child { margin-bottom: 0; }
+.noji-card-summary { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 12px; }
+.noji-card-summary > input { margin: 0; justify-self: start; }
+.noji-card-text { display: grid; gap: 4px; min-width: 0; }
+.noji-card-japanese { font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.noji-card-meaning { color: var(--ikr-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.noji-card-summary .noji-card-edit { min-width: 39px; padding: 4px 3px; font-size: 12px; border-color: transparent; background: transparent; }
+.study-noji-dialog .noji-preview li[data-editing=true] { background: var(--study-library); border-color: var(--ikr-line-strong); }
+.noji-preview li[data-included=false] .noji-card-text { opacity: .5; }
+.noji-card-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 14px; margin: 0 12px 12px 41px; border-top: 1px solid var(--ikr-line); }
+.noji-card-editor[hidden] { display: none; }
+.noji-card-editor[data-mode=original] > [data-noji-field=meaning] { grid-row: 1; grid-column: 1; }
+.noji-card-editor[data-mode=original] > [data-noji-field=japanese] { grid-row: 1; grid-column: 2; }
+.noji-preview textarea { min-width: 0; width: 100%; min-height: 32px; padding: 6px; font: inherit; font-size: 13px; field-sizing: content; resize: none; overflow: hidden; }
+.noji-row-issue { color: var(--ikr-danger); font-size: 11px; line-height: 1.5; }
+.noji-row-issue:empty { display: none; }
+.noji-card-editor label { font-size: 12px; gap: 6px; }
+.noji-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.study-noji-dialog [role="status"] { flex: 1 1 180px; margin: 0; }
+.study-noji-dialog [role="status"][data-error="true"] { color: var(--ikr-danger); }
+.study-noji-dialog button[type="submit"] { margin-left: auto; }
+@media (max-width: 540px) {
+  .study-noji-dialog { padding: 16px; }
+  .noji-card-summary { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; padding: 10px; }
+  .noji-card-editor { grid-template-columns: minmax(0, 1fr); margin: 0 10px 10px; padding: 12px 0 0; }
+  .noji-card-editor[data-mode=original] > [data-noji-field=japanese] { grid-row: 2; grid-column: 1; }
+}
+@media (max-height: 540px) {
+  .study-noji-dialog form { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ikr-line-strong) transparent; }
+  .study-noji-dialog .noji-import-fields { overflow: visible; flex: none; }
+  .study-noji-dialog .noji-preview { max-height: none; overflow: visible; flex: none; }
+}

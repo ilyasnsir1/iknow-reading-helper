@@ -19,7 +19,7 @@ from process_resources import worker_threads
 for _thread_variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_thread_variable] = str(worker_threads())
 
-HOST_VERSION = "1.22.0"
+HOST_VERSION = "1.23.0"
 MAX_INPUT = 16 * 1024 * 1024
 MAX_RESULT = 8 * 1024 * 1024
 CACHE_ROOT = Path(os.environ.get("IKNOW_READER_CACHE", str(Path(os.environ.get("LOCALAPPDATA", Path.home())) / "iKnowLesehilfe"))).resolve()
@@ -398,24 +398,26 @@ def handle(message):
 
             for name in ("neural_speech", "word_speech"):
                 module = sys.modules.get(name)
-                requests = getattr(module, "_requests", None)
-                if requests is not None and requests.unfinished_tasks:
-                    return True
+                for queue_name in ("_requests", "_reading_requests"):
+                    requests = getattr(module, queue_name, None)
+                    if requests is not None and requests.unfinished_tasks:
+                        return True
             return False
         updater.handle(message, CACHE_ROOT, send, HOST_VERSION, busy=update_busy)
         return
-    if kind in {"prepare", "word-neural", "word-speech", "word-neural-prepare"}:
+    if kind in {"prepare", "word-neural", "word-speech", "word-neural-prepare", "noji-reading"}:
         import component_manager
+        response_type = {"word-neural": "word-neural-result", "word-speech": "word-speech-result",
+                         "word-neural-prepare": "word-neural-prepare-result", "noji-reading": "noji-reading-result"}.get(kind, "error")
         if component_manager.is_active(CACHE_ROOT):
-            send({"type": {"word-neural": "word-neural-result", "word-speech": "word-speech-result", "word-neural-prepare": "word-neural-prepare-result"}.get(kind, "error"),
+            send({"type": response_type,
                   "requestId": request_id, "courseId": message.get("courseId"), "ok": False,
                   "code": "component_installing", "message": "Wait for the model download or installation to finish.",
                   "error": "Wait for the model download or installation to finish."})
             return
         import updater
         if updater.installing(CACHE_ROOT):
-            envelope = {"type": {"word-neural": "word-neural-result", "word-speech": "word-speech-result",
-                                  "word-neural-prepare": "word-neural-prepare-result"}.get(kind, "error"),
+            envelope = {"type": response_type,
                         "requestId": request_id, "ok": False, "code": "update_in_progress",
                         "message": "An application update is being installed. Please wait.",
                         "error": "An application update is being installed. Please wait."}
@@ -423,6 +425,10 @@ def handle(message):
                 envelope["courseId"] = str(message["courseId"])
             send(envelope)
             return
+    if kind == "noji-reading":
+        import neural_speech
+        neural_speech.enqueue(message, CACHE_ROOT, send, stopping)
+        return
     if kind in {"word-neural-prepare", "word-neural-prepare-status", "word-neural-prepare-pause"}:
         import word_voice_jobs
         word_voice_jobs.handle(message, CACHE_ROOT, send)
@@ -547,7 +553,7 @@ def main():
             try:
                 message = json.loads(payload.decode("utf-8"), parse_constant=lambda _: (_ for _ in ()).throw(ValueError("Invalid number.")))
 
-                if isinstance(message, dict) and message.get("type") not in {"update:check", "update:status", "update:install", "components:status", "components:start", "components:pause", "components:resume", "ping", "diagnostics", "changelog:author"}:
+                if isinstance(message, dict) and message.get("type") != "noji-reading" and message.get("type") not in {"update:check", "update:status", "update:install", "components:status", "components:start", "components:pause", "components:resume", "ping", "diagnostics", "changelog:author"}:
                     warm_dependencies()
                 handle(message)
             except (ValueError, TypeError, UnicodeError) as error:

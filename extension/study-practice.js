@@ -4,6 +4,7 @@
   const RATINGS = Object.freeze(["again", "hard", "good"]);
   const MAX_SESSION_ITEMS = 2000;
   const Core = globalThis.IKnowReaderCore || (typeof require === "function" ? require("./core.js") : null);
+  const NojiReading = () => globalThis.IKnowNojiCardReading || (typeof require === "function" ? require("./noji-card-reading.js") : null);
   const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const stamp = value => Number.isSafeInteger(value) && value >= 0 && value <= DATE_LIMIT;
   const counter = value => Number.isSafeInteger(value) && value >= 0 && value <= MAX_COUNTER;
@@ -126,6 +127,7 @@
     return start === null || end === null || end <= start ? "" : spoken.slice(start, end);
   }
   function buildCloze(record, options = {}) {
+    if (record?.cardMode === "original") { const converted = NojiReading()?.practiceRecord(record); return converted ? buildCloze(converted, options) : null; }
     const details = detailsFor(record);
     if (!details) return null;
     const gapPosition = options.gapPosition ?? "first";
@@ -201,10 +203,11 @@
     return kind === "sentence" ? normalized.replace(/[.,!?。、！？…:;：；「」『』【】〈〉《》（）()\[\]{}"“”„«»]/gu, "") : normalized;
   }
   function buildListening(record, options = {}) {
+    if (record?.cardMode === "original") { const converted = NojiReading()?.practiceRecord(record); return converted ? buildListening(converted, options) : null; }
     if (!object(record) || !["word", "sentence"].includes(record.kind)) return null;
     const context = !string(record.audioUrl).trim() && object(record.context) && string(record.context.audioUrl).trim();
     const value = context ? record.context : record;
-    if (!string(value.audioUrl).trim()) return null;
+    if (!string(value.audioUrl).trim() && !options.canSynthesize?.(value)) return null;
     const kind = context ? "sentence" : record.kind, details = { ...value, kind };
     const japanese = string(value.japanese).trim(), kana = string(value.kana).trim(), raw = string(value.romaji).trim();
     const spoken = Core?.displayRomaji ? Core.displayRomaji(details, "spoken").trim() : raw;
@@ -233,7 +236,9 @@
         !record.key || record.key.length > 130 || !Array.isArray(collection)) return null;
     const preferred = options.language === "de" ? "de" : "en", fields = { en: "english", de: "german" };
     const language = string(record[fields[preferred]]).trim() ? preferred : preferred === "en" ? "de" : "en";
-    const field = fields[language], correct = string(record[field]).trim(), japanese = normalizeAnswer(record.japanese);
+    const original = record.cardMode === "original" || /^noji-[a-f0-9]{16}$/.test(record.courseId || ""), field = original ? "japanese" : fields[language];
+    const prompt = original ? string(record[fields[language]]).trim() : record.japanese;
+    const correct = string(record[field]).trim(), japanese = normalizeAnswer(prompt);
     const correctNormalized = normalizeListeningAnswer(correct);
     if (!correctNormalized || !japanese) return null;
     const targetParts = meaningParts(correct);
@@ -243,7 +248,7 @@
     for (const candidate of collection) {
       if (!object(candidate) || candidate.kind !== record.kind || typeof candidate.key !== "string" ||
           !candidate.key || candidate.key.length > 130 || seenKeys.has(candidate.key)) continue;
-      const candidateJapanese = normalizeAnswer(candidate.japanese);
+      const candidateJapanese = normalizeAnswer(original ? candidate[fields[language]] : candidate.japanese);
       if (!candidateJapanese || candidateJapanese === japanese) continue;
       const label = string(candidate[field]).trim(), normalized = normalizeListeningAnswer(label);
       if (!normalized || normalized === correctNormalized) continue;
@@ -263,7 +268,7 @@
     const choices = best.map(({ id, label }) => ({ id, label }));
     if (!choices.length) return null;
     choices.splice(stableHash(record.key) % (choices.length + 1), 0, { id: record.key, label: correct });
-    return { choices, correctId: record.key, details: { ...record }, language };
+    return { choices, correctId: record.key, details: { ...record }, language, ...(original ? { prompt } : {}) };
   }
   function isDue(record, now) {
     return !validReview(record?.review) || record.review.dueAt <= now;
@@ -283,7 +288,7 @@
       if (options.dueOnly !== false && !isDue(record, now)) return false;
 
       if (mode === "cloze") return Boolean(buildCloze(record, { ...options, gapPosition: "first" }));
-      if (mode === "listening") return Boolean(string(record.audioUrl) || string(record.context?.audioUrl));
+      if (mode === "listening") return Boolean(string(record.audioUrl) || string(record.context?.audioUrl) || options.canSynthesize?.(record));
       return true;
     });
     const rank = record => validReview(record.review) ? record.review.dueAt <= now ? 0 : 2 : 1;

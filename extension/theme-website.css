@@ -1,0 +1,81 @@
+html[data-ikr-website-theme] {
+  background: var(--ikr-bg);
+  color-scheme: dark;
+}
+
+html[data-ikr-website-theme] body {
+  background: var(--ikr-bg) !important;
+  color: var(--ikr-text) !important;
+}
+
+html[data-ikr-website-theme] :is(.marketing_navi, .marketing_navi .fixed-container, #header-bg, .page_footer, .big_footer, .site-header, .site-footer) {
+  background: var(--ikr-surface) !important;
+  border-color: var(--ikr-line) !important;
+  color: var(--ikr-text) !important;
+}
+
+html[data-ikr-website-theme] :is(.content-container, .content-details, .content-primary, .main-content, .content-tab, .panel-content, .course-content-container, .course-content, .series-courses, .series_details, .series_container, .course_container, .course-container, .course-wrapper, .course, .series_course, .item, .items, .item-details, .item-sentences, .sentence, .series-item-inner, .series_divider, .navigator) {
+  background-color: var(--ikr-surface) !important;
+  border-color: var(--ikr-line) !important;
+  color: var(--ikr-text) !important;
+}
+
+html[data-ikr-website-theme] :is(.content-tab[data-panel-selected], .content-tab.selected, .course-wrapper.even, .series_course:hover, .navigator) {
+  background-color: var(--ikr-surface-soft) !important;
+}
+
+html[data-ikr-website-theme] :is(.courses.show .tab_content, .course_preview .big_box) {
+  background: var(--ikr-surface) !important;
+  border-color: var(--ikr-line) !important;
+}
+
+html[data-ikr-website-theme] .content-tabs .content-tab::before { background: var(--ikr-surface-soft) !important; }
+
+html[data-ikr-website-theme] .course-content :is(.glyph-volume-max, .part_of_speech) { color: var(--ikr-muted) !important; }
+html[data-ikr-website-theme] .course-content .cue-response .transliteration { color: var(--ikr-warning) !important; }
+
+html[data-ikr-website-theme] :is(.marketing_navi, .page_footer, .content-container, .series-courses, .series_list) :where(h1, h2, h3, h4, p, dt, dd, th, td, .cue, .response, .text, .translation, .stat, .stat-datum, .stat-label, .category-name, .course-name, .series_name, .series_description, .course-stats, .difficulty-level, .transliteration, .copyright):not(.ikr-owned *) {
+  color: var(--ikr-text) !important;
+  border-color: var(--ikr-line) !important;
+}
+
+html[data-ikr-website-theme] :is(.marketing_navi, .page_footer, .content-container, .series-courses, .series_list) a:not(.logo a, .signup_link, .btn, .ikr-owned, .ikr-owned *) {
+  color: var(--ikr-accent) !important;
+}
+
+html[data-ikr-website-theme] :is(.content, .marketing_navi, .site-header) :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), select, textarea, .business):not(.ikr-owned *) {
+  color: var(--ikr-text) !important;
+  border-color: var(--ikr-line-strong) !important;
+  background-color: var(--ikr-elevated) !important;
+}
+
+html[data-ikr-website-theme] :is(.ikr-translation-en, .ikr-translation-de, .ikr-item-german, .ikr-source-note, .ikr-source-note p, .ikr-group-info) {
+  color: var(--ikr-text);
+}
+
+html[data-ikr-website-theme] .ikr-group-info {
+  background: var(--ikr-surface-soft);
+  border-color: var(--ikr-line-strong);
+}
+
+html[data-ikr-website-theme] .ikr-group-info-pin {
+  color: var(--ikr-text);
+  background: var(--ikr-elevated);
+  border-color: var(--ikr-line-strong);
+}
+
+html[data-ikr-website-theme] .ikr-color-0 { --ikr-bg: #293f59; --ikr-ink: #bfdfff; }
+html[data-ikr-website-theme] .ikr-color-1 { --ikr-bg: #57382e; --ikr-ink: #ffd5bd; }
+html[data-ikr-website-theme] .ikr-color-2 { --ikr-bg: #443657; --ikr-ink: #e8d5ff; }
+html[data-ikr-website-theme] .ikr-color-3 { --ikr-bg: #234b3f; --ikr-ink: #bdf4df; }
+html[data-ikr-website-theme] .ikr-color-4 { --ikr-bg: #50462b; --ikr-ink: #fae7a3; }
+html[data-ikr-website-theme] .ikr-color-5 { --ikr-bg: #553348; --ikr-ink: #ffcee9; }
+
+:root[data-ikr-website-theme] {
+  --ikr-local-tool-bg: var(--ikr-elevated);
+  --ikr-local-tool-border: var(--ikr-line);
+  --ikr-local-tool-ink: var(--ikr-muted);
+  --ikr-local-tool-hover: var(--ikr-surface-hover);
+  --ikr-local-tool-hover-border: var(--ikr-line-strong);
+  --ikr-local-tool-saved: var(--ikr-accent-soft);
+}

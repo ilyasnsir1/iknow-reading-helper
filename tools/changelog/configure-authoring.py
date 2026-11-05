@@ -42,7 +42,7 @@ def preview_draft(source, output, snapshot, *, display_version=None, display_dat
     if any(output == root or output.is_relative_to(root) or root.is_relative_to(output) for root in protected):
         raise ValueError("Use a separate preview folder outside source, installed applications and publisher files.")
     output.mkdir(parents=True, exist_ok=True)
-    for name in ("changelog.css", "changelog-versions.js", "changelog.js", "changelog-editor.css", "theme.css", "theme.js", "icons/icon128.png"):
+    for name in ("changelog.css", "changelog-versions.js", "changelog.js", "changelog-editor.css", "theme.css", "theme.js", "form-inputs.js", "icons/icon128.png"):
         target = author._safe(output / name, output)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / "extension" / name, target)
@@ -77,13 +77,15 @@ def main():
     parser = argparse.ArgumentParser(description='Enable local publisher editing or export its reviewed draft to source.')
     parser.add_argument("action", choices=("enable", "status", "export", "rebase", "preview"))
     parser.add_argument("--source", type=Path, default=SOURCE)
+    parser.add_argument("--publisher-root", type=Path, default=author.PUBLISHER_ROOT, help="Publisher's local signing and draft directory.")
     parser.add_argument("--output", type=Path, help="Separate read-only draft preview folder; only for preview.")
     parser.add_argument("--display-version", help="Show the final publication layout locally, without finalizing the draft.")
     parser.add_argument("--display-date", help="Intended date in the local final layout, YYYY-MM-DD.")
     parser.add_argument("--installed-version", help="Show existing notes as this installed version, without creating a new entry.")
     parser.add_argument("--reviewed", action="store_true", help="Confirm the draft/source differences have been reviewed before rebasing.")
     args = parser.parse_args()
-    source, publisher = args.source.resolve(strict=True), author.PUBLISHER_ROOT
+    source, publisher = args.source.resolve(strict=True), args.publisher_root.resolve()
+    author.PUBLISHER_ROOT = publisher
     config = json.loads((source / "helper/update-config.json").read_bytes())
     if args.action == "enable":
 

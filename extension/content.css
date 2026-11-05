@@ -1,13 +1,22 @@
 .ikr-toolbar {
-  box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  box-sizing: border-box; display: block; container-type:inline-size;
   margin: 12px 0; padding: 14px 16px; border: 1px solid #eadbc8; border-radius: 10px;
   background: #fffaf3; color: #292c34; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   box-shadow: 0 2px 9px #46301508;
 }
 .ikr-toolbar strong { font-size: 14px; color: #6d3b12; }
 .ikr-toolbar label { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: #34363e; font-weight: 500; }
-.ikr-toolbar-selects { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; flex:1 1 500px; min-width:min(100%,500px); }
-.ikr-toolbar-theme { display:inline-flex; flex:0 0 auto; margin-left:auto; max-width:100%; }
+.ikr-toolbar-switches { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+.ikr-toolbar-switches label { white-space:nowrap; }
+.ikr-toolbar-controls { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) 136px; gap:10px; align-items:end; margin-top:12px; }
+.ikr-toolbar-selects { display:contents; }
+.ikr-toolbar .ikr-toolbar-field { display:grid; min-width:0; align-items:start; gap:4px; color:#73675c; font-size:11px; font-weight:400; line-height:16px; }
+.ikr-toolbar .ikr-toolbar-field select { width:100%; min-width:0; height:34px; min-height:34px; font-size:12px; line-height:18px; border-radius:4px; }
+.ikr-toolbar-theme { display:block; width:136px; max-width:100%; }
+.ikr-toolbar .ikr-toolbar-theme .ikr-theme-trigger { width:136px; max-width:100%; }
+@container(max-width:780px) { .ikr-toolbar-controls { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@container(max-width:450px) { .ikr-toolbar-controls { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; } }
+@container(max-width:280px) { .ikr-toolbar-controls { grid-template-columns:minmax(0,1fr); } }
 .ikr-toolbar input { width: 15px; height: 15px; margin: 0; accent-color: #b55012; }
 .ikr-toolbar select, .ikr-toolbar button {
   box-sizing: border-box; font: inherit; min-height: 30px; padding: 3px 8px; color: #34363e;
@@ -30,7 +39,8 @@
 .ikr-toolbar :focus-visible, .ikr-owned .ikr-group:focus-visible, .ikr-group:focus-visible {
   outline: 2px solid #969ba8; outline-offset: 3px;
 }
-.ikr-status { flex-basis: 100%; color: #66615c; font-size: 12px; }
+.ikr-status { display:block; color: #66615c; font-size: 12px; }
+.ikr-status:not(:empty) { margin-top:9px; }
 .ikr-status[data-error="true"] { color: #9f2821; }
 .ikr-item-line, .ikr-sentence-line {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important;

@@ -2,9 +2,31 @@
   "use strict";
   const URLS = ["https://iknow.jp/*", "https://en.iknow.jp/*", "https://ja.iknow.jp/*"];
   const HOSTS = new Set(["iknow.jp", "en.iknow.jp", "ja.iknow.jp"]);
+  const EXTENSION_PAGES = new Set(["/study.html", "/queue.html", "/changelog.html", "/models.html", "/word-voice.html", "/helper-setup.html", "/diagnostics.html", "/activity-sharing.html"]);
+  const MAX_RESTORE_TABS = 100;
   const validVersion = value => typeof value === "string" && /^\d{1,5}(?:\.\d{1,5}){1,3}$/.test(value);
-  const ids = value => Array.isArray(value) ? [...new Set(value.filter(id => Number.isInteger(id) && id >= 0))] : [];
+  const validId = id => Number.isInteger(id) && id >= 0;
+  const ids = value => Array.isArray(value) ? [...new Set(value.filter(validId))] : [];
   const refreshable = value => ["current", "complete", "available"].includes(value?.status);
+  function extensionUrl(chrome, value) {
+    if (typeof value !== "string" || value.length > 2048) return null;
+    try {
+      const own = new URL(chrome.runtime.getURL("")), url = new URL(value);
+      return url.protocol === "chrome-extension:" && own.host === url.host && EXTENSION_PAGES.has(url.pathname) &&
+        !url.username && !url.password ? url : null;
+    } catch { return null; }
+  }
+  function normalizeExtensionPlan(chrome, value) {
+    if (!validVersion(value?.version) || !Array.isArray(value.tabs)) return null;
+    const tabs = [], seen = new Set();
+    for (const tab of value.tabs.slice(0, MAX_RESTORE_TABS)) {
+      const url = extensionUrl(chrome, tab?.url);
+      if (!url || !validId(tab.id) || !validId(tab.windowId) || !validId(tab.index) || seen.has(tab.id)) continue;
+      seen.add(tab.id);
+      tabs.push({ id: tab.id, windowId: tab.windowId, index: tab.index, pinned: tab.pinned === true, active: tab.active === true, url: url.href });
+    }
+    return tabs.length ? { version: value.version, tabs, used: ids(value.used).slice(0, MAX_RESTORE_TABS) } : null;
+  }
   function eligible(tab) {
     try {
       const url = new URL(tab?.pendingUrl || tab?.url || "");
@@ -15,6 +37,38 @@
     let running = null;
     const result = (ok, extra = {}) => ({ ok, state: getState(), ...extra });
     const matchingTabs = async () => (await chrome.tabs.query({ url: URLS })).filter(eligible);
+
+    async function captureExtensionTabs(version) {
+      try {
+        const tabs = (await chrome.tabs.query({})).filter(tab => !tab.incognito).map(tab => ({ ...tab, url: tab.pendingUrl || tab.url }));
+        return normalizeExtensionPlan(chrome, { version, tabs: tabs.filter(tab => extensionUrl(chrome, tab.url)).sort((a, b) => a.windowId - b.windowId || a.index - b.index) });
+      } catch { return null; }
+    }
+
+    async function restoreExtensionTabs(version) {
+      const plan = getState().extensionTabRestore;
+      if (plan?.version !== version || getState().autoRefreshTarget !== version || !refreshable(getState())) return;
+      const used = new Set(plan.used);
+      try {
+        const current = (await chrome.tabs.query({})).filter(tab => !tab.incognito);
+        const originals = new Set(plan.tabs.map(tab => tab.id));
+        for (const [index, tab] of plan.tabs.entries()) {
+          const original = current.find(item => item.id === tab.id);
+          const windowExists = current.some(item => item.windowId === tab.windowId);
+          const matches = item => !used.has(item.id) && !originals.has(item.id) && (item.pendingUrl || item.url) === tab.url;
+          let restored = original || current.find(item => matches(item) && (!windowExists || item.windowId === tab.windowId));
+          if (!restored) {
+            restored = await chrome.tabs.create({ url: tab.url, pinned: tab.pinned, active: tab.active,
+              ...(windowExists ? { windowId: tab.windowId, index: tab.index } : {}) });
+          }
+          if (validId(restored?.id)) used.add(restored.id);
+          const remaining = plan.tabs.slice(index + 1);
+          await save({ extensionTabRestore: remaining.length ? { version, tabs: remaining, used: [...used] } : null });
+        }
+      } catch (error) {
+        globalThis.IKnowReaderDiagnosticHistory?.exception("updates", error, { code: "update_extension_tabs_restore_failed" });
+      }
+    }
 
     const refreshMessage = message => getState().status === "available" ? {} : { message };
     async function openChangelog(version) {
@@ -30,7 +84,16 @@
 
         await save({ changelogOpenedVersion: version });
         if (getVersion() !== version || getState().changelogTarget !== version) return;
-        try { await chrome.tabs.create({ url: chrome.runtime.getURL("changelog.html") + "#" + entry, active: true }); }
+        const url = chrome.runtime.getURL("changelog.html") + "#" + entry;
+        let existing;
+        try {
+          existing = (await chrome.tabs.query({ currentWindow: true })).find(tab => !tab.incognito && validId(tab.id) &&
+            extensionUrl(chrome, tab.pendingUrl || tab.url)?.pathname === "/changelog.html");
+        } catch { }
+        try {
+          if (existing) await chrome.tabs.update(existing.id, { url, active: true });
+          else await chrome.tabs.create({ url, active: true });
+        }
         catch (error) {
 
           await save({ changelogOpenedVersion: previous });
@@ -47,6 +110,7 @@
     }
     async function perform(manual) {
       const version = getVersion(), state = getState();
+      await restoreExtensionTabs(version);
 
       if (!manual && (!validVersion(version) || state.autoRefreshTarget !== version ||
         !refreshable(state) || state.autoRefreshCompleteVersion === version)) {
@@ -145,7 +209,7 @@
       }).finally(() => { running = null; });
       return running;
     }
-    return Object.freeze({ run, get busy() { return running !== null; } });
+    return Object.freeze({ run, captureExtensionTabs, get busy() { return running !== null; } });
   }
-  globalThis.IKnowReaderUpdateRefresh = Object.freeze({ create });
+  globalThis.IKnowReaderUpdateRefresh = Object.freeze({ create, normalizeExtensionPlan });
 })();

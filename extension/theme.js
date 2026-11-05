@@ -4,22 +4,34 @@
  const root=document.documentElement,own=root.classList.contains("ikr-theme-page");
  const scope=!own||root.dataset.ikrThemeScope==="panels"?"panels":"app";
  const KEY=scope==="panels"?"iknowReaderPanelTheme":"iknowReaderTheme";
+ const WEBSITE_SCOPE_KEY="iknowReaderWebsiteThemeScope";
+ const website=!own;
  const choices=Object.freeze([{id:"paper",label:"Original",swatch:["#fff6e9","#c99065"]},{id:"midnight",label:"Midnight",swatch:["#263344","#a2afcf"]},{id:"tokyo",label:"Tokyo Neon",swatch:["#392747","#c6a1eb"]},{id:"forest",label:"Kyoto Forest",swatch:["#2a4034","#b5c6a4"]}]);
  const valid=value=>choices.some(choice=>choice.id===value)?value:"paper";
  const controls=new Set();
  let current="paper",confirmed="paper",generation=0,revision=0,pendingWrites=0,desired="paper",writes=Promise.resolve();
+ let websiteScope="panels",confirmedScope="panels",scopeRevision=0,pendingScopeWrites=0,scopeWrites=Promise.resolve();
  const icon='<svg class="ikr-theme-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 12A6.1 6.1 0 0 1 8 4a6.5 6.5 0 1 0 8 8Z"/></svg>';
  const chevron='<svg class="ikr-theme-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6 3.5 3.5L11.5 6"/></svg>';
  const check='<svg class="ikr-theme-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8 3 3 6-6"/></svg>';
+ function updateWebsiteScope(){
+  if(!website)return;
+  root.toggleAttribute("data-ikr-website-theme",websiteScope==="site"&&current!=="paper");
+  for(const control of controls){
+   for(const button of control.scopeOptions)button.setAttribute("aria-pressed",String(button.dataset.websiteThemeScope===websiteScope));
+  }
+ }
  function apply(value){
   current=valid(value);root.dataset.ikrTheme=current;root.classList.remove("ikr-theme-pending");
   if(own)try{localStorage.setItem(KEY,current);}catch{}
   for(const control of controls){if(!control.wrapper.isConnected){control.close();controls.delete(control);continue;}control.name.textContent=choices.find(choice=>choice.id===current).label;for(const button of control.options)button.setAttribute("aria-pressed",String(button.dataset.themeValue===current));}
+  updateWebsiteScope();
  }
  if(own){root.classList.add("ikr-theme-pending");try{apply(localStorage.getItem(KEY));}catch{apply("paper");}}
  else apply("paper");
  const loadGeneration=generation,loadRevision=revision;
- const ready=Promise.resolve().then(()=>globalThis.chrome?.storage?.local?.get(KEY)).then(stored=>{
+ const ready=Promise.resolve().then(()=>globalThis.chrome?.storage?.local?.get(website?[KEY,WEBSITE_SCOPE_KEY]:KEY)).then(stored=>{
+  if(website&&!scopeRevision){confirmedScope=websiteScope=stored?.[WEBSITE_SCOPE_KEY]==="site"?"site":"panels";updateWebsiteScope();}
   if(loadGeneration===generation&&loadRevision===revision){confirmed=valid(stored?.[KEY]);apply(confirmed);}
  }).catch(()=>{confirmed=current;root.classList.remove("ikr-theme-pending");});
  function choose(value,feedback){
@@ -32,12 +44,36 @@
    finally{pendingWrites--;}
   });return writes;
  }
+ function chooseWebsiteScope(value,feedback){
+  const request=++scopeRevision;
+  websiteScope=value;
+  pendingScopeWrites++;
+  updateWebsiteScope();
+  scopeWrites=scopeWrites.then(async()=>{
+   try{
+    await chrome.storage.local.set({[WEBSITE_SCOPE_KEY]:value});
+    confirmedScope=value;
+    feedback.textContent="Theme scope saved.";
+   }catch{
+    if(request===scopeRevision){websiteScope=confirmedScope;updateWebsiteScope();}
+    feedback.textContent="Could not save the theme scope. Try again.";
+   }finally{
+    pendingScopeWrites--;
+    if(!pendingScopeWrites&&request===scopeRevision){
+     try{
+      const stored=await chrome.storage.local.get(WEBSITE_SCOPE_KEY);
+      if(request===scopeRevision){confirmedScope=websiteScope=stored?.[WEBSITE_SCOPE_KEY]==="site"?"site":"panels";updateWebsiteScope();}
+     }catch{}
+    }
+   }
+  });
+ }
  function mount(container){
   if(!container||container.dataset.ikrThemeMounted)return;
   container.dataset.ikrThemeMounted="true";
   const wrapper=document.createElement("div");wrapper.className="ikr-theme-picker ikr-owned";
   const trigger=document.createElement("button");trigger.type="button";trigger.className="ikr-theme-trigger";trigger.innerHTML=icon;
-  const name=document.createElement("span");name.className="ikr-theme-label";trigger.append(name);trigger.insertAdjacentHTML("beforeend",chevron);trigger.setAttribute("aria-label",scope==="panels"?"Choose course panel theme":"Choose app theme");trigger.title=scope==="panels"?"Theme for iKnow course and series panels":"Theme for Reading Helper pages and popup";trigger.setAttribute("aria-expanded","false");
+  const name=document.createElement("span");name.className="ikr-theme-label";trigger.append(name);trigger.insertAdjacentHTML("beforeend",chevron);trigger.setAttribute("aria-label",scope==="panels"?"Choose course panel theme":"Choose app theme");trigger.title=website?"Theme for iKnow":"Theme for Reading Helper pages and popup";trigger.setAttribute("aria-expanded","false");
   const panel=document.createElement("div");panel.className="ikr-theme-options";panel.hidden=true;panel.setAttribute("role","group");panel.setAttribute("aria-label","Theme");panel.setAttribute("popover","manual");
   const feedback=document.createElement("span");feedback.className="ikr-theme-feedback";feedback.setAttribute("role","status");
   const close=()=>{try{panel.hidePopover?.();}catch{}panel.hidden=true;trigger.setAttribute("aria-expanded","false");};
@@ -54,10 +90,24 @@
    const rim=document.createElementNS(ns,"circle");rim.setAttribute("cx","10");rim.setAttribute("cy","10");rim.setAttribute("r","9");rim.setAttribute("fill","none");rim.setAttribute("stroke","#9f94ab66");rim.setAttribute("stroke-width",".6");swatch.append(base,half,rim);const label=document.createElement("span");label.className="ikr-theme-label";label.textContent=choice.label;button.append(swatch,label);button.insertAdjacentHTML("beforeend",check);
    button.addEventListener("click",()=>{void choose(choice.id,feedback);close();trigger.focus({preventScroll:true});});panel.append(button);return button;
   });
+  const scopeOptions=[];
+  if(website){
+   const section=document.createElement("div");section.className="ikr-website-theme-scope";
+   section.setAttribute("role","group");section.setAttribute("aria-label","Apply theme to");
+   const heading=document.createElement("p");heading.textContent="Apply to";section.append(heading);
+   for(const [value,label] of [["panels","Helper panels"],["site","Entire iKnow page"]]){
+    const button=document.createElement("button");button.type="button";button.className="ikr-theme-option";button.dataset.websiteThemeScope=value;
+    const caption=document.createElement("span");caption.className="ikr-theme-label";caption.textContent=label;
+    button.append(caption);button.insertAdjacentHTML("beforeend",check);
+    button.addEventListener("click",()=>chooseWebsiteScope(value,feedback));
+    section.append(button);scopeOptions.push(button);
+   }
+   panel.append(section);
+  }
   trigger.addEventListener("click",()=>{if(panel.hidden)open();else close();});
   wrapper.addEventListener("keydown",event=>{if(event.key==="Escape"){close();trigger.focus({preventScroll:true});event.stopPropagation();}if(event.key==="ArrowDown"&&event.target===trigger){event.preventDefault();open();options[0].focus();}});
   wrapper.addEventListener("focusout",event=>{if(!wrapper.contains(event.relatedTarget))close();});
-  wrapper.append(trigger,panel,feedback);container.append(wrapper);controls.add({name,options,wrapper,close});apply(current);
+  wrapper.append(trigger,panel,feedback);container.append(wrapper);controls.add({name,options,scopeOptions,wrapper,close});apply(current);
  }
  function scan(){
   if(own&&document.body?.dataset.ikrPage!=="popup"){
@@ -71,7 +121,13 @@
   document.querySelectorAll("[data-ikr-theme-picker]").forEach(mount);
  }
  globalThis.chrome?.storage?.onChanged?.addListener((changes,area)=>{
-  if(area!=="local"||!changes[KEY])return;
+  if(area!=="local")return;
+  if(website&&changes[WEBSITE_SCOPE_KEY]&&!pendingScopeWrites){
+   scopeRevision++;
+   confirmedScope=websiteScope=changes[WEBSITE_SCOPE_KEY].newValue==="site"?"site":"panels";
+   updateWebsiteScope();
+  }
+  if(!changes[KEY])return;
   const observed=++revision;
 
   void Promise.resolve(chrome.storage.local.get(KEY)).then(stored=>{

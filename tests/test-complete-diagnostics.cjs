@@ -3,7 +3,7 @@ const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm"),asse
 const ext=path.resolve(__dirname,"../extension");
 const tick=async()=>{for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));};
 const plain=value=>JSON.parse(JSON.stringify(value));
-const helper=()=>({schemaVersion:1,diagnosticFormatVersion:2,helperVersion:"1.17.0",platform:{system:"Windows"},
+const helper=()=>({schemaVersion:1,diagnosticFormatVersion:3,helperVersion:"1.17.0",platform:{system:"Windows"},technicalProfile:{schemaVersion:1,collectedAt:1700000000000,os:{name:"Windows",version:"10.0",architecture:"x64"},cpu:{logicalCores:16},memory:{totalMiB:32768},gpus:[{name:"NVIDIA GeForce RTX 5070 Ti",driverVersion:"617.42",vramMiB:16384}],runtime:{helperVersion:"1.23.0"},checks:[]},
  localChecks:{application:{helperVersion:"1.17.0"},managedFiles:{status:"modified",files:[{component:"helper/engine.py",status:"modified"}]},registration:{folderMatch:true}},
  events:{status:"available",events:Array.from({length:160},(_,i)=>({at:1700000000+i,component:"model",event:i===159?"inference_failed":"progress",completed:i,details:{nested:{failure:{chain:[{exceptionType:"TimeoutError",frames:[{module:"engine.py",function:"generate",line:330}]}]}}}}))},
  jobs:[{status:"error",code:"model_request_timeout",stage:"language",completed:41,total:200}],
@@ -29,8 +29,8 @@ async function fixture(initial={},mode="ready") {
   discovery:{intervalMs:300000,retryIntervalMs:600000,nextCheckAt:attemptedAt+600000,failureCount:2,lastCheckMode:"automatic",lastCheckOutcome:"failed",lastCheckFinishedAt:attemptedAt+10,lastErrorCode:"update_check_failed",lastErrorMessage:"unavailable C:\\Users\\Secret\\host.cmd"}}});assert.equal(f.connections,0);assert.equal(f.writes,0);
  const one=f.api.exportReport({states:[{courseId:"19053",status:"error",stage:"language",completed:41,total:200,message:"timeout",stageTotals:{language:200},stageProgress:{language:{completed:41,total:200}}}]}),two=f.api.exportReport({});
  assert.equal(one,two);let {report}=await one;
- assert.equal(f.connections,1);assert.equal(f.messages[0].extended,true);assert.equal(report.diagnosticFormatVersion,2);assert.equal(report.collection.helperExtended,true);
- assert.equal(report.helper.report.events.events.length,160);assert.equal(report.helper.report.events.events.at(-1).event,"inference_failed");
+ assert.equal(f.connections,1);assert.equal(f.messages[0].extended,true);assert.equal(report.diagnosticFormatVersion,3);assert.equal(report.collection.helperExtended,true);
+ assert.equal(report.helper.report.technicalProfile.gpus[0].name,"NVIDIA GeForce RTX 5070 Ti");assert.equal(report.helper.report.technicalProfile.gpus[0].driverVersion,"617.42");assert.equal(report.helper.report.events.events.length,160);assert.equal(report.helper.report.events.events.at(-1).event,"inference_failed");
  assert.equal(report.helper.report.events.events[159].details.nested.failure.chain[0].frames[0].function,"generate");
  assert.equal(report.helper.report.localChecks.managedFiles.status,"modified");assert.equal(report.helper.report.updates.activeCheck.providers.legacyCsp.hresult,-2146893802);
  assert.equal(report.preparation.courses[0].stageProgress.language.completed,41);assert.equal(f.disconnections,undefined);

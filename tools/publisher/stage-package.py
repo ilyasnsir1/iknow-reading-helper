@@ -8,6 +8,14 @@ import shutil
 
 DOCS = ('README.md', '.gitignore')
 
+def write_baseline(output):
+    baseline = output / 'RELEASE-FILES.json'
+    version = json.loads((output / 'extension/manifest.json').read_bytes())['version']
+    files = {file.relative_to(output).as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
+             for file in sorted(output.rglob('*')) if file.is_file() and file != baseline}
+    baseline.write_bytes((json.dumps({'version': version, 'sha256': files}, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+    print(f'Staged {len(files) + 1} managed files for version {version}.')
+
 def stage(source, output):
     source, output = source.resolve(strict=True), output.resolve()
     if source == output or source.is_relative_to(output) or output.is_relative_to(source):
@@ -20,11 +28,7 @@ def stage(source, output):
     for name in DOCS:
         if (source / name).is_file():
             shutil.copy2(source / name, output / name)
-    version = json.loads((output / 'extension/manifest.json').read_bytes())['version']
-    files = {file.relative_to(output).as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
-             for file in sorted(output.rglob('*')) if file.is_file()}
-    (output / 'RELEASE-FILES.json').write_bytes((json.dumps({'version': version, 'sha256': files}, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
-    print(f'Staged {len(files) + 1} managed files for version {version}.')
+    write_baseline(output)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Stage only managed application files from the source checkout for a release.')

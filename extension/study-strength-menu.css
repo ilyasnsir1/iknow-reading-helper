@@ -13,6 +13,6 @@
 .level-dot[data-strength=learning]{background:var(--ikr-warning)}
 .level-dot[data-strength=strong]{background:var(--ikr-positive)}
 .level-dot[data-strength=auto]{border:1px solid var(--ikr-muted);background:transparent}
-.level-check{margin-left:auto;opacity:0;font-size:13px}
+.focus-strength-menu .level-check{display:block;margin-left:auto;width:13px;height:13px;flex:0 0 13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:0}
 [aria-checked=true]>.level-check{opacity:1}
 .focus-strength-menu>p{font-size:10px;color:var(--ikr-muted);line-height:1.6;margin:5px 4px 0;padding:9px 5px 5px;border-top:1px solid var(--ikr-line)}

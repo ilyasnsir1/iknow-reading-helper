@@ -2,6 +2,92 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "voices-and-flashcards",
+      "version": "1.42.0",
+      "status": "released",
+      "date": "2026-11-05",
+      "title": "Noji cards and more voices",
+      "summary": "Bring your flashcards into Study and choose how you listen.",
+      "changes": [
+        {
+          "type": "added",
+          "title": "Noji flashcards",
+          "description": "Bring a Noji deck into Study from a CSV file. Your cards keep their original front and back.",
+          "details": [
+            "Choose the front and back columns, then check every card before importing.",
+            "Edit a card or uncheck anything you do not want to bring over.",
+            "Keep your words, sentences and examples together in one deck.",
+            "Find your decks with the Noji library filter. Flip cards and listen where Japanese is available."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/noji-import-review.png",
+              "alt": "The Noji import screen with a CSV deck, front and back columns and cards ready to import.",
+              "caption": "Choose your CSV and check the cards before importing."
+            },
+            {
+              "src": "changelog-media/noji-import-edit.png",
+              "alt": "Editing the front and back of a Noji card while another card is unchecked.",
+              "caption": "Change a card or leave it out of the import."
+            }
+          ]
+        },
+        {
+          "type": "added",
+          "title": "Voice choices",
+          "description": "Right-click the play button in Study to choose a voice.",
+          "details": [
+            "iKnow: original audio, Mao Plain or Nise.",
+            "Noji: Mao Plain or Nise.",
+            "Keep separate choices for iKnow and Noji."
+          ],
+          "images": [
+            {
+              "src": "changelog-media/noji-cards-and-voices.png",
+              "alt": "A Noji card in Study with the voice menu open.",
+              "caption": "Right-click the play button to choose Mao Plain or Nise."
+            }
+          ]
+        },
+        {
+          "type": "added",
+          "title": "Optional usage sharing",
+          "description": "Choose whether to share extension activity to help improve Reading Helper.",
+          "details": [
+            "Off until you enable it.",
+            "Optionally share GPU, driver, system and model details for troubleshooting.",
+            "Turn sharing off whenever you like."
+          ],
+          "images": []
+        },
+        {
+          "type": "added",
+          "title": "Study options",
+          "description": "Choose how you read and what you practise.",
+          "details": [
+            "Keep Romaji visible on iKnow study cards.",
+            "Filter your library and practice selection by New, Weak, Learning or Strong.",
+            "Apply a dark theme to iKnow course and series pages or just the Helper panels."
+          ],
+          "images": []
+        },
+        {
+          "type": "improved",
+          "title": "Study pages",
+          "description": "Small changes across Reading Helper.",
+          "details": [
+            "A tidier settings panel on iKnow.",
+            "Clearer audio labels and separate volume for local AI voices.",
+            "Keep Reading Helper tabs open on future updates once this version is installed.",
+            "Close buttons use text instead of X icons.",
+            "Type without browser spelling underlines.",
+            "Selection menus now use matching checkmarks."
+          ],
+          "images": []
+        }
+      ]
+    },
+    {
       "id": "practice-layout-and-volume",
       "version": "1.41.3",
       "status": "released",

@@ -292,12 +292,13 @@
       else if (interactionChanged) updateInfo(state);
     }
     renderToolbar();
-    const audioChanged = enabledChanged || ["audioFollow", "wordAudio", "wordAudioMode", "wordAudioSpeed", "wordNeuralVoice"].some(key => previous[key] !== settings[key]);
+    const audioChanged = enabledChanged || ["audioFollow", "wordAudio", "wordAudioMode", "wordAudioSpeed", "wordNeuralVoice", "sentenceVoice"].some(key => previous[key] !== settings[key]);
     if (audioChanged) AudioFollow?.configure(settings.enabled && settings.audioFollow, message => {
         if (audioError === message) return;
         audioError = message;
         updateStatus();
-      }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice, volumeEnabled: settings.enabled });
+      }, settings.enabled && settings.wordAudio, { mode: settings.wordAudioMode, speed: settings.wordAudioSpeed, voice: settings.wordNeuralVoice, volumeEnabled: settings.enabled, sentenceVoice: settings.enabled && settings.sentenceVoice });
+    if (enabledChanged || previous.sentenceVoice !== settings.sentenceVoice) for (const state of sentenceStates.values()) syncSentenceVoice(state);
     if (interactionChanged || romajiChanged) AudioFollow?.refresh({ wordsOnly: true });
     if (settings.enabled && !previous.enabled) schedule();
     if (enabledChanged) updateAutomation();
@@ -353,10 +354,13 @@
     toolbar = own(create("div", "ikr-toolbar"));
     toolbar.setAttribute("role", "region");
     toolbar.setAttribute("aria-label", "iKnow Reading Helper");
-    toolbar.append(create("strong", "", "iKnow! Reading Helper"));
-    toolbar.append(checkbox("enabled", "On"), checkbox("wordRomaji", "Words"), checkbox("sentenceRomaji", "Sentences"), checkbox("kanaVisible", "Kana"), checkbox("sentenceBold", "Bold"), checkbox("groupInfo", "Meaning"), checkbox("wordAudio", "Word audio"), checkbox("audioFollow", "Follow audio"), checkbox("followPanels", "Pin panels"));
+    const switches = create("div", "ikr-toolbar-switches");
+    switches.append(create("strong", "", "iKnow! Reading Helper"));
+    switches.append(checkbox("enabled", "On"), checkbox("wordRomaji", "Words"), checkbox("sentenceRomaji", "Sentences"), checkbox("kanaVisible", "Kana"), checkbox("sentenceBold", "Bold"), checkbox("groupInfo", "Meaning"), checkbox("wordAudio", "Word audio"), checkbox("audioFollow", "Follow audio"), checkbox("followPanels", "Pin panels"));
+    toolbar.append(switches);
+    const controls = create("div", "ikr-toolbar-controls");
     const menus = create("div", "ikr-toolbar-selects");
-    const colorLabel = create("label", "", "Colors ");
+    const colorLabel = create("label", "ikr-toolbar-field", "Colors ");
     const select = create("select");
     select.dataset.setting = "colorMode";
     for (const [value, label] of [["hover", "On hover"], ["all", "All groups"], ["off", "Off"]]) {
@@ -365,29 +369,38 @@
     select.addEventListener("change", () => { void saveSetting("colorMode", select.value); });
     colorLabel.append(select);
     menus.append(colorLabel);
-    const alignmentLabel = create("label", "", "Alignment ");
+    const alignmentLabel = create("label", "ikr-toolbar-field", "Alignment ");
     const alignmentSelect = create("select"); alignmentSelect.dataset.setting = "alignmentMode";
     for (const [value, label] of [["phrases", "Meaning groups"], ["words", "Word detail"]]) {
       const option = create("option", "", label); option.value = value; alignmentSelect.append(option);
     }
     alignmentSelect.addEventListener("change", () => { void saveSetting("alignmentMode", alignmentSelect.value); });
     alignmentLabel.append(alignmentSelect); menus.append(alignmentLabel);
-    const translationLabel = create("label", "", "Language ");
+    const translationLabel = create("label", "ikr-toolbar-field", "Language ");
     const languageSelect = create("select"); languageSelect.dataset.setting = "translationLanguage";
     for (const [value, label] of [["en", "English"], ["de", "German"], ["both", "Both"]]) {
       const option = create("option", "", label); option.value = value; languageSelect.append(option);
     }
     languageSelect.addEventListener("change", () => { void saveSetting("translationLanguage", languageSelect.value); });
     translationLabel.append(languageSelect); menus.append(translationLabel);
-    const romajiLabel = create("label", "", "Romaji ");
+    const romajiLabel = create("label", "ikr-toolbar-field", "Romaji ");
     const romajiSelect = create("select"); romajiSelect.dataset.setting = "romajiStyle";
     for (const [value, label] of [["source", "Source spelling"], ["spoken", "Pronunciation"]]) {
       const option = create("option", "", label); option.value = value; romajiSelect.append(option);
     }
     romajiSelect.addEventListener("change", () => { void saveSetting("romajiStyle", romajiSelect.value); });
     romajiLabel.append(romajiSelect); menus.append(romajiLabel);
-    const themePicker = create("span", "ikr-toolbar-theme");
-    toolbar.append(menus, themePicker);
+    const voiceLabel = create("label", "ikr-toolbar-field", "Sentence audio ");
+    const voiceSelect = create("select"); voiceSelect.dataset.setting = "sentenceVoice";
+    for (const [value, label] of Object.entries(Core.SENTENCE_VOICES)) {
+      const option = create("option", "", value === "original" ? "iKnow audio" : label); option.value = value; voiceSelect.append(option);
+    }
+    voiceSelect.addEventListener("change", () => { void saveSetting("sentenceVoice", voiceSelect.value); });
+    voiceLabel.append(voiceSelect); menus.append(voiceLabel);
+    const themeField = create("div", "ikr-toolbar-field ikr-toolbar-theme-field");
+    themeField.append(create("span", "", "Theme"));
+    const themePicker = create("span", "ikr-toolbar-theme");themeField.append(themePicker);
+    controls.append(menus, themeField);toolbar.append(controls);
     const retry = create("button", "", "Reload");
     retry.type = "button"; retry.dataset.retry = "true"; retry.hidden = true;
     retry.addEventListener("click", () => {
@@ -709,6 +722,25 @@
     });
     return line;
   }
+  function syncSentenceVoice(state) {
+    if (!settings.enabled || settings.sentenceVoice === "original" || !Core.neuralSentenceText(plain(state.sentence.cue.text))) {
+      state.voiceButton?.remove();
+      return;
+    }
+    if (!state.voiceButton) {
+      const button = own(create("button", "ikr-study-action ikr-sentence-voice"));
+      button.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3zM13 7a4 4 0 0 1 0 6M15 5a7 7 0 0 1 0 10"/></svg>';
+      button.type = "button";
+      button.addEventListener("click", event => { event.stopPropagation(); void AudioFollow?.playSentence(state, button); }, { signal: state.abort.signal });
+      state.voiceButton = button; state.ownedNodes.push(button);
+    }
+    const label = "Play sentence with " + Core.SENTENCE_VOICES[settings.sentenceVoice];
+    state.voiceButton.title = label; state.voiceButton.setAttribute("aria-label", label);
+    if (!state.voiceButton.isConnected) {
+      if (state.studyTools?.isConnected) state.studyTools.append(state.voiceButton);
+      else state.container.querySelector(".sentence-text > .translation")?.after(state.voiceButton);
+    }
+  }
   function renderSentence(container, sentence, record) {
     const text = container.querySelector(".sentence-text > .text");
     const kana = container.querySelector(".sentence-text > .transliteration");
@@ -781,6 +813,7 @@
     updateTranslation(state);
     AudioFollow?.register(state);
     globalThis.IKnowReaderCourseStudy?.sentence(state, courseId, course?.title);
+    syncSentenceVoice(state);
     sentenceStates.set(container, state);
   }
   function renderItems() {

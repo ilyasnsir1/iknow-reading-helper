@@ -4,12 +4,13 @@
   const BACKUP_FORMAT = "iknow-reading-helper-study-backup", MAX_BACKUP_BYTES = 12 * 1024 * 1024;
   const APP_THEME_KEY = "iknowReaderTheme", PANEL_THEME_KEY = "iknowReaderPanelTheme";
   const PREFERENCES_KEY = "iknowReaderStudyPreferences";
-  const DEFAULT_PREFERENCES = Object.freeze({ attempts: "retry", gapPosition: "random" });
+  const DEFAULT_PREFERENCES = Object.freeze({ attempts: "retry", gapPosition: "random", showRomaji: false });
   const THEMES = ["paper", "midnight", "tokyo", "forest"], RATINGS = ["again", "hard", "good"];
   const MAX_TIMESTAMP = 8640000000000000, PERSONAL_KEYS = ["notes", "review"];
+  const NOJI_DECK = /^noji-[a-f0-9]{16}$/;
   const TEXT_DETAIL_KEYS = ["japanese", "jpan", "kana", "romaji", "english", "german", "audioUrl"];
   const DETAIL_KEYS = [...TEXT_DETAIL_KEYS, "clozeTarget"];
-  const RECORD_KEYS = ["kind", "courseId", "courseTitle", "sourceId", ...DETAIL_KEYS, "context", ...PERSONAL_KEYS, "key", "createdAt", "updatedAt"];
+  const RECORD_KEYS = ["kind", "courseId", "courseTitle", "sourceId", "script", "cardMode", ...DETAIL_KEYS, "context", ...PERSONAL_KEYS, "key", "createdAt", "updatedAt"];
   const HOSTS = new Set(["iknow.jp", "en.iknow.jp", "ja.iknow.jp", "assets.iknow.jp", "assets0.iknow.jp", "assets1.iknow.jp", "assets2.iknow.jp", "assets3.iknow.jp"]);
   const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const object = value => value !== null && typeof value === "object" && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value));
@@ -25,7 +26,7 @@
     if (!object(value) || Object.keys(value).some(key => !keys.includes(key))) throw Error(message);
   }
   function preferences(value) {
-    onlyKeys(value, ["attempts", "gapPosition"], "Choose valid Study preferences.");
+    onlyKeys(value, ["attempts", "gapPosition", "showRomaji"], "Choose valid Study preferences.");
     if (!Object.keys(value).length) throw Error("Choose a Study preference to change.");
     const result = {};
     if (own(value, "attempts")) {
@@ -36,13 +37,17 @@
       if (!["first", "random"].includes(value.gapPosition)) throw Error("Choose First word or Random word.");
       result.gapPosition = value.gapPosition;
     }
+    if (own(value, "showRomaji")) {
+      if (typeof value.showRomaji !== "boolean") throw Error("Choose whether Romaji stays visible.");
+      result.showRomaji = value.showRomaji;
+    }
     return result;
   }
   function storedPreferences(value) {
     try { return { ...DEFAULT_PREFERENCES, ...preferences(value) }; } catch { return { ...DEFAULT_PREFERENCES }; }
   }
   function validKey(key) {
-    if (typeof key !== "string" || key.length > 130 || !/^(word|sentence):[1-9]\d{0,9}:[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(key)) throw Error("Choose a valid saved study item.");
+    if (typeof key !== "string" || key.length > 130 || !/^(word|sentence):(?:[1-9]\d{0,9}:[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}|noji-[a-f0-9]{16}:[a-f0-9]{32})$/.test(key)) throw Error("Choose a valid saved study item.");
     return key;
   }
   function notes(value) {
@@ -88,9 +93,19 @@
   }
   function validate(input) {
     if (!object(input) || !["word", "sentence"].includes(input.kind)) throw Error("Choose a word or sentence to save.");
-    const id = courseId(input.courseId), sourceId = text(input.sourceId, 100, true);
+    const imported = isImportedDeck(input.courseId);
+    const id = imported ? input.courseId : courseId(input.courseId), sourceId = text(input.sourceId, 100, true);
     if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(sourceId)) throw Error("The study item has no stable source identifier.");
     const result = { kind: input.kind, courseId: id, courseTitle: text(input.courseTitle, 500), sourceId, ...details(input) };
+    if (imported && (!/^[a-f0-9]{32}$/.test(sourceId) || !result.courseTitle || !(result.english || result.german) || result.audioUrl || input.context !== undefined)) throw Error("This imported card is invalid.");
+    if (own(input, "cardMode")) {
+      if (!imported || input.cardMode !== "original" || !own(input, "script") && (result.kana || result.romaji) || result.jpan || result.clozeTarget) throw Error("This original card is invalid.");
+      result.cardMode = "original";
+    }
+    if (own(input, "script")) {
+      if (!imported || input.script !== "romaji" || !validRomaji(result.japanese) || result.romaji !== result.japanese || result.kana && !validKana(result.kana)) throw Error("This Romaji card is invalid.");
+      result.script = "romaji";
+    }
     if (input.context !== undefined) result.context = details(input.context);
     if (result.kind === "word" && result.context?.clozeTarget && result.context.clozeTarget.vocabulary !== result.japanese) throw Error("The saved example belongs to another vocabulary word.");
     if (own(input, "notes")) result.notes = notes(input.notes);
@@ -98,6 +113,41 @@
     return result;
   }
   function makeKey(input) { const value = validate(input); return `${value.kind}:${value.courseId}:${value.sourceId}`; }
+  function isImportedDeck(id) { return typeof id === "string" && NOJI_DECK.test(id); }
+  function validRomaji(value) {
+    return /[a-z]/iu.test(value.normalize("NFKC")) && /^[a-zāīūēōâîûêô0-9\s.,!?:;'’‘()（）\[\]/-]+$/iu.test(value.normalize("NFKC"));
+  }
+  function validKana(value) {
+    return /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value) && /^[\p{Script=Hiragana}\p{Script=Katakana}\p{M}ー0-9\s。、・！？!?.,:;：；「」『』()（）\[\]/-]+$/u.test(value);
+  }
+  async function importDigest(value, length) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest).slice(0, length / 2), byte => byte.toString(16).padStart(2, "0")).join("");
+  }
+  async function importedCards(input) {
+    onlyKeys(input, ["title", "kind", "language", "cards"], "Choose a valid Noji deck.");
+    const title = text(input.title, 120, true).normalize("NFC");
+    if (/[\r\n\t]/u.test(title) || (own(input, "kind") && !["word", "sentence"].includes(input.kind)) || !["en", "de"].includes(input.language) || !Array.isArray(input.cards) ||
+        !input.cards.length || input.cards.length > MAX_RECORDS || bytes(input) > MAX_BYTES) throw Error("Choose a valid Noji deck with up to 2,000 cards.");
+    const courseId = "noji-" + await importDigest(title, 16);
+    const records = await Promise.all(input.cards.map(async card => {
+      onlyKeys(card, ["japanese", "meaning", "kind", "script", "cardMode", "kana", "notes"], "An imported card is invalid.");
+      const kind = own(card, "kind") ? card.kind : input.kind;
+      if (!["word", "sentence"].includes(kind)) throw Error("Choose a word or sentence for each imported card.");
+      const japanese = text(card.japanese, 5000, true).normalize("NFC"), meaning = text(card.meaning, 5000).normalize("NFC");
+      const roman = card.script === "romaji";
+      const original = card.cardMode === "original";
+      if (own(card, "cardMode") && !original || own(card, "script") && !roman || !original && !(roman ? validRomaji(japanese) : /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u.test(japanese)) || !meaning) throw Error("Each imported card needs two complete sides.");
+      const sourceId = await importDigest(JSON.stringify([input.language, japanese, meaning]), 32);
+      const extra = {};
+      if (original) extra.cardMode = "original";
+      if (roman) { extra.script = "romaji"; extra.romaji = japanese; }
+      if (own(card, "kana")) extra.kana = text(card.kana, 5000);
+      if (own(card, "notes")) extra.notes = notes(card.notes);
+      return validate({ kind, courseId, courseTitle: title, sourceId, japanese, [input.language === "de" ? "german" : "english"]: meaning, ...extra });
+    }));
+    return { courseId, records };
+  }
   function library(value) {
     if (value === undefined) return { schemaVersion: 1, records: {} };
     if (!object(value) || value.schemaVersion !== 1 || !object(value.records) || Object.keys(value.records).length > MAX_RECORDS) throw Error("Your study library could not be read. Its existing data has been kept.");
@@ -211,6 +261,34 @@
           await storage.set({ [KEY]: data }); return record;
         });
       },
+      async importCards(input) {
+        const { courseId, records } = await importedCards(input);
+        return transaction(async () => {
+          const data = await read(), timestamp = now(); let added = 0, updated = 0;
+          const existing = new Map(Object.values(data.records).filter(record => record.courseId === courseId).map(record => [record.sourceId, record]));
+          for (const item of records) {
+            const previous = existing.get(item.sourceId);
+            if (previous) {
+              if (item.cardMode !== previous.cardMode) {
+                const changed = { ...item, kind: previous.kind, key: previous.key, createdAt: previous.createdAt, updatedAt: timestamp };
+                if (item.cardMode === "original" && previous.script === "romaji" && previous.kana) Object.assign(changed, { script: previous.script, romaji: previous.romaji, kana: previous.kana });
+                for (const key of PERSONAL_KEYS) if (own(previous, key)) changed[key] = previous[key];
+                data.records[previous.key] = changed; existing.set(item.sourceId, changed); updated++;
+              } else if (item.script === "romaji" && previous.script === "romaji" && !previous.kana && item.kana) {
+                previous.kana = item.kana; previous.updatedAt = timestamp; updated++;
+              }
+              continue;
+            }
+            const key = makeKey(item);
+            data.records[key] = { ...item, key, createdAt: timestamp, updatedAt: timestamp };
+            existing.set(item.sourceId, data.records[key]);
+            added++;
+          }
+          bounded(data);
+          if (added || updated) await storage.set({ [KEY]: data });
+          return { courseId, added, skipped: records.length - added, ...(updated ? { updated } : {}) };
+        });
+      },
       remove(key) {
         try { validKey(key); } catch (error) { return Promise.reject(error); }
         return transaction(async () => { const data = await read(); delete data.records[key]; await storage.set({ [KEY]: data }); return true; });
@@ -246,6 +324,7 @@
           const data = await read(); let enriched = 0;
           for (const value of incoming) {
             const key = makeKey(value), previous = data.records[key]; if (!previous) continue;
+            if (previous.cardMode === "original") continue;
             const record = { ...previous };
 
             for (const field of ["courseTitle", ...TEXT_DETAIL_KEYS]) if (!record[field] && value[field]) record[field] = value[field];
@@ -325,7 +404,7 @@
   }
   async function list(options = {}) {
     const data = library((await chrome.storage.local.get(KEY))[KEY]);
-    const selected = options.courseId ? courseId(options.courseId) : null;
+    const selected = options.courseId && (isImportedDeck(options.courseId) ? options.courseId : courseId(options.courseId));
     const records=Object.values(data.records).filter(record => !selected || record.courseId === selected);
     return records.sort(options.order === "added" ? (a, b) => a.createdAt - b.createdAt : (a, b) => b.updatedAt - a.updatedAt || a.key.localeCompare(b.key));
   }
@@ -340,6 +419,7 @@
     const backend = createBackend(chrome.storage.local);
     chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const privateCommands = ["ikr:study:notes", "ikr:study:rate", "ikr:study:backup:export", "ikr:study:backup:preview", "ikr:study:backup:import", "ikr:study:preferences:get", "ikr:study:preferences:set", "ikr:study:delete-many", "ikr:study:clear", "ikr:study:restore-deleted", "ikr:study:enrich"];
+      privateCommands.push("ikr:study:import-cards");
       if (!["ikr:study:save", "ikr:study:remove", "ikr:study:open", ...privateCommands].includes(message?.type)) return;
       let sourceCourse = null, trusted = false, studyPage = false;
       try {
@@ -354,6 +434,7 @@
       if (privateCommands.includes(message.type) && !studyPage) { respond({ ok: false, message: "Open Your study space to manage notes, reviews and backups." }); return; }
       if (!trusted) { respond({ ok: false, message: "Study changes are only available from Reading Helper or an iKnow course." }); return; }
       const operation = async () => {
+        if (message.type === "ikr:study:import-cards") return { ok: true, summary: await backend.importCards(message.deck) };
         if (message.type === "ikr:study:delete-many") return { ok: true, deleted: await backend.removeMany(message.keys) };
         if (message.type === "ikr:study:clear") return { ok: true, deleted: await backend.clearLibrary(message.options) };
         if (message.type === "ikr:study:restore-deleted") return { ok: true, summary: await backend.restoreDeleted(message.records) };
@@ -385,6 +466,7 @@
     });
   }
   const api = Object.freeze({ KEY, PREFERENCES_KEY, MAX_RECORDS, MAX_BYTES, MAX_BACKUP_BYTES, BACKUP_FORMAT, validate, makeKey, audioUrl, list, serialize,
+    isImportedDeck, validKey, importCards: deck => command("import-cards", { deck }),
     getPreferences: () => command("preferences:get"), setPreferences: value => command("preferences:set", { preferences: preferences(value) }),
     save: record => command("save", { record: validate(record) }), remove: key => command("remove", { key }),
     removeMany: keys => command("delete-many", { keys: selectedKeys(keys) }), clearLibrary: options => command("clear", { options }),

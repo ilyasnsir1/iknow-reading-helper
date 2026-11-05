@@ -14,8 +14,7 @@
     if (!object(value) || Object.keys(value).some(key => !allowed.includes(key))) throw Error(error);
   }
   function key(value) {
-    if (typeof value !== "string" || value.length > 130 || !/^(word|sentence):[1-9]\d{0,9}:[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(value)) throw Error("Choose a valid study item.");
-    return value;
+    return Study.validKey(value);
   }
   function sessionId(value) {
     if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(value)) throw Error("This practice session is not valid.");

@@ -135,8 +135,8 @@
     dialog = el("dialog", "changelog-editor"); dialog.id = "changelog-editor"; dialog.setAttribute("aria-labelledby", "editor-title");
     const head = el("header", "editor-head"), copy = el("div"), title = el("h2", "", "Edit changelog"); title.id = "editor-title";
     copy.append(title, el("p", "", "Keep it short. One change per bullet."));
-    const close = action("", discard, "editor-close"); close.setAttribute("aria-label", "Close editor");
-    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"), path = document.createElementNS(ns, "path"); svg.setAttribute("viewBox", "0 0 20 20"); path.setAttribute("d", "m6 6 8 8M14 6l-8 8"); svg.append(path); close.append(svg); head.append(copy, close);
+    const close = action("Close", discard, "editor-close"); close.setAttribute("aria-label", "Close editor");
+    head.append(copy, close);
     const body = el("div", "editor-body"), aside = el("aside", "editor-sidebar"); sidebar = el("div", "editor-entry-list");
     aside.append(sidebar, action("Add entry", () => { readForm(); working.entries.unshift({ id: "update-" + Date.now().toString(36), version: null, status: "unreleased", date: null, title: "New update", summary: "", changes: [{ type: "added", title: "New change", description: "", details: [], images: [] }] }); selected = 0; renderForm(); }, "editor-action editor-new-entry"));
     form = el("div", "editor-form"); body.append(aside, form);

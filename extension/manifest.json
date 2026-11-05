@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "iKnow! Reading Helper",
-  "version": "1.41.3",
+  "version": "1.42.0",
   "description": "Romaji, meaning colors, German translations and word audio for iKnow Japanese courses.",
   "permissions": [
     "storage",
@@ -55,7 +55,6 @@
         "https://ja.iknow.jp/courses/*"
       ],
       "js": [
-        "theme.js",
         "update-presence.js",
         "diagnostic-page-errors.js",
         "core.js",
@@ -84,7 +83,6 @@
         "content.js"
       ],
       "css": [
-        "theme.css",
         "content.css",
         "automation.css",
         "series.css",
@@ -105,7 +103,6 @@
         "https://ja.iknow.jp/content/japanese/series/*"
       ],
       "js": [
-        "theme.js",
         "update-presence.js",
         "diagnostic-page-errors.js",
         "core.js",
@@ -113,11 +110,31 @@
         "series.js"
       ],
       "css": [
-        "theme.css",
         "series.css",
         "theme-content.css"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://iknow.jp/courses/*",
+        "https://en.iknow.jp/courses/*",
+        "https://ja.iknow.jp/courses/*",
+        "https://iknow.jp/series/*",
+        "https://en.iknow.jp/series/*",
+        "https://ja.iknow.jp/series/*",
+        "https://iknow.jp/content/japanese/series/*",
+        "https://en.iknow.jp/content/japanese/series/*",
+        "https://ja.iknow.jp/content/japanese/series/*"
+      ],
+      "js": [
+        "theme.js"
+      ],
+      "css": [
+        "theme.css",
+        "theme-website.css"
+      ],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [

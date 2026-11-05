@@ -82,7 +82,9 @@ const tick=()=>new Promise(resolve=>setTimeout(resolve,180));
   await late.evaluate(()=>releaseInitialThemeRead());await late.evaluate(()=>IKnowReaderTheme.ready);assert.equal(await late.locator("html").getAttribute("data-ikr-theme"),"forest");
   await late.close();await study.evaluate(()=>IKnowReaderTheme.choose("tokyo"));await until(async()=>await popup.locator("html").getAttribute("data-ikr-theme")==="tokyo","restore reviewed palette");
   console.log("PASS A delayed initial preference snapshot cannot overwrite a newer cross-page theme event");
-  await popup.bringToFront();await popup.locator('.ikr-theme-trigger').focus();await popup.keyboard.press('ArrowDown');await popup.locator('.ikr-theme-options').waitFor({state:'visible'});
+   await popup.bringToFront();
+   const themeTrigger=popup.locator('.ikr-theme-trigger');
+   await themeTrigger.scrollIntoViewIfNeeded();await tick();await themeTrigger.press('ArrowDown');await popup.locator('.ikr-theme-options').waitFor({state:'visible'});
   const swatches=await popup.locator('.ikr-theme-options svg.ikr-theme-swatch').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect(),circle=node.querySelector('circle');return{width:r.width,height:r.height,round:circle?.getAttribute('r'),background:getComputedStyle(node).backgroundImage};}));
   assert.equal(swatches.length,4);for(const swatch of swatches){assert.equal(swatch.width,swatch.height);assert.ok(swatch.width>=18,JSON.stringify(swatches));assert.equal(swatch.round,'9');assert.equal(swatch.background,'none');}
   await popup.keyboard.press('Escape');
@@ -90,18 +92,30 @@ const tick=()=>new Promise(resolve=>setTimeout(resolve,180));
   assert.equal(await divider.evaluate(e=>getComputedStyle(e).borderTopColor),await popup.locator('.colors-card').evaluate(e=>getComputedStyle(e).borderTopColor),'Understanding divider uses the theme border instead of an original white separator');
   await course.mouse.move(0,0);await tick();
   for(const handle of await course.locator('.ikr-panel-handle').all())assert.equal(await handle.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)','idle drag handles remain transparent');
-  await study.locator('[data-action="reveal-reading"]').hover();assert.equal(await study.locator('[data-action="reveal-reading"]').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
-  assert.ok(await study.locator('[data-action="reveal-reading"]').evaluate(e=>parseFloat(getComputedStyle(e).paddingLeft)>=6),'Romaji reveal text has breathing room without a filled pill');
-  console.log('PASS Theme dots are round SVG artwork, the Understanding divider uses the dark palette, idle drag handles are transparent, and Romaji reveal remains a spacious text action');
+  assert.equal(await study.locator('[data-action="reveal-reading"]').count(),0,'iKnow readings reveal through the word tokens without a Show/Hide action');
+  console.log('PASS Theme dots are round SVG artwork, the Understanding divider uses the dark palette, idle drag handles are transparent, and iKnow readings have no extra Show/Hide action');
   const search=study.locator('#demo-search');await search.click();assert.equal(await search.evaluate(e=>getComputedStyle(e).outlineStyle),"none");assert.match(await search.evaluate(e=>getComputedStyle(e).boxShadow),/inset/,'Text input focus remains inside the field');
-  await study.locator('[data-action="delete-all"]').focus();await study.keyboard.press('Tab');assert.equal(await search.evaluate(e=>e===document.activeElement),true);assert.match(await search.evaluate(e=>getComputedStyle(e).boxShadow),/inset/,'Keyboard focus remains visible inside the field');
+   await study.locator('[data-action="delete-all"]').focus();
+   for(const source of ['all','iknow','noji']){
+     await study.keyboard.press('Tab');
+     assert.equal(await study.evaluate(()=>document.activeElement.dataset.librarySource),source);
+   }
+   await study.keyboard.press('Tab');assert.equal(await search.evaluate(e=>e===document.activeElement),true);assert.match(await search.evaluate(e=>getComputedStyle(e).boxShadow),/inset/,'Keyboard focus remains visible inside the field');
   const remove=study.locator('.focus-study-actions [data-action="delete"]');await remove.hover();const deleteLayout=await remove.evaluate(e=>{const a=e.getBoundingClientRect(),b=e.querySelector("svg").getBoundingClientRect(),text=[...e.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim()),range=document.createRange();range.selectNodeContents(text);const label=range.getBoundingClientRect();return{vertical:Math.abs(a.y+a.height/2-b.y-b.height/2),gap:label.left-b.right,text:text.textContent.trim(),inside:label.right<a.right};});assert.ok(deleteLayout.vertical<=.5);assert.ok(deleteLayout.gap>=5&&deleteLayout.gap<=9);assert.equal(deleteLayout.text,"Delete");assert.equal(deleteLayout.inside,true);
-  await study.locator('[data-action="backup"]').click();const closeCenter=await study.locator('.focus-backup-close').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.querySelector("svg").getBoundingClientRect();return Math.max(Math.abs(a.x+a.width/2-b.x-b.width/2),Math.abs(a.y+a.height/2-b.y-b.height/2));});assert.ok(closeCenter<=.5);await study.locator('.focus-backup-close').click();
+   await study.locator('[data-action="backup"]').click();
+   const close=study.locator('.focus-backup-close');assert.equal(await close.innerText(),'Close');assert.equal(await close.locator('svg').count(),0);
+   const closeCenter=await close.evaluate(button=>{
+     const box=button.getBoundingClientRect(),range=document.createRange();
+     range.selectNodeContents(button);
+     const text=range.getBoundingClientRect();
+     return {x:Math.abs(box.x+box.width/2-text.x-text.width/2),y:Math.abs(box.y+box.height/2-text.y-text.height/2)};
+   });
+   assert.ok(closeCenter.x<=.5&&closeCenter.y<=1.5,JSON.stringify(closeCenter));await close.click();
   const courseFilter=study.locator('#demo-course');assert.match(await courseFilter.locator('option[value="19053"]').innerText(),/Step 4/);assert.match(await courseFilter.locator('option[value="19054"]').innerText(),/Everyday Japanese/);
   assert.ok(await courseFilter.evaluate(e=>{const s=getComputedStyle(e),box=e.getBoundingClientRect();return parseFloat(s.paddingLeft)>=9&&parseFloat(s.paddingRight)>=24&&box.width<=300;}),'The native library filter remains compact with room for its arrow and long source title');
   await study.evaluate(()=>{globalThis.testCourseChanges=0;document.getElementById("demo-course").addEventListener("change",()=>testCourseChanges++);});
   await courseFilter.focus();await study.keyboard.press("End");await study.keyboard.press("Enter");assert.equal(await courseFilter.inputValue(),"19054");assert.equal(await study.evaluate(()=>testCourseChanges),1);
-  console.log("PASS Search distinguishes pointer and keyboard focus, Delete aligns its icon and text, the backup close SVG stays centered, and the native course filter retains long titles and keyboard selection");
+   console.log("PASS Search distinguishes pointer and keyboard focus, Delete aligns its icon and text, the backup Close text stays centered, and the native course filter retains long titles and keyboard selection");
   const snapshot=locator=>locator.evaluate(e=>{const s=getComputedStyle(e);return[s.backgroundColor,s.borderColor,s.color,s.opacity];});
   await study.locator('[data-action="compare"]').click();await study.locator('[data-compare-action="take"]').waitFor();await tick();const disabled=study.locator('[data-compare-action="take"]'),disabledBefore=await snapshot(disabled);await disabled.hover();await tick();assert.deepEqual(await snapshot(disabled),disabledBefore);
   const bookmark=course.locator(".ikr-study-tools button").first();await course.mouse.move(0,0);const rest=await snapshot(bookmark),opacity=await bookmark.evaluate(e=>getComputedStyle(e.parentElement).opacity);

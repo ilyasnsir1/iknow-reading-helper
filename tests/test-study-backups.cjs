@@ -52,7 +52,7 @@ function saved(input, updatedAt = 123) {
   assert.equal(exported.format, Store.BACKUP_FORMAT); assert.equal(exported.schemaVersion, 1);
   assert.equal(exported.library.records[key].notes, "updated"); assert.equal(exported.library.records[key].review.lastRating, "again");
   assert.deepEqual(exported.learning, { records: {} }, "Backups contain progress without an active session");
-  assert.deepEqual(exported.settings, { reading: settings, appTheme: "tokyo", panelTheme: "forest", study: { attempts: "single", gapPosition: "random" } });
+  assert.deepEqual(exported.settings, { reading: settings, appTheme: "tokyo", panelTheme: "forest", study: { attempts: "single", gapPosition: "random", showRomaji: false } });
   assert.doesNotMatch(JSON.stringify(exported), /secretCredential|publisherKey|nativeConfig|courseCache|must not leave/);
   assert.equal(exporting.writes.length, 0);
 
@@ -79,10 +79,10 @@ function saved(input, updatedAt = 123) {
   assert.deepEqual(Object.keys(importing.writes[1]).sort(), [Store.KEY, Core.STORAGE_KEY, "iknowReaderTheme", "iknowReaderPanelTheme", Store.PREFERENCES_KEY, LearningStore.KEY].sort());
   assert.equal(importing.data.iknowReaderTheme, "tokyo"); assert.equal(importing.data.iknowReaderPanelTheme, "forest");
   assert.equal(importing.data[Core.STORAGE_KEY].romajiStyle, "spoken");
-  assert.deepEqual(importing.data[Store.PREFERENCES_KEY], { attempts: "single", gapPosition: "random" });
+  assert.deepEqual(importing.data[Store.PREFERENCES_KEY], { attempts: "single", gapPosition: "random", showRomaji: false });
   const legacy = clone(incoming); delete legacy.settings.study;
   await importing.backend.importBackup(legacy, { includeSettings: true });
-  assert.deepEqual(importing.data[Store.PREFERENCES_KEY], { attempts: "single", gapPosition: "random" }, "Old backups must not reset attempts");
+  assert.deepEqual(importing.data[Store.PREFERENCES_KEY], { attempts: "single", gapPosition: "random", showRomaji: false }, "Old backups must not reset attempts");
   assert.equal((await importing.backend.previewBackup(backup({}))).hasSettings, false);
 
   const poisonCases = [
@@ -171,9 +171,9 @@ function saved(input, updatedAt = 123) {
   const beforeDenied = messaging.data, writesBeforeDenied = messaging.writes.length;
   for (const sender of untrusted) for (const message of privateMessages) assert.equal((await dispatch(message, sender)).ok, false);
   assert.deepEqual(messaging.data, beforeDenied); assert.equal(messaging.writes.length, writesBeforeDenied);
-  assert.deepEqual(await Store.getPreferences(), { attempts: "retry", gapPosition: "random" });
-  assert.deepEqual(await Store.setPreferences({ attempts: "single" }), { attempts: "single", gapPosition: "random" });
-  assert.deepEqual(await Store.getPreferences(), { attempts: "single", gapPosition: "random" });
+  assert.deepEqual(await Store.getPreferences(), { attempts: "retry", gapPosition: "random", showRomaji: false });
+  assert.deepEqual(await Store.setPreferences({ attempts: "single" }), { attempts: "single", gapPosition: "random", showRomaji: false });
+  assert.deepEqual(await Store.getPreferences(), { attempts: "single", gapPosition: "random", showRomaji: false });
   assert.equal((await Store.updateNotes(key, "allowed note")).notes, "allowed note");
   assert.equal((await Store.rate(key, "hard")).review.lastRating, "hard");
   const publicBackup = await Store.exportBackup(); assert.equal(publicBackup.library.records[key].notes, "allowed note");

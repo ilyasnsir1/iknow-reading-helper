@@ -42,6 +42,8 @@
     if (plan && validVersion(plan.version)) markers.autoRefreshPlan = { version: plan.version,
       remaining: Array.isArray(plan.remaining) ? [...new Set(plan.remaining.filter(id => Number.isInteger(id) && id >= 0))].slice(0, 2000) : [],
       claimed: Array.isArray(plan.claimed) ? [...new Set(plan.claimed.filter(id => Number.isInteger(id) && id >= 0))].slice(0, 2000) : [] };
+    const restore = globalThis.IKnowReaderUpdateRefresh?.normalizeExtensionPlan(chrome, value?.extensionTabRestore);
+    if (restore) markers.extensionTabRestore = restore;
     return markers;
   }
   function trusted(sender) {
@@ -110,13 +112,14 @@
         refreshTabs: state.autoRefreshCompleteVersion !== target, message: state.autoRefreshCompleteVersion === target ? "Your iKnow pages are up to date." : "Updated. Refreshing your open iKnow pages…" });
       await refresher?.run(); return;
     }
+    if (reloadScheduled) return;
     if (state.reloadedVersion === target) {
       await save({ status: "error", refreshTabs: false, message: "The update files are installed, but Brave is still running the previous version. Reload Reading Helper at brave://extensions, then reopen this popup." }); return;
     }
-    if (reloadScheduled) return;
     reloadScheduled = true;
+    const extensionTabRestore = await refresher?.captureExtensionTabs(target) || null;
     await save({ status: "complete", reloadedVersion: target, autoRefreshTarget: target, autoRefreshPlan: null, changelogTarget: target,
-      refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
+      extensionTabRestore, refreshTabs: true, message: "Update installed. Reloading Reading Helper…" });
     setTimeout(() => chrome.runtime.reload(), 500);
   }
   async function pollOnce() {
